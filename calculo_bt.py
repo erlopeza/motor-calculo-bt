@@ -1,12 +1,11 @@
 # ============================================================
-# Motor de Cálculo BT — Bloque 4: Exportar reporte
+# Motor de Cálculo BT — Bloque 5: Leer desde Excel
 # Proyecto: Herramienta para proyectos eléctricos
 # Sistema: 380V / 3P+N / 50Hz
 # ============================================================
 
-# datetime permite obtener la fecha y hora actual
-# Lo usaremos para el nombre del archivo y el encabezado del reporte
 from datetime import datetime
+import openpyxl   # librería para leer/escribir archivos Excel
 
 # --- CONSTANTES ---
 V_NOMINAL = 380
@@ -53,83 +52,116 @@ def clasificar_caida(dV_pct):
     else:
         return "FALLA — redimensionar conductor"
 
-def mostrar_conductores():
-    """Muestra la tabla de conductores disponibles."""
-    print("\n  Conductores disponibles:")
-    print("  " + "-" * 40)
-    for nombre, datos in CONDUCTORES.items():
-        print(f"  {nombre:8} → {datos['mm2']:6} mm²  |  {datos['I_max']} A máx")
-    print("  " + "-" * 40)
+# --- FUNCIÓN DE LECTURA EXCEL ---
 
-def ingresar_circuito(numero):
-    """Solicita datos de un circuito por teclado."""
-    print(f"\n  === CIRCUITO {numero} ===")
-    nombre    = input("  Nombre del circuito : ").strip()
-    mostrar_conductores()
-    conductor = input("  Conductor (ej: 6AWG): ").strip().upper()
-    while conductor not in CONDUCTORES:
-        print(f"  ⚠ '{conductor}' no existe.")
-        conductor = input("  Conductor           : ").strip().upper()
-    I_diseno = float(input("  Corriente diseño (A): "))
-    cos_phi  = float(input("  Factor de potencia  : "))
-    L_m      = float(input("  Longitud cable (m)  : "))
-    return {
-        "nombre":    nombre,
-        "conductor": conductor,
-        "S_mm2":     CONDUCTORES[conductor]["mm2"],
-        "I_max":     CONDUCTORES[conductor]["I_max"],
-        "I_diseno":  I_diseno,
-        "cos_phi":   cos_phi,
-        "L_m":       L_m,
-    }
+def leer_circuitos_excel(nombre_archivo):
+    """
+    Lee los circuitos desde un archivo Excel.
+    Estructura esperada:
+        Columna A → nombre
+        Columna B → conductor
+        Columna C → I_diseno
+        Columna D → cos_phi
+        Columna E → L_m
+    La fila 1 es el encabezado — se omite.
+    Retorna lista de diccionarios con los datos de cada circuito.
+    """
+    circuitos = []   # lista vacía donde guardaremos los circuitos
+    errores   = []   # lista para registrar filas con problemas
 
-# --- FUNCIÓN DE REPORTE ---
-# Recibe la lista de circuitos y el nombre del proyecto
-# Genera las líneas del reporte como texto
-# Retorna una lista de líneas — así podemos mostrar Y guardar
+    # Abrir el archivo Excel
+    # data_only=True lee los valores calculados, no las fórmulas
+    libro = openpyxl.load_workbook(nombre_archivo, data_only=True)
+
+    # Seleccionar la primera hoja del libro
+    hoja = libro.active
+
+    print(f"\n  Leyendo: {nombre_archivo}")
+    print(f"  Filas encontradas: {hoja.max_row - 1} circuitos")
+    print()
+
+    # Recorrer filas desde la 2 (fila 1 es encabezado)
+    # hoja.iter_rows() recorre fila por fila
+    # min_row=2 salta el encabezado
+    # values_only=True devuelve solo los valores, no objetos de celda
+    for fila in hoja.iter_rows(min_row=2, values_only=True):
+
+        # Cada fila es una tupla con los valores de cada columna
+        nombre    = fila[0]   # columna A
+        conductor = fila[1]   # columna B
+        I_diseno  = fila[2]   # columna C
+        cos_phi   = fila[3]   # columna D
+        L_m       = fila[4]   # columna E
+
+        # Saltar filas vacías — puede haber filas vacías al final
+        if nombre is None:
+            continue
+
+        # Convertir conductor a mayúsculas para coincidir con la tabla
+        conductor = str(conductor).strip().upper()
+
+        # Verificar que el conductor existe en la tabla
+        if conductor not in CONDUCTORES:
+            errores.append(f"  ⚠ Fila '{nombre}': conductor '{conductor}' no existe")
+            continue
+
+        # Agregar el circuito a la lista
+        circuitos.append({
+            "nombre":    str(nombre).strip(),
+            "conductor": conductor,
+            "S_mm2":     CONDUCTORES[conductor]["mm2"],
+            "I_max":     CONDUCTORES[conductor]["I_max"],
+            "I_diseno":  float(I_diseno),
+            "cos_phi":   float(cos_phi),
+            "L_m":       float(L_m),
+        })
+
+    # Mostrar errores si los hay
+    if errores:
+        print("  ADVERTENCIAS:")
+        for e in errores:
+            print(e)
+        print()
+
+    return circuitos
+
+# --- FUNCIONES DE REPORTE ---
 
 def generar_reporte(nombre_proyecto, circuitos, fecha):
-    """
-    Genera el reporte completo como lista de líneas de texto.
-    Retorna: lista de strings y contadores ok/falla.
-    """
-    lineas     = []   # lista vacía donde iremos agregando líneas
-    total_ok   = 0
+    """Genera reporte como lista de líneas."""
+    lineas      = []
+    total_ok    = 0
     total_falla = 0
 
-    # Encabezado
     lineas.append("=" * 55)
     lineas.append(f"  REPORTE — {nombre_proyecto}")
     lineas.append(f"  Fecha  : {fecha}")
     lineas.append(f"  Sistema: {V_NOMINAL}V / 3P+N / 50Hz")
+    lineas.append(f"  Total circuitos: {len(circuitos)}")
     lineas.append("=" * 55)
 
-    # Una sección por cada circuito
     for c in circuitos:
         P_watts      = calcular_potencia(c["I_diseno"], c["cos_phi"])
         dV_V, dV_pct = calcular_caida_tension(c["L_m"], c["S_mm2"], c["I_diseno"])
         estado       = clasificar_caida(dV_pct)
 
-        # Verificar corriente vs capacidad
         if c["I_diseno"] > c["I_max"]:
-            alerta_I = f"⚠ SUPERA máx {c['I_max']}A"
+            alerta_I = f"SUPERA max {c['I_max']}A"
         else:
-            alerta_I = f"OK (máx {c['I_max']}A)"
+            alerta_I = f"OK (max {c['I_max']}A)"
 
         lineas.append("")
         lineas.append(f"  Circuito  : {c['nombre']}")
-        lineas.append(f"  Conductor : {c['conductor']} ({c['S_mm2']} mm²)")
-        lineas.append(f"  Corriente : {c['I_diseno']} A  → {alerta_I}")
+        lineas.append(f"  Conductor : {c['conductor']} ({c['S_mm2']} mm2)")
+        lineas.append(f"  Corriente : {c['I_diseno']} A  -> {alerta_I}")
         lineas.append(f"  Potencia  : {P_watts} W")
-        lineas.append(f"  Caída ΔV  : {dV_V} V  ({dV_pct} %)  → {estado}")
+        lineas.append(f"  Caida dV  : {dV_V} V  ({dV_pct} %)  -> {estado}")
 
-        # Actualizar contadores
         if "FALLA" in estado:
             total_falla += 1
         else:
             total_ok += 1
 
-    # Resumen final
     lineas.append("")
     lineas.append("=" * 55)
     lineas.append(f"  Circuitos OK    : {total_ok}")
@@ -139,46 +171,48 @@ def generar_reporte(nombre_proyecto, circuitos, fecha):
     return lineas, total_ok, total_falla
 
 def guardar_reporte(lineas, nombre_archivo):
-    """
-    Guarda la lista de líneas en un archivo .txt
-    El archivo queda en la misma carpeta que el script.
-    """
-    # with garantiza que el archivo se cierra aunque haya error
-    # "w" crea el archivo o sobreescribe si ya existe
-    # encoding="utf-8" soporta tildes y caracteres especiales
+    """Guarda reporte en archivo txt."""
     with open(nombre_archivo, "w", encoding="utf-8") as archivo:
         for linea in lineas:
-            archivo.write(linea + "\n")   # \n = salto de línea
-
-    print(f"\n  ✓ Reporte guardado: {nombre_archivo}")
+            archivo.write(linea + "\n")
+    print(f"\n  Reporte guardado: {nombre_archivo}")
 
 # ============================================================
 # PROGRAMA PRINCIPAL
 # ============================================================
 
 print("=" * 55)
-print("  MOTOR DE CÁLCULO BT")
-print("  Herramienta para proyectos eléctricos")
+print("  MOTOR DE CALCULO BT")
+print("  Herramienta para proyectos electricos")
 print(f"  Sistema: {V_NOMINAL}V / 3P+N / 50Hz")
 print("=" * 55)
 
-# Fecha y hora actual — para el reporte y el nombre del archivo
-# strftime define el formato: día/mes/año hora:minuto
-ahora = datetime.now()
-fecha = ahora.strftime("%d/%m/%Y %H:%M")
-
-# Nombre del archivo usa fecha sin caracteres especiales
-# Formato: REPORTE_PROYECTO_20260321_1430.txt
+# Fecha para el reporte y nombre del archivo
+ahora         = datetime.now()
+fecha         = ahora.strftime("%d/%m/%Y %H:%M")
 fecha_archivo = ahora.strftime("%Y%m%d_%H%M")
 
-nombre_proyecto = input("\n  Nombre del proyecto: ").strip()
-n_circuitos     = int(input("  ¿Cuántos circuitos? : "))
+# Pedir nombre del proyecto y archivo Excel
+nombre_proyecto = input("\n  Nombre del proyecto : ").strip()
+archivo_excel   = input("  Archivo Excel       : ").strip()
 
-# Ingresar circuitos
-circuitos = []
-for i in range(n_circuitos):
-    c = ingresar_circuito(i + 1)
-    circuitos.append(c)
+# Verificar que el archivo termina en .xlsx
+if not archivo_excel.endswith(".xlsx"):
+    archivo_excel = archivo_excel + ".xlsx"
+
+# Leer circuitos desde Excel
+try:
+    # try/except captura errores sin romper el programa
+    # Si el archivo no existe, muestra mensaje claro
+    circuitos = leer_circuitos_excel(archivo_excel)
+except FileNotFoundError:
+    print(f"\n  ERROR: no se encontro el archivo '{archivo_excel}'")
+    print("  Verifica que el archivo esta en la carpeta motor-calculo-bt")
+    exit()   # detiene el programa
+
+if len(circuitos) == 0:
+    print("  ERROR: no se encontraron circuitos validos en el archivo")
+    exit()
 
 # Generar reporte
 lineas, total_ok, total_falla = generar_reporte(
@@ -186,7 +220,6 @@ lineas, total_ok, total_falla = generar_reporte(
 )
 
 # Mostrar en pantalla
-print()
 for linea in lineas:
     print(linea)
 

@@ -1,0 +1,53 @@
+=======================================================
+  REPORTE — LEO-ARICA
+  Fecha  : 21/03/2026 18:41
+  Sistema: 380V / 3P+N / 50Hz
+  Total circuitos: 7
+=======================================================
+
+  Circuito  : CRAC Unit 1-A
+  Conductor : 6AWG (13.3 mm2)
+  Corriente : 63.0 A  -> OK (max 65A)
+  Potencia  : 35244 W
+  Caida dV  : 1.436 V  (0.378 %)  -> ÓPTIMO
+
+  Circuito  : CRAC Unit 1-B
+  Conductor : 6AWG (13.3 mm2)
+  Corriente : 63.0 A  -> OK (max 65A)
+  Potencia  : 35244 W
+  Caida dV  : 1.436 V  (0.378 %)  -> ÓPTIMO
+
+  Circuito  : Antenna Panel campo
+  Conductor : 2AWG (33.6 mm2)
+  Corriente : 63.0 A  -> OK (max 115A)
+  Potencia  : 35244 W
+  Caida dV  : 4.546 V  (1.196 %)  -> ÓPTIMO
+
+  Circuito  : STS Panel BUS A
+  Conductor : 1/0AWG (53.5 mm2)
+  Corriente : 63.0 A  -> OK (max 150A)
+  Potencia  : 37318 W
+  Caida dV  : 0.714 V  (0.188 %)  -> ÓPTIMO
+
+  Circuito  : STS Panel BUS B
+  Conductor : 1/0AWG (53.5 mm2)
+  Corriente : 63.0 A  -> OK (max 150A)
+  Potencia  : 37318 W
+  Caida dV  : 0.714 V  (0.188 %)  -> ÓPTIMO
+
+  Circuito  : Alimentacion UPS 1
+  Conductor : 400MCM (203.0 mm2)
+  Corriente : 500.0 A  -> SUPERA max 335A
+  Potencia  : 296172 W
+  Caida dV  : 1.12 V  (0.295 %)  -> ÓPTIMO
+
+  Circuito  : Alimentacion UPS 2
+  Conductor : 400MCM (203.0 mm2)
+  Corriente : 500.0 A  -> SUPERA max 335A
+  Potencia  : 296172 W
+  Caida dV  : 1.12 V  (0.295 %)  -> ÓPTIMO
+
+=======================================================
+  Circuitos OK    : 7
+  Circuitos FALLA : 0
+=======================================================
