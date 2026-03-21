@@ -1,0 +1,82 @@
+============================================================
+  REPORTE — LEO-ARICA-V2
+  Fecha          : 21/03/2026 19:40
+  Normativa      : SEC RIC N10 / NEC / IEC 60364
+  Limite caida   : 3.0% circuito final / 5% total
+  Total circuitos: 10
+============================================================
+
+  Circuito   : CRAC Unit 1-A
+  Sistema    : 3F / 380V | Temp: 30.0C
+  Conductor  : 6AWG (13.3 mm2)
+  Corriente  : 63.0A diseño -> OK (cap. 65.0A)
+  Potencia   : 35244 W
+  Caida dV   : 1.436 V  (0.378%)  -> ÓPTIMO
+
+  Circuito   : CRAC Unit 1-B
+  Sistema    : 3F / 380V | Temp: 30.0C
+  Conductor  : 6AWG (13.3 mm2)
+  Corriente  : 63.0A diseño -> OK (cap. 65.0A)
+  Potencia   : 35244 W
+  Caida dV   : 1.436 V  (0.378%)  -> ÓPTIMO
+
+  Circuito   : Antenna Panel campo
+  Sistema    : 3F / 380V | Temp: 35.0C
+  Conductor  : 2AWG (33.6 mm2)
+  Corriente  : 63.0A diseño -> OK (cap. 110.4A)
+  Potencia   : 35244 W
+  Caida dV   : 4.546 V  (1.196%)  -> ÓPTIMO
+
+  Circuito   : STS Panel BUS A
+  Sistema    : 3F / 380V | Temp: 30.0C
+  Conductor  : 1/0AWG (53.5 mm2)
+  Corriente  : 63.0A diseño -> OK (cap. 150.0A)
+  Potencia   : 37318 W
+  Caida dV   : 0.714 V  (0.188%)  -> ÓPTIMO
+
+  Circuito   : STS Panel BUS B
+  Sistema    : 3F / 380V | Temp: 30.0C
+  Conductor  : 1/0AWG (53.5 mm2)
+  Corriente  : 63.0A diseño -> OK (cap. 150.0A)
+  Potencia   : 37318 W
+  Caida dV   : 0.714 V  (0.188%)  -> ÓPTIMO
+
+  Circuito   : Alimentacion UPS 1
+  Sistema    : 3F / 380V | Temp: 30.0C
+  Conductor  : 4x400MCM (203.0mm2 c/u = 812.0mm2 total)
+  Corriente  : 500.0A diseño -> OK (cap. 1340.0A)
+  Potencia   : 296172 W
+  Caida dV   : 0.28 V  (0.074%)  -> ÓPTIMO
+
+  Circuito   : Alimentacion UPS 2
+  Sistema    : 3F / 380V | Temp: 30.0C
+  Conductor  : 4x400MCM (203.0mm2 c/u = 812.0mm2 total)
+  Corriente  : 500.0A diseño -> OK (cap. 1340.0A)
+  Potencia   : 296172 W
+  Caida dV   : 0.28 V  (0.074%)  -> ÓPTIMO
+
+  Circuito   : Iluminacion HUB
+  Sistema    : 1F / 220V | Temp: 35.0C
+  Conductor  : 12AWG (3.31 mm2)
+  Corriente  : 16.0A diseño -> OK (cap. 24.0A)
+  Potencia   : 3520 W
+  Caida dV   : 13.535 V  (6.152%)  -> FALLA — supera 5% total instalación
+
+  Circuito   : Tomacorriente Oficina
+  Sistema    : 1F / 220V | Temp: 30.0C
+  Conductor  : 10AWG (5.26 mm2)
+  Corriente  : 20.0A diseño -> OK (cap. 35.0A)
+  Potencia   : 4400 W
+  Caida dV   : 3.327 V  (1.512%)  -> ACEPTABLE
+
+  Circuito   : Mini Split 1-A
+  Sistema    : 2F / 220V | Temp: 30.0C
+  Conductor  : 10AWG (5.26 mm2)
+  Corriente  : 25.0A diseño -> OK (cap. 35.0A)
+  Potencia   : 4950 W
+  Caida dV   : 2.495 V  (1.134%)  -> ÓPTIMO
+
+============================================================
+  Circuitos OK    : 9
+  Circuitos FALLA : 1
+============================================================

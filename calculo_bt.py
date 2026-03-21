@@ -1,18 +1,37 @@
 # ============================================================
-# Motor de Cálculo BT — Bloque 5: Leer desde Excel
-# Proyecto: Herramienta para proyectos eléctricos
-# Sistema: 380V / 3P+N / 50Hz
+# Motor de Cálculo BT — Bloque 7: Sistema completo
+# Soporte: 1F / 2F / 3F — Paralelos — Corrección temperatura
+# Normativa: SEC RIC N°10 / NEC / IEC 60364
 # ============================================================
 
 from datetime import datetime
-import openpyxl   # librería para leer/escribir archivos Excel
+import openpyxl
 
 # --- CONSTANTES ---
-V_NOMINAL = 380
-RHO_CU    = 0.0175
-LIMITE_DV = 3.0
+RHO_CU    = 0.0175   # resistividad cobre Ω·mm²/m
+RHO_AL    = 0.028    # resistividad aluminio Ω·mm²/m
+LIMITE_DV = 3.0      # límite normativo caída de tensión %
 
-# --- TABLA DE CONDUCTORES ---
+# --- TENSIONES NOMINALES POR SISTEMA ---
+# Define la tensión de referencia para calcular % de caída
+TENSION_SISTEMA = {
+    "3F": 380,   # trifásico — tensión de línea
+    "1F": 220,   # monofásico — tensión fase-neutro
+    "2F": 220,   # bifásico — tensión fase-neutro
+}
+
+# --- FACTOR DE CAÍDA POR SISTEMA ---
+# 3F usa √3 porque la corriente circula por 3 fases
+# 1F y 2F usan 2 porque la corriente va y vuelve (ida + neutro)
+FACTOR_SISTEMA = {
+    "3F": 1.732,
+    "1F": 2.0,
+    "2F": 2.0,
+}
+
+# --- TABLA DE CONDUCTORES AWG/MCM ---
+# I_max basado en NEC Table 310.15 — XLPE/PVC 90°C en conduit
+# Temperatura de referencia: 30°C
 CONDUCTORES = {
     "14AWG":  {"mm2": 2.08,  "I_max": 20},
     "12AWG":  {"mm2": 3.31,  "I_max": 25},
@@ -29,144 +48,217 @@ CONDUCTORES = {
     "500MCM": {"mm2": 253.0, "I_max": 380},
 }
 
-# --- FUNCIONES DE CÁLCULO ---
+# --- FACTORES DE CORRECCIÓN POR TEMPERATURA ---
+# NEC Table 310.15(B)(1) — conductor XLPE 90°C
+# A mayor temperatura ambiente, menor capacidad de corriente
+FACTORES_TEMP = {
+    25: 1.04,   # más frío que referencia → más capacidad
+    30: 1.00,   # temperatura de referencia
+    35: 0.96,   # reducción 4%
+    40: 0.91,   # reducción 9%
+    45: 0.87,   # reducción 13%
+    50: 0.82,   # reducción 18%
+}
 
-def calcular_potencia(I_diseno, cos_phi):
-    """Calcula potencia activa trifásica en Watts."""
-    return round(1.732 * V_NOMINAL * I_diseno * cos_phi)
+# ============================================================
+# FUNCIONES DE CÁLCULO
+# ============================================================
 
-def calcular_caida_tension(L_m, S_mm2, I_diseno):
-    """Calcula caída de tensión trifásica en V y %."""
-    dV_V   = (1.732 * RHO_CU * L_m * I_diseno) / S_mm2
-    dV_pct = (dV_V / V_NOMINAL) * 100
+def factor_temperatura(temp_amb):
+    """
+    Retorna el factor de corrección por temperatura.
+    Si la temperatura no está en la tabla usa 1.00 (30°C).
+    """
+    return FACTORES_TEMP.get(int(temp_amb), 1.00)
+
+def capacidad_corregida(I_max, paralelos, temp_amb):
+    """
+    Calcula la capacidad real del conjunto de conductores
+    aplicando corrección por temperatura y cantidad de paralelos.
+    Capacidad = I_max × paralelos × factor_temperatura
+    """
+    factor = factor_temperatura(temp_amb)
+    return round(I_max * paralelos * factor, 1)
+
+def calcular_potencia(I_diseno, cos_phi, sistema):
+    """
+    Calcula potencia activa según el tipo de sistema.
+    3F: P = √3 × V × I × cosφ
+    1F/2F: P = V × I × cosφ
+    """
+    V = TENSION_SISTEMA.get(sistema, 380)
+    if sistema == "3F":
+        P = 1.732 * V * I_diseno * cos_phi
+    else:
+        P = V * I_diseno * cos_phi
+    return round(P)
+
+def calcular_caida_tension(L_m, S_mm2, I_diseno, paralelos, sistema):
+    """
+    Calcula caída de tensión según el tipo de sistema.
+    Incorpora conductores en paralelo aumentando la sección equivalente.
+    Retorna caída en V y en %.
+    """
+    # Sección equivalente total con paralelos
+    # Más paralelos = más sección = menos caída
+    S_eq   = S_mm2 * paralelos
+
+    # Factor según sistema (1.732 para 3F, 2.0 para 1F/2F)
+    factor = FACTOR_SISTEMA.get(sistema, 1.732)
+
+    # Tensión nominal para calcular el porcentaje
+    V_nom  = TENSION_SISTEMA.get(sistema, 380)
+
+    # Fórmula de caída de tensión
+    dV_V   = (factor * RHO_CU * L_m * I_diseno) / S_eq
+    dV_pct = (dV_V / V_nom) * 100
+
     return round(dV_V, 3), round(dV_pct, 3)
 
 def clasificar_caida(dV_pct):
-    """Clasifica estado normativo según caída de tensión."""
+    """Clasifica estado normativo según SEC RIC N°10 / IEC 60364."""
     if dV_pct <= 1.5:
         return "ÓPTIMO"
     elif dV_pct <= 3.0:
         return "ACEPTABLE"
     elif dV_pct <= 5.0:
-        return "PRECAUCIÓN"
+        return "PRECAUCIÓN — supera 3% circuito final"
     else:
-        return "FALLA — redimensionar conductor"
+        return "FALLA — supera 5% total instalación"
 
-# --- FUNCIÓN DE LECTURA EXCEL ---
+# ============================================================
+# LECTURA EXCEL
+# ============================================================
 
 def leer_circuitos_excel(nombre_archivo):
     """
-    Lee los circuitos desde un archivo Excel.
-    Estructura esperada:
-        Columna A → nombre
-        Columna B → conductor
-        Columna C → I_diseno
-        Columna D → cos_phi
-        Columna E → L_m
-    La fila 1 es el encabezado — se omite.
-    Retorna lista de diccionarios con los datos de cada circuito.
+    Lee circuitos desde Excel.
+    Estructura esperada (fila 1 = encabezados):
+        A: nombre | B: sistema | C: conductor | D: paralelos
+        E: I_diseno | F: cos_phi | G: L_m | H: temp_amb
     """
-    circuitos = []   # lista vacía donde guardaremos los circuitos
-    errores   = []   # lista para registrar filas con problemas
+    circuitos = []
+    errores   = []
 
-    # Abrir el archivo Excel
-    # data_only=True lee los valores calculados, no las fórmulas
     libro = openpyxl.load_workbook(nombre_archivo, data_only=True)
-
-    # Seleccionar la primera hoja del libro
-    hoja = libro.active
+    hoja  = libro.active
 
     print(f"\n  Leyendo: {nombre_archivo}")
-    print(f"  Filas encontradas: {hoja.max_row - 1} circuitos")
-    print()
+    print(f"  Circuitos encontrados: {hoja.max_row - 1}")
 
-    # Recorrer filas desde la 2 (fila 1 es encabezado)
-    # hoja.iter_rows() recorre fila por fila
-    # min_row=2 salta el encabezado
-    # values_only=True devuelve solo los valores, no objetos de celda
     for fila in hoja.iter_rows(min_row=2, values_only=True):
+        nombre    = fila[0]
+        sistema   = fila[1]
+        conductor = fila[2]
+        paralelos = fila[3]
+        I_diseno  = fila[4]
+        cos_phi   = fila[5]
+        L_m       = fila[6]
+        temp_amb  = fila[7]
 
-        # Cada fila es una tupla con los valores de cada columna
-        nombre    = fila[0]   # columna A
-        conductor = fila[1]   # columna B
-        I_diseno  = fila[2]   # columna C
-        cos_phi   = fila[3]   # columna D
-        L_m       = fila[4]   # columna E
-
-        # Saltar filas vacías — puede haber filas vacías al final
+        # Saltar filas vacías
         if nombre is None:
             continue
 
-        # Convertir conductor a mayúsculas para coincidir con la tabla
+        # Normalizar texto
+        sistema   = str(sistema).strip().upper()
         conductor = str(conductor).strip().upper()
 
-        # Verificar que el conductor existe en la tabla
-        if conductor not in CONDUCTORES:
-            errores.append(f"  ⚠ Fila '{nombre}': conductor '{conductor}' no existe")
+        # Validar sistema
+        if sistema not in FACTOR_SISTEMA:
+            errores.append(f"'{nombre}': sistema '{sistema}' inválido (usar 1F, 2F o 3F)")
             continue
 
-        # Agregar el circuito a la lista
+        # Validar conductor
+        if conductor not in CONDUCTORES:
+            errores.append(f"'{nombre}': conductor '{conductor}' no existe en tabla")
+            continue
+
         circuitos.append({
             "nombre":    str(nombre).strip(),
+            "sistema":   sistema,
             "conductor": conductor,
             "S_mm2":     CONDUCTORES[conductor]["mm2"],
             "I_max":     CONDUCTORES[conductor]["I_max"],
+            "paralelos": int(paralelos),
             "I_diseno":  float(I_diseno),
             "cos_phi":   float(cos_phi),
             "L_m":       float(L_m),
+            "temp_amb":  float(temp_amb),
         })
 
-    # Mostrar errores si los hay
+    # Mostrar advertencias sin detener el programa
     if errores:
-        print("  ADVERTENCIAS:")
+        print("\n  ADVERTENCIAS:")
         for e in errores:
-            print(e)
-        print()
+            print(f"  ⚠ {e}")
 
     return circuitos
 
-# --- FUNCIONES DE REPORTE ---
+# ============================================================
+# GENERACIÓN DE REPORTE
+# ============================================================
 
 def generar_reporte(nombre_proyecto, circuitos, fecha):
-    """Genera reporte como lista de líneas."""
+    """Genera reporte completo como lista de líneas."""
     lineas      = []
     total_ok    = 0
     total_falla = 0
 
-    lineas.append("=" * 55)
+    # Encabezado
+    lineas.append("=" * 60)
     lineas.append(f"  REPORTE — {nombre_proyecto}")
-    lineas.append(f"  Fecha  : {fecha}")
-    lineas.append(f"  Sistema: {V_NOMINAL}V / 3P+N / 50Hz")
+    lineas.append(f"  Fecha          : {fecha}")
+    lineas.append(f"  Normativa      : SEC RIC N10 / NEC / IEC 60364")
+    lineas.append(f"  Limite caida   : {LIMITE_DV}% circuito final / 5% total")
     lineas.append(f"  Total circuitos: {len(circuitos)}")
-    lineas.append("=" * 55)
+    lineas.append("=" * 60)
 
     for c in circuitos:
-        P_watts      = calcular_potencia(c["I_diseno"], c["cos_phi"])
-        dV_V, dV_pct = calcular_caida_tension(c["L_m"], c["S_mm2"], c["I_diseno"])
+        # Calcular
+        I_cap        = capacidad_corregida(c["I_max"], c["paralelos"], c["temp_amb"])
+        P_watts      = calcular_potencia(c["I_diseno"], c["cos_phi"], c["sistema"])
+        dV_V, dV_pct = calcular_caida_tension(
+                           c["L_m"], c["S_mm2"], c["I_diseno"],
+                           c["paralelos"], c["sistema"]
+                       )
         estado       = clasificar_caida(dV_pct)
 
-        if c["I_diseno"] > c["I_max"]:
-            alerta_I = f"SUPERA max {c['I_max']}A"
+        # Verificar corriente con capacidad corregida
+        if c["I_diseno"] > I_cap:
+            alerta_I = f"SUPERA capacidad {I_cap}A"
         else:
-            alerta_I = f"OK (max {c['I_max']}A)"
+            alerta_I = f"OK (cap. {I_cap}A)"
+
+        # Descripción del sistema
+        V_nom = TENSION_SISTEMA[c["sistema"]]
+        desc_sistema = f"{c['sistema']} / {V_nom}V"
+
+        # Descripción del conductor con paralelos
+        if c["paralelos"] > 1:
+            desc_conductor = f"{c['paralelos']}x{c['conductor']} ({c['S_mm2']}mm2 c/u = {c['S_mm2']*c['paralelos']}mm2 total)"
+        else:
+            desc_conductor = f"{c['conductor']} ({c['S_mm2']} mm2)"
 
         lineas.append("")
-        lineas.append(f"  Circuito  : {c['nombre']}")
-        lineas.append(f"  Conductor : {c['conductor']} ({c['S_mm2']} mm2)")
-        lineas.append(f"  Corriente : {c['I_diseno']} A  -> {alerta_I}")
-        lineas.append(f"  Potencia  : {P_watts} W")
-        lineas.append(f"  Caida dV  : {dV_V} V  ({dV_pct} %)  -> {estado}")
+        lineas.append(f"  Circuito   : {c['nombre']}")
+        lineas.append(f"  Sistema    : {desc_sistema} | Temp: {c['temp_amb']}C")
+        lineas.append(f"  Conductor  : {desc_conductor}")
+        lineas.append(f"  Corriente  : {c['I_diseno']}A diseño -> {alerta_I}")
+        lineas.append(f"  Potencia   : {P_watts} W")
+        lineas.append(f"  Caida dV   : {dV_V} V  ({dV_pct}%)  -> {estado}")
 
-        if "FALLA" in estado:
+        if "FALLA" in estado or "SUPERA" in alerta_I:
             total_falla += 1
         else:
             total_ok += 1
 
+    # Resumen
     lineas.append("")
-    lineas.append("=" * 55)
+    lineas.append("=" * 60)
     lineas.append(f"  Circuitos OK    : {total_ok}")
     lineas.append(f"  Circuitos FALLA : {total_falla}")
-    lineas.append("=" * 55)
+    lineas.append("=" * 60)
 
     return lineas, total_ok, total_falla
 
@@ -181,48 +273,42 @@ def guardar_reporte(lineas, nombre_archivo):
 # PROGRAMA PRINCIPAL
 # ============================================================
 
-print("=" * 55)
+print("=" * 60)
 print("  MOTOR DE CALCULO BT")
-print("  Herramienta para proyectos electricos")
-print(f"  Sistema: {V_NOMINAL}V / 3P+N / 50Hz")
-print("=" * 55)
+print("  Soporte: 1F / 2F / 3F | Paralelos | Temp. ambiente")
+print("  Normativa: SEC RIC N10 / NEC / IEC 60364")
+print("=" * 60)
 
-# Fecha para el reporte y nombre del archivo
 ahora         = datetime.now()
 fecha         = ahora.strftime("%d/%m/%Y %H:%M")
 fecha_archivo = ahora.strftime("%Y%m%d_%H%M")
 
-# Pedir nombre del proyecto y archivo Excel
 nombre_proyecto = input("\n  Nombre del proyecto : ").strip()
 archivo_excel   = input("  Archivo Excel       : ").strip()
 
-# Verificar que el archivo termina en .xlsx
 if not archivo_excel.endswith(".xlsx"):
-    archivo_excel = archivo_excel + ".xlsx"
+    archivo_excel += ".xlsx"
 
-# Leer circuitos desde Excel
 try:
-    # try/except captura errores sin romper el programa
-    # Si el archivo no existe, muestra mensaje claro
     circuitos = leer_circuitos_excel(archivo_excel)
 except FileNotFoundError:
-    print(f"\n  ERROR: no se encontro el archivo '{archivo_excel}'")
-    print("  Verifica que el archivo esta en la carpeta motor-calculo-bt")
-    exit()   # detiene el programa
-
-if len(circuitos) == 0:
-    print("  ERROR: no se encontraron circuitos validos en el archivo")
+    print(f"\n  ERROR: no se encontro '{archivo_excel}'")
+    print("  Verifica que el archivo esta en la carpeta del proyecto")
     exit()
 
-# Generar reporte
+if len(circuitos) == 0:
+    print("  ERROR: no se encontraron circuitos validos")
+    exit()
+
+# Generar y mostrar reporte
 lineas, total_ok, total_falla = generar_reporte(
     nombre_proyecto, circuitos, fecha
 )
 
-# Mostrar en pantalla
+print()
 for linea in lineas:
     print(linea)
 
-# Guardar en archivo
+# Guardar reporte
 nombre_archivo = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.txt"
 guardar_reporte(lineas, nombre_archivo)
