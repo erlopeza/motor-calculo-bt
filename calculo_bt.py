@@ -7,6 +7,7 @@
 
 from datetime import datetime
 import openpyxl
+import sys
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 # --- CONSTANTES ---
@@ -387,11 +388,11 @@ try:
     circuitos = leer_circuitos_excel(archivo_excel)
 except FileNotFoundError:
     print(f"\n  ERROR: no se encontro '{archivo_excel}'")
-    exit()
+    sys.exit()
 
 if len(circuitos) == 0:
     print("  ERROR: no se encontraron circuitos validos")
-    exit()
+    sys.exit()
 
 # Generar reporte txt
 lineas, total_ok, total_falla = generar_reporte_txt(
@@ -413,3 +414,4 @@ print(f"\n  Proyecto  : {nombre_proyecto}")
 print(f"  OK        : {total_ok}")
 print(f"  FALLA     : {total_falla}")
 print("\n  Listo.")
+input("\n  Presiona Enter para cerrar...")
