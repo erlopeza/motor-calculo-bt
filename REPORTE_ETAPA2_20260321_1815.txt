@@ -1,0 +1,22 @@
+=======================================================
+  REPORTE — ETAPA2
+  Fecha  : 21/03/2026 18:15
+  Sistema: 380V / 3P+N / 50Hz
+=======================================================
+
+  Circuito  : cocina
+  Conductor : 10AWG (5.26 mm²)
+  Corriente : 30.0 A  → OK (máx 35A)
+  Potencia  : 15796 W
+  Caída ΔV  : 3.457 V  (0.91 %)  → ÓPTIMO
+
+  Circuito  : SALAMULTI
+  Conductor : 12AWG (3.31 mm²)
+  Corriente : 20.0 A  → OK (máx 25A)
+  Potencia  : 11189 W
+  Caída ΔV  : 10.989 V  (2.892 %)  → ACEPTABLE
+
+=======================================================
+  Circuitos OK    : 2
+  Circuitos FALLA : 0
+=======================================================
