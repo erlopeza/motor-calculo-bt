@@ -5,6 +5,7 @@
 # ============================================================
 
 import sys
+import math
 from datetime import datetime
 from conductores import LIMITE_DV, TENSION_SISTEMA
 from calculos import (
@@ -13,6 +14,7 @@ from calculos import (
 )
 from excel import leer_circuitos_excel, leer_transformador_excel, guardar_txt, exportar_excel
 from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
+from icc_punto import calcular_icc_todos_circuitos
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
@@ -21,8 +23,7 @@ from transformador import calcular_icc_transformador, icc_desde_tabla, clasifica
 def generar_seccion_transformador(datos_trafo):
     """
     Genera la sección del transformador para el reporte.
-    Usa Modo A (datos de placa) o Modo B (tabla típica).
-    Retorna lista de líneas y diccionario con resultados.
+    Retorna líneas del reporte y diccionario con Icc y Zt.
     """
     lineas    = []
     resultado = {}
@@ -35,7 +36,6 @@ def generar_seccion_transformador(datos_trafo):
     modo = datos_trafo["modo"]
 
     if modo == "A":
-        # Modo A — cálculo con datos de placa
         Icc_kA, Zt_ohm, info = calcular_icc_transformador(
             datos_trafo["kVA"],
             datos_trafo["Vn_BT"],
@@ -43,14 +43,14 @@ def generar_seccion_transformador(datos_trafo):
         )
         lineas_trafo = reporte_transformador(info, "A", Icc_kA)
     else:
-        # Modo B — valores típicos IEC 60076
         Icc_kA, Ucc_pct, kVA_ref = icc_desde_tabla(datos_trafo["kVA"])
+        Zt_ohm = (Ucc_pct / 100) * (datos_trafo["Vn_BT"] ** 2 / (datos_trafo["kVA"] * 1000))
         info = {
             "kVA":     datos_trafo["kVA"],
             "Vn_BT":   datos_trafo["Vn_BT"],
             "Ucc_pct": Ucc_pct,
             "In_A":    round(datos_trafo["kVA"] * 1000 / (1.732 * datos_trafo["Vn_BT"]), 1),
-            "Zt_ohm":  round((Ucc_pct/100) * (datos_trafo["Vn_BT"]**2 / (datos_trafo["kVA"]*1000)), 6),
+            "Zt_ohm":  round(Zt_ohm, 6),
             "Icc_A":   round(Icc_kA * 1000, 1),
         }
         lineas_trafo = reporte_transformador(info, "B", Icc_kA)
@@ -58,15 +58,17 @@ def generar_seccion_transformador(datos_trafo):
 
     lineas += lineas_trafo
 
-    # Guardar resultado para usar en módulos siguientes
+    # Guardar Zt_ohm — necesario para calcular Icc por punto (M2)
     resultado = {
         "Icc_kA":  Icc_kA,
+        "Zt_ohm":  Zt_ohm,
         "nivel":   clasificar_icc(Icc_kA),
         "nombre":  datos_trafo["nombre"],
         "modo":    modo,
     }
 
     return lineas, resultado
+
 
 def generar_reporte_txt(nombre_proyecto, circuitos, fecha, datos_trafo=None):
     """Genera reporte completo como lista de líneas de texto."""
@@ -87,6 +89,13 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha, datos_trafo=None):
     lineas.append("")
     lineas_trafo, resultado_trafo = generar_seccion_transformador(datos_trafo)
     lineas += lineas_trafo
+
+    # --- CALCULAR Icc POR PUNTO — M2 ---
+    # Si hay Zt del transformador, calcula Icc en cada circuito
+    if resultado_trafo and "Zt_ohm" in resultado_trafo:
+        circuitos = calcular_icc_todos_circuitos(
+            resultado_trafo["Zt_ohm"], circuitos
+        )
 
     # --- SECCIÓN CIRCUITOS ---
     lineas.append("")
@@ -117,6 +126,10 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha, datos_trafo=None):
         lineas.append(f"  Corriente : {c['I_diseno']}A -> {estado_I} (cap. {I_cap}A)")
         lineas.append(f"  Potencia  : {P_watts} W")
         lineas.append(f"  Caida dV  : {dV_V}V ({dV_pct}%) -> {estado_dV}")
+
+        # Icc en el punto — si fue calculada por M2
+        if "Icc_kA" in c:
+            lineas.append(f"  Icc punto : {c['Icc_kA']} kA  -> {c['nivel_icc']}")
 
         if estado_dV == "FALLA" or estado_I == "SUPERA":
             cond, mm2, dv = sugerir_conductor(
@@ -150,7 +163,7 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha, datos_trafo=None):
 
 print("=" * 60)
 print("  MOTOR DE CALCULO BT — VERSION MODULAR")
-print("  1F / 2F / 3F | Paralelos | Temp | Sugerencia")
+print("  1F / 2F / 3F | Paralelos | Temp | Sugerencia | Icc")
 print("  Normativa: SEC RIC N10 / NEC / IEC 60364")
 print("=" * 60)
 
@@ -165,10 +178,9 @@ if not archivo_excel.endswith(".xlsx"):
     archivo_excel += ".xlsx"
 
 # --- LEER TRANSFORMADOR ---
-# No es obligatorio — si no existe la hoja continúa sin Icc
 datos_trafo = leer_transformador_excel(archivo_excel)
 
-# --- LEER CIRCUITOS CON MANEJO DE ERRORES ---
+# --- LEER CIRCUITOS ---
 try:
     circuitos = leer_circuitos_excel(archivo_excel)
 except FileNotFoundError as e:
@@ -189,7 +201,7 @@ except Exception as e:
     input("\n  Presiona Enter para cerrar...")
     sys.exit()
 
-# --- VALIDAR QUE HAY CIRCUITOS ---
+# --- VALIDAR ---
 if len(circuitos) == 0:
     print("\n  ERROR: no se procesó ningún circuito válido.")
     print("  Revisa las advertencias anteriores y corrige el Excel.")
