@@ -18,38 +18,37 @@ from transformador import (
     icc_desde_tabla,
     clasificar_icc,
 )
+from icc_punto import (
+    calcular_zt_cable,
+    calcular_icc_punto,
+    reduccion_icc,
+)
 
 # ============================================================
 # TESTS DE CAÍDA DE TENSIÓN
-# Valores verificados manualmente contra el reporte real
 # ============================================================
 
 def test_caida_trifasico_basico():
-    """CRAC Unit 1-A — 3F / 6AWG / 63A / 10m"""
     dV_V, dV_pct = calcular_caida_tension(10, 13.3, 63, 1, "3F")
     assert dV_V   == 1.436
     assert dV_pct == 0.378
 
 def test_caida_trifasico_largo():
-    """Antenna Panel campo — 3F / 2AWG / 63A / 80m"""
     dV_V, dV_pct = calcular_caida_tension(80, 33.6, 63, 1, "3F")
     assert dV_V   == 4.546
     assert dV_pct == 1.196
 
 def test_caida_trifasico_paralelos():
-    """Alimentacion UPS 1 — 3F / 4x400MCM / 500A / 15m"""
     dV_V, dV_pct = calcular_caida_tension(15, 203.0, 500, 4, "3F")
     assert dV_V   == 0.28
     assert dV_pct == 0.074
 
 def test_caida_monofasico():
-    """Iluminacion HUB — 1F / 12AWG / 16A / 80m"""
     dV_V, dV_pct = calcular_caida_tension(80, 3.31, 16, 1, "1F")
     assert dV_V   == 13.535
     assert dV_pct == 6.152
 
 def test_caida_bifasico():
-    """Mini Split 1-A — 2F / 10AWG / 25A / 15m"""
     dV_V, dV_pct = calcular_caida_tension(15, 5.26, 25, 1, "2F")
     assert dV_V   == 2.495
     assert dV_pct == 1.134
@@ -59,15 +58,12 @@ def test_caida_bifasico():
 # ============================================================
 
 def test_potencia_trifasico():
-    """CRAC Unit 1-A — 3F / 63A / cosφ=0.85"""
     assert calcular_potencia(63, 0.85, "3F") == 35244
 
 def test_potencia_monofasico():
-    """Iluminacion HUB — 1F / 16A / cosφ=1.0"""
     assert calcular_potencia(16, 1.0, "1F") == 3520
 
 def test_potencia_bifasico():
-    """Mini Split 1-A — 2F / 25A / cosφ=0.90"""
     assert calcular_potencia(25, 0.90, "2F") == 4950
 
 # ============================================================
@@ -95,15 +91,12 @@ def test_clasificacion_falla():
 # ============================================================
 
 def test_capacidad_temperatura_referencia():
-    """6AWG a 30°C — sin corrección"""
     assert capacidad_corregida(65, 1, 30) == 65.0
 
 def test_capacidad_temperatura_alta():
-    """2AWG a 35°C — factor 0.96"""
     assert capacidad_corregida(115, 1, 35) == 110.4
 
 def test_capacidad_paralelos():
-    """4x400MCM a 30°C"""
     assert capacidad_corregida(335, 4, 30) == 1340.0
 
 # ============================================================
@@ -111,61 +104,50 @@ def test_capacidad_paralelos():
 # ============================================================
 
 def test_sugerencia_conductor_falla():
-    """12AWG falla en 1F/80m/16A — debe sugerir 8AWG"""
     cond, mm2, dv = sugerir_conductor(80, 16, 1, "1F", 35)
     assert cond == "8AWG"
     assert mm2  == 8.37
     assert dv   == 2.433
 
 def test_sugerencia_conductor_ok():
-    """Circuito que cumple — sugerencia dentro del límite"""
     cond, mm2, dv = sugerir_conductor(10, 63, 1, "3F", 30)
     assert cond is not None
     assert dv <= 3.0
 
 # ============================================================
 # TESTS DEL TRANSFORMADOR — PARAMETRIZADOS
-# Un solo test verifica múltiples transformadores
-# Agregar un caso nuevo = agregar una línea a la tabla
 # ============================================================
 
 @pytest.mark.parametrize("kVA, Vn, Ucc, Icc_min, Icc_max, In_esperado", [
-    (1000, 380, 5.0, 30.0, 31.0, 1519.8),   # LEO ARICA — caso real
-    (400,  380, 4.0, 15.0, 16.0,  607.9),   # transformador mediano
-    (630,  380, 4.0, 23.0, 25.0,  957.3),   # transformador grande
-    (250,  380, 4.0,  9.0, 10.0,  379.9),   # transformador pequeño
-    (160,  380, 4.0,  6.0,  7.0,  243.1),   # transformador chico
+    (1000, 380, 5.0, 30.0, 31.0, 1519.8),
+    (400,  380, 4.0, 15.0, 16.0,  607.9),
+    (630,  380, 4.0, 23.0, 25.0,  957.3),
+    (250,  380, 4.0,  9.0, 10.0,  379.9),
+    (160,  380, 4.0,  6.0,  7.0,  243.1),
 ])
 def test_icc_transformador(kVA, Vn, Ucc, Icc_min, Icc_max, In_esperado):
-    """
-    Verifica Icc en bornes BT para distintos transformadores.
-    Usa rangos en lugar de valores exactos — tolerancia de redondeo.
-    """
     Icc_kA, Zt_ohm, datos = calcular_icc_transformador(kVA, Vn, Ucc)
-    assert Icc_min <= Icc_kA <= Icc_max   # dentro del rango esperado
-    assert Zt_ohm > 0                      # impedancia positiva
-    assert datos["Ucc_pct"] == Ucc        # dato de entrada correcto
-    assert datos["kVA"] == kVA            # potencia correcta
+    assert Icc_min <= Icc_kA <= Icc_max
+    assert Zt_ohm > 0
+    assert datos["Ucc_pct"] == Ucc
+    assert datos["kVA"] == kVA
 
 # ============================================================
 # TESTS MODO B — tabla típica IEC 60076
 # ============================================================
 
 @pytest.mark.parametrize("kVA_entrada, kVA_ref_esperado, Ucc_esperado", [
-    (950,  1000, 5.0),   # cerca de 1000 → usa 1000
-    (1050, 1000, 5.0),   # cerca de 1000 → usa 1000
-    (300,   250, 4.0),   # cerca de 250 → usa 250
-    (500,   400, 4.0),   # cerca de 400 → usa 400
-    (100,   100, 4.0),   # exacto 100 → usa 100
+    (950,  1000, 5.0),
+    (1050, 1000, 5.0),
+    (300,   250, 4.0),
+    (500,   400, 4.0),
+    (100,   100, 4.0),
 ])
 def test_icc_desde_tabla(kVA_entrada, kVA_ref_esperado, Ucc_esperado):
-    """
-    Modo B — verifica que busca el kVA más cercano en la tabla.
-    """
     Icc_kA, Ucc_pct, kVA_ref = icc_desde_tabla(kVA_entrada)
-    assert kVA_ref  == kVA_ref_esperado
-    assert Ucc_pct  == Ucc_esperado
-    assert Icc_kA   > 0
+    assert kVA_ref == kVA_ref_esperado
+    assert Ucc_pct == Ucc_esperado
+    assert Icc_kA  > 0
 
 # ============================================================
 # TESTS DE CLASIFICACIÓN DE Icc
@@ -179,6 +161,44 @@ def test_icc_desde_tabla(kVA_entrada, kVA_ref_esperado, Ucc_esperado):
     (55.0, "EXTREMO"),
 ])
 def test_clasificacion_icc(Icc_kA, texto_esperado):
-    """Verifica clasificación por nivel de cortocircuito."""
-    resultado = clasificar_icc(Icc_kA)
-    assert texto_esperado in resultado
+    assert texto_esperado in clasificar_icc(Icc_kA)
+
+# ============================================================
+# TESTS DE Icc EN PUNTO — MÓDULO 2
+# ============================================================
+
+@pytest.mark.parametrize("L, S, par, Zt_esperado", [
+    (10,  13.3,  1, 0.013158),
+    (80,  33.6,  1, 0.041667),
+    (15, 203.0,  4, 0.000323),
+    (20,  53.5,  1, 0.006542),
+])
+def test_zt_cable(L, S, par, Zt_esperado):
+    """Verifica impedancia resistiva del cable."""
+    Zt = calcular_zt_cable(L, S, par)
+    assert abs(Zt - Zt_esperado) < 0.0001
+
+def test_icc_punto_crac():
+    """CRAC 1-A — Icc en punto debe ser menor que en bornes."""
+    Zt_trafo = 0.007220
+    Icc_kA, Zt_total, Zt_cable = calcular_icc_punto(
+        Zt_trafo, 10, 13.3, 1, "3F"
+    )
+    assert Icc_kA < 30.39
+    assert Icc_kA > 0
+    assert Zt_total > Zt_trafo
+
+def test_icc_punto_antenna_largo():
+    """Antenna Panel 80m — reducción importante, Icc positiva."""
+    Zt_trafo = 0.007220
+    Icc_kA, _, _ = calcular_icc_punto(
+        Zt_trafo, 80, 33.6, 1, "3F"
+    )
+    assert Icc_kA < 30.39   # menor que en bornes
+    assert Icc_kA > 3.0     # positiva y significativa
+
+def test_reduccion_icc():
+    """Reducción positiva, menor al 100%, dentro de rango."""
+    reduccion = reduccion_icc(30.39, 15.0)
+    assert 0 < reduccion < 100
+    assert 50.0 <= reduccion <= 51.0   # rango — tolerancia redondeo
