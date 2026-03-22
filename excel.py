@@ -6,7 +6,8 @@
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from conductores import CONDUCTORES, FACTOR_SISTEMA, TENSION_SISTEMA, LIMITE_DV
+from openpyxl.utils.exceptions import InvalidFileException
+from conductores import CONDUCTORES, FACTOR_SISTEMA, TENSION_SISTEMA, LIMITE_DV, FACTORES_TEMP
 from calculos import (
     capacidad_corregida, calcular_potencia,
     calcular_caida_tension, clasificar_caida, sugerir_conductor
@@ -14,22 +15,43 @@ from calculos import (
 
 def leer_circuitos_excel(nombre_archivo):
     """
-    Lee circuitos desde Excel.
-    Fila 1 = encabezados. Datos desde fila 2.
-    Columnas: nombre | sistema | conductor | paralelos |
-              I_diseno | cos_phi | L_m | temp_amb
-    Retorna lista de diccionarios.
+    Lee circuitos desde Excel con manejo de errores por tipo.
+    Cada tipo de error da un mensaje específico y útil.
     """
     circuitos = []
     errores   = []
 
-    libro = openpyxl.load_workbook(nombre_archivo, data_only=True)
-    hoja  = libro.active
+    # --- NIVEL 1: verificar que el archivo existe y es válido ---
+    try:
+        libro = openpyxl.load_workbook(nombre_archivo, data_only=True)
+    except FileNotFoundError:
+        # El archivo no existe en la carpeta
+        raise FileNotFoundError(
+            f"No se encontró '{nombre_archivo}'.\n"
+            f"Verifica que el archivo está en la misma carpeta que el programa."
+        )
+    except openpyxl.utils.exceptions.InvalidFileException:
+        # El archivo no es un Excel válido o está corrupto
+        raise ValueError(
+            f"'{nombre_archivo}' no es un archivo Excel válido.\n"
+            f"Verifica que el archivo tiene extensión .xlsx y no está dañado."
+        )
+    except PermissionError:
+        # El archivo está abierto en Excel u otro programa
+        raise PermissionError(
+            f"No se puede leer '{nombre_archivo}'.\n"
+            f"Cierra el archivo en Excel antes de ejecutar el programa."
+        )
+
+    hoja = libro.active
 
     print(f"\n  Leyendo: {nombre_archivo}")
     print(f"  Circuitos encontrados: {hoja.max_row - 1}")
 
-    for fila in hoja.iter_rows(min_row=2, values_only=True):
+    # --- NIVEL 2: verificar cada fila de datos ---
+    for num_fila, fila in enumerate(
+        hoja.iter_rows(min_row=2, values_only=True), start=2
+    ):
         nombre    = fila[0]
         sistema   = fila[1]
         conductor = fila[2]
@@ -39,18 +61,72 @@ def leer_circuitos_excel(nombre_archivo):
         L_m       = fila[6]
         temp_amb  = fila[7]
 
+        # Saltar filas vacías
         if nombre is None:
             continue
 
         sistema   = str(sistema).strip().upper()
         conductor = str(conductor).strip().upper()
 
+        # Validar sistema
         if sistema not in FACTOR_SISTEMA:
-            errores.append(f"'{nombre}': sistema '{sistema}' inválido")
+            errores.append(
+                f"Fila {num_fila} '{nombre}': "
+                f"sistema '{sistema}' inválido — usar 1F, 2F o 3F"
+            )
             continue
 
+        # Validar conductor
         if conductor not in CONDUCTORES:
-            errores.append(f"'{nombre}': conductor '{conductor}' no existe")
+            errores.append(
+                f"Fila {num_fila} '{nombre}': "
+                f"conductor '{conductor}' no existe en tabla"
+            )
+            continue
+
+        # Validar que los valores numéricos sean números
+        try:
+            paralelos = int(paralelos)
+            I_diseno  = float(I_diseno)
+            cos_phi   = float(cos_phi)
+            L_m       = float(L_m)
+            temp_amb  = float(temp_amb)
+        except (TypeError, ValueError):
+            errores.append(
+                f"Fila {num_fila} '{nombre}': "
+                f"valor no numérico en columnas D-H — "
+                f"verifica que no hay texto donde debe ir un número"
+            )
+            continue
+
+        # Validar rangos lógicos
+        if I_diseno <= 0:
+            errores.append(
+                f"Fila {num_fila} '{nombre}': "
+                f"corriente debe ser mayor a 0A"
+            )
+            continue
+
+        if not 0 < cos_phi <= 1:
+            errores.append(
+                f"Fila {num_fila} '{nombre}': "
+                f"factor de potencia debe estar entre 0 y 1"
+            )
+            continue
+
+        if L_m <= 0:
+            errores.append(
+                f"Fila {num_fila} '{nombre}': "
+                f"longitud debe ser mayor a 0 metros"
+            )
+            continue
+
+        if int(temp_amb) not in FACTORES_TEMP:
+            errores.append(
+                f"Fila {num_fila} '{nombre}': "
+                f"temperatura {temp_amb}°C no está en tabla — "
+                f"usar 25, 30, 35, 40, 45 o 50"
+            )
             continue
 
         circuitos.append({
@@ -59,15 +135,16 @@ def leer_circuitos_excel(nombre_archivo):
             "conductor": conductor,
             "S_mm2":     CONDUCTORES[conductor]["mm2"],
             "I_max":     CONDUCTORES[conductor]["I_max"],
-            "paralelos": int(paralelos),
-            "I_diseno":  float(I_diseno),
-            "cos_phi":   float(cos_phi),
-            "L_m":       float(L_m),
-            "temp_amb":  float(temp_amb),
+            "paralelos": paralelos,
+            "I_diseno":  I_diseno,
+            "cos_phi":   cos_phi,
+            "L_m":       L_m,
+            "temp_amb":  temp_amb,
         })
 
+    # Mostrar advertencias sin detener el programa
     if errores:
-        print("\n  ADVERTENCIAS:")
+        print(f"\n  ADVERTENCIAS ({len(errores)} filas con problemas):")
         for e in errores:
             print(f"  ⚠ {e}")
 

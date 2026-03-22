@@ -4,7 +4,6 @@
 # Razón para cambiar: modificar interacción con el usuario
 # ============================================================
 
-# Importa todo lo necesario desde los otros módulos
 import sys
 from datetime import datetime
 from conductores import LIMITE_DV, TENSION_SISTEMA
@@ -53,7 +52,11 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha):
                 c["L_m"], c["I_diseno"], c["paralelos"],
                 c["sistema"], c["temp_amb"]
             )
-            lineas.append(f"  SUGERENCIA: usar {cond} ({mm2}mm2) -> dV={dv}%" if cond else "  SUGERENCIA: ningún conductor en tabla es suficiente")
+            lineas.append(
+                f"  SUGERENCIA: usar {cond} ({mm2}mm2) -> dV={dv}%"
+                if cond else
+                "  SUGERENCIA: ningún conductor en tabla es suficiente"
+            )
             total_falla += 1
         else:
             total_ok += 1
@@ -86,19 +89,38 @@ archivo_excel   = input("  Archivo Excel       : ").strip()
 if not archivo_excel.endswith(".xlsx"):
     archivo_excel += ".xlsx"
 
+# --- LEER EXCEL CON MANEJO DE ERRORES ---
 try:
     circuitos = leer_circuitos_excel(archivo_excel)
-except FileNotFoundError:
-    print(f"\n  ERROR: no se encontro '{archivo_excel}'")
-    print("  Verifica que el archivo esta en la misma carpeta")
+except FileNotFoundError as e:
+    print(f"\n  ERROR: {e}")
+    input("\n  Presiona Enter para cerrar...")
+    sys.exit()
+except ValueError as e:
+    print(f"\n  ERROR: {e}")
+    input("\n  Presiona Enter para cerrar...")
+    sys.exit()
+except PermissionError as e:
+    print(f"\n  ERROR: {e}")
+    input("\n  Presiona Enter para cerrar...")
+    sys.exit()
+except Exception as e:
+    print(f"\n  ERROR inesperado: {e}")
+    print("  Contacta al desarrollador con este mensaje.")
     input("\n  Presiona Enter para cerrar...")
     sys.exit()
 
+# --- VALIDAR QUE HAY CIRCUITOS ---
 if len(circuitos) == 0:
-    print("  ERROR: no se encontraron circuitos validos")
+    print("\n  ERROR: no se procesó ningún circuito válido.")
+    print("  Revisa las advertencias anteriores y corrige el Excel.")
     input("\n  Presiona Enter para cerrar...")
     sys.exit()
 
+if len(circuitos) < 10:
+    print(f"\n  Continuando con {len(circuitos)} circuitos válidos...")
+
+# --- GENERAR Y MOSTRAR REPORTE ---
 lineas, total_ok, total_falla = generar_reporte_txt(
     nombre_proyecto, circuitos, fecha
 )
@@ -107,8 +129,9 @@ print()
 for linea in lineas:
     print(linea)
 
-nombre_txt   = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.txt"
-nombre_xlsx  = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.xlsx"
+# --- GUARDAR ARCHIVOS ---
+nombre_txt  = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.txt"
+nombre_xlsx = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.xlsx"
 
 guardar_txt(lineas, nombre_txt)
 exportar_excel(nombre_proyecto, circuitos, fecha, nombre_xlsx)
