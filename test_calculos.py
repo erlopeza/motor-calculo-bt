@@ -202,3 +202,82 @@ def test_reduccion_icc():
     reduccion = reduccion_icc(30.39, 15.0)
     assert 0 < reduccion < 100
     assert 50.0 <= reduccion <= 51.0   # rango — tolerancia redondeo
+    # ============================================================
+# TESTS DE PROTECCIONES — MÓDULO 3
+# ============================================================
+from protecciones import (
+    calcular_umbral_magnetico,
+    verificar_disparo,
+    verificar_poder_de_corte,
+    verificar_circuito_completo,
+    clasificar_margen_disparo,
+)
+
+@pytest.mark.parametrize("In_A, curva, Im_min_esp, Im_max_esp", [
+    (63,  "C",  315.0,  630.0),   # Antena Panel — curva C
+    (16,  "C",   80.0,  160.0),   # Iluminacion HUB — curva C
+    (200, "TM", 1200.0, 2000.0),  # CRAC — curva TM
+    (25,  "C",  125.0,  250.0),   # Tomacorriente — curva C
+    (16,  "C",   80.0,  160.0),   # Mini Split — curva C
+])
+def test_umbral_magnetico(In_A, curva, Im_min_esp, Im_max_esp):
+    """Verifica umbrales de disparo por curva."""
+    Im_min, Im_max = calcular_umbral_magnetico(In_A, curva)
+    assert Im_min == Im_min_esp
+    assert Im_max == Im_max_esp
+
+def test_disparo_crac_tm():
+    """
+    CRAC Unit 1-A — TM200 / Icc=10.77kA
+    Im_min = 200 × 6 = 1200A
+    Icc_punto = 10770A → 10770 > 1200 → dispara con margen amplio
+    """
+    puede, margen, Im_min = verificar_disparo(10770, 200, "TM")
+    assert puede == True
+    assert Im_min == 1200.0
+    assert margen > 50   # margen amplio
+
+def test_disparo_iluminacion_critico():
+    """
+    Iluminacion HUB — C16 / Icc=0.26kA = 260A
+    Im_min = 16 × 5 = 80A
+    260A > 80A → dispara, pero margen bajo
+    """
+    puede, margen, Im_min = verificar_disparo(260, 16, "C")
+    assert puede == True
+    assert Im_min == 80.0
+    assert margen > 0
+
+def test_poder_de_corte_suficiente():
+    """CRAC: Icu=36kA ≥ Icc=10.77kA → suficiente"""
+    ok, margen = verificar_poder_de_corte(10.77, 36)
+    assert ok == True
+    assert margen > 0
+
+def test_poder_de_corte_insuficiente():
+    """Caso hipotético: Icu=6kA < Icc=10kA → insuficiente"""
+    ok, margen = verificar_poder_de_corte(10.0, 6.0)
+    assert ok == False
+    assert margen < 0
+
+@pytest.mark.parametrize("margen, clasif_esperada", [
+    (-5.0,  "NO DISPARA"),
+    ( 5.0,  "MARGEN CRÍTICO"),
+    (30.0,  "MARGEN ACEPTABLE"),
+    (100.0, "MARGEN AMPLIO"),
+])
+def test_clasificacion_margen(margen, clasif_esperada):
+    resultado = clasificar_margen_disparo(margen)
+    assert clasif_esperada in resultado
+
+def test_verificacion_completa_ok():
+    """CRAC 1-A — todo debe estar OK."""
+    r = verificar_circuito_completo("CRAC Unit 1-A", 200, "TM", 36, 10.77, 380)
+    assert r["estado"] == "OK"
+    assert r["puede_disparar"] == True
+    assert r["poder_ok"] == True
+
+def test_verificacion_completa_falla_disparo():
+    """Caso extremo: Icc muy baja — no puede disparar."""
+    r = verificar_circuito_completo("Prueba", 200, "TM", 36, 0.05, 380)
+    assert "FALLA DISPARO" in r["estado"]
