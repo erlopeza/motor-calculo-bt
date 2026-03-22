@@ -1,0 +1,20 @@
+# PyInstaller — archivos de compilación
+dist/
+build/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Entorno virtual
+.venv/
+venv/
+
+# Reportes generados — no son código
+REPORTE_*.txt
+REPORTE_*.xlsx
+
+# Excel de entrada — cada proyecto tiene el suyo
+# circuitos.xlsx   ← comentado: lo dejamos como plantilla de ejemplo
