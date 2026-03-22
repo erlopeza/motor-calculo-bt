@@ -11,20 +11,87 @@ from calculos import (
     capacidad_corregida, calcular_potencia,
     calcular_caida_tension, clasificar_caida, sugerir_conductor
 )
-from excel import leer_circuitos_excel, guardar_txt, exportar_excel
+from excel import leer_circuitos_excel, leer_transformador_excel, guardar_txt, exportar_excel
+from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
 
-def generar_reporte_txt(nombre_proyecto, circuitos, fecha):
+# ============================================================
+# GENERACIÓN DE REPORTE TXT
+# ============================================================
+
+def generar_seccion_transformador(datos_trafo):
+    """
+    Genera la sección del transformador para el reporte.
+    Usa Modo A (datos de placa) o Modo B (tabla típica).
+    Retorna lista de líneas y diccionario con resultados.
+    """
+    lineas    = []
+    resultado = {}
+
+    if datos_trafo is None:
+        lineas.append("  TRANSFORMADOR: no se encontró hoja 'Transformador'")
+        lineas.append("  Icc en bornes BT: no calculada")
+        return lineas, resultado
+
+    modo = datos_trafo["modo"]
+
+    if modo == "A":
+        # Modo A — cálculo con datos de placa
+        Icc_kA, Zt_ohm, info = calcular_icc_transformador(
+            datos_trafo["kVA"],
+            datos_trafo["Vn_BT"],
+            datos_trafo["Ucc_pct"]
+        )
+        lineas_trafo = reporte_transformador(info, "A", Icc_kA)
+    else:
+        # Modo B — valores típicos IEC 60076
+        Icc_kA, Ucc_pct, kVA_ref = icc_desde_tabla(datos_trafo["kVA"])
+        info = {
+            "kVA":     datos_trafo["kVA"],
+            "Vn_BT":   datos_trafo["Vn_BT"],
+            "Ucc_pct": Ucc_pct,
+            "In_A":    round(datos_trafo["kVA"] * 1000 / (1.732 * datos_trafo["Vn_BT"]), 1),
+            "Zt_ohm":  round((Ucc_pct/100) * (datos_trafo["Vn_BT"]**2 / (datos_trafo["kVA"]*1000)), 6),
+            "Icc_A":   round(Icc_kA * 1000, 1),
+        }
+        lineas_trafo = reporte_transformador(info, "B", Icc_kA)
+        lineas_trafo.append(f"  Referencia tabla: {kVA_ref} kVA (IEC 60076)")
+
+    lineas += lineas_trafo
+
+    # Guardar resultado para usar en módulos siguientes
+    resultado = {
+        "Icc_kA":  Icc_kA,
+        "nivel":   clasificar_icc(Icc_kA),
+        "nombre":  datos_trafo["nombre"],
+        "modo":    modo,
+    }
+
+    return lineas, resultado
+
+def generar_reporte_txt(nombre_proyecto, circuitos, fecha, datos_trafo=None):
     """Genera reporte completo como lista de líneas de texto."""
     lineas      = []
     total_ok    = 0
     total_falla = 0
 
+    # --- ENCABEZADO ---
     lineas.append("=" * 60)
     lineas.append(f"  REPORTE — {nombre_proyecto}")
     lineas.append(f"  Fecha        : {fecha}")
     lineas.append(f"  Normativa    : SEC RIC N10 / NEC / IEC 60364")
     lineas.append(f"  Limite caida : {LIMITE_DV}% circuito final / 5% total")
     lineas.append(f"  Circuitos    : {len(circuitos)}")
+    lineas.append("=" * 60)
+
+    # --- SECCIÓN TRANSFORMADOR ---
+    lineas.append("")
+    lineas_trafo, resultado_trafo = generar_seccion_transformador(datos_trafo)
+    lineas += lineas_trafo
+
+    # --- SECCIÓN CIRCUITOS ---
+    lineas.append("")
+    lineas.append("=" * 60)
+    lineas.append("  CIRCUITOS — CAÍDA DE TENSIÓN Y VERIFICACIÓN")
     lineas.append("=" * 60)
 
     for c in circuitos:
@@ -36,8 +103,12 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha):
         estado_dV = clasificar_caida(dV_pct)
         estado_I  = "OK" if c["I_diseno"] <= I_cap else "SUPERA"
 
-        desc_cond = f"{c['paralelos']}x{c['conductor']} (S={c['S_mm2']*c['paralelos']}mm2)" if c["paralelos"] > 1 else f"{c['conductor']} ({c['S_mm2']}mm2)"
-        V_nom     = TENSION_SISTEMA[c["sistema"]]
+        desc_cond = (
+            f"{c['paralelos']}x{c['conductor']} (S={c['S_mm2']*c['paralelos']}mm2)"
+            if c["paralelos"] > 1
+            else f"{c['conductor']} ({c['S_mm2']}mm2)"
+        )
+        V_nom = TENSION_SISTEMA[c["sistema"]]
 
         lineas.append("")
         lineas.append(f"  Circuito  : {c['nombre']}")
@@ -55,16 +126,20 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha):
             lineas.append(
                 f"  SUGERENCIA: usar {cond} ({mm2}mm2) -> dV={dv}%"
                 if cond else
-                "  SUGERENCIA: ningún conductor en tabla es suficiente"
+                "  SUGERENCIA: ningun conductor en tabla es suficiente"
             )
             total_falla += 1
         else:
             total_ok += 1
 
+    # --- RESUMEN FINAL ---
     lineas.append("")
     lineas.append("=" * 60)
     lineas.append(f"  Circuitos OK    : {total_ok}")
     lineas.append(f"  Circuitos FALLA : {total_falla}")
+    if resultado_trafo:
+        lineas.append(f"  Icc bornes BT   : {resultado_trafo['Icc_kA']} kA")
+        lineas.append(f"  Nivel Icc       : {resultado_trafo['nivel']}")
     lineas.append("=" * 60)
 
     return lineas, total_ok, total_falla
@@ -89,7 +164,11 @@ archivo_excel   = input("  Archivo Excel       : ").strip()
 if not archivo_excel.endswith(".xlsx"):
     archivo_excel += ".xlsx"
 
-# --- LEER EXCEL CON MANEJO DE ERRORES ---
+# --- LEER TRANSFORMADOR ---
+# No es obligatorio — si no existe la hoja continúa sin Icc
+datos_trafo = leer_transformador_excel(archivo_excel)
+
+# --- LEER CIRCUITOS CON MANEJO DE ERRORES ---
 try:
     circuitos = leer_circuitos_excel(archivo_excel)
 except FileNotFoundError as e:
@@ -122,7 +201,7 @@ if len(circuitos) < 10:
 
 # --- GENERAR Y MOSTRAR REPORTE ---
 lineas, total_ok, total_falla = generar_reporte_txt(
-    nombre_proyecto, circuitos, fecha
+    nombre_proyecto, circuitos, fecha, datos_trafo
 )
 
 print()
