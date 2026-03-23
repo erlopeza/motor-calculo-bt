@@ -325,3 +325,71 @@ def exportar_excel(nombre_proyecto, circuitos, fecha, nombre_archivo):
 
     libro.save(nombre_archivo)
     print(f"  Excel guardado: {nombre_archivo}")
+# ============================================================
+# Funciones para agregar a excel.py
+# Pegar antes de la función guardar_txt()
+# ============================================================
+
+def leer_balance_excel(libro_openpyxl):
+    """
+    Lee la hoja 'balance' del libro Excel.
+    Estructura: nombre | tablero | fase | tipo_carga
+    Retorna dict indexado por nombre de circuito.
+    """
+    balance = {}
+
+    hoja_nombre = None
+    for nombre in libro_openpyxl.sheetnames:
+        if nombre.lower() == "balance":
+            hoja_nombre = nombre
+            break
+
+    if not hoja_nombre:
+        return balance
+
+    hoja = libro_openpyxl[hoja_nombre]
+
+    for fila in hoja.iter_rows(min_row=2, values_only=True):
+        if not fila[0]:
+            continue
+        nombre     = str(fila[0]).strip()
+        tablero    = str(fila[1]).strip() if fila[1] else "SIN TABLERO"
+        fase       = str(fila[2]).strip().upper() if fila[2] else "L1"
+        tipo_carga = str(fila[3]).strip().lower() if fila[3] else "critica"
+
+        balance[nombre] = {
+            "tablero":    tablero,
+            "fase":       fase,
+            "tipo_carga": tipo_carga,
+        }
+
+    return balance
+
+
+def leer_tableros_excel(libro_openpyxl):
+    """
+    Lee la hoja 'tableros' del libro Excel.
+    Estructura: nombre | capacidad_kva
+    Retorna dict {nombre_tablero: capacidad_kva}.
+    """
+    tableros = {}
+
+    hoja_nombre = None
+    for nombre in libro_openpyxl.sheetnames:
+        if nombre.lower() == "tableros":
+            hoja_nombre = nombre
+            break
+
+    if not hoja_nombre:
+        return tableros
+
+    hoja = libro_openpyxl[hoja_nombre]
+
+    for fila in hoja.iter_rows(min_row=2, values_only=True):
+        if not fila[0]:
+            continue
+        nombre   = str(fila[0]).strip()
+        cap_kva  = float(fila[1]) if fila[1] else 0
+        tableros[nombre] = cap_kva
+
+    return tableros

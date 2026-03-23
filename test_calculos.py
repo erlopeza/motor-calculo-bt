@@ -281,3 +281,52 @@ def test_verificacion_completa_falla_disparo():
     """Caso extremo: Icc muy baja — no puede disparar."""
     r = verificar_circuito_completo("Prueba", 200, "TM", 36, 0.05, 380)
     assert "FALLA DISPARO" in r["estado"]
+    # ============================================================
+# TESTS DE BALANCE — MÓDULO 4
+# ============================================================
+from balance import obtener_fs, calcular_balance_tableros, FACTORES_SIMULTANEIDAD
+
+def test_fs_critica():
+    assert obtener_fs("critica") == 1.0
+
+def test_fs_hvac():
+    """HVAC tratado igual que critica según decisión del proyecto."""
+    assert obtener_fs("hvac") == 1.0
+
+def test_fs_tomacorriente():
+    assert obtener_fs("tomacorriente") == 0.5
+
+def test_fs_motor():
+    assert obtener_fs("motor") == 0.75
+
+def test_fs_desconocido():
+    """Tipo desconocido usa fs=1.0 como fallback conservador."""
+    assert obtener_fs("desconocido") == 1.0
+
+def test_balance_mcp():
+    """
+    Balance básico — MDP con 2 circuitos simples.
+    Verifica que la suma y el porcentaje son correctos.
+    """
+    circuitos = [
+        {"nombre": "C1", "sistema": "3F", "I_diseno": 63,
+         "cos_phi": 0.85, "S_mm2": 13.3, "paralelos": 1,
+         "L_m": 10, "temp_amb": 30, "I_max": 65, "conductor": "6AWG"},
+        {"nombre": "C2", "sistema": "1F", "I_diseno": 16,
+         "cos_phi": 1.0, "S_mm2": 3.31, "paralelos": 1,
+         "L_m": 80, "temp_amb": 35, "I_max": 25, "conductor": "12AWG"},
+    ]
+    balance_datos = {
+        "C1": {"tablero": "MDP", "fase": "L1", "tipo_carga": "critica"},
+        "C2": {"tablero": "MDP", "fase": "L3", "tipo_carga": "iluminacion"},
+    }
+    tableros_datos = {"MDP": 1000}
+
+    r = calcular_balance_tableros(circuitos, balance_datos, tableros_datos, 1000)
+
+    assert "MDP" in r["tableros"]
+    assert r["tableros"]["MDP"]["S_total_kva"] > 0
+    assert r["tableros"]["MDP"]["uso_pct"] < 100
+    assert r["tableros"]["MDP"]["estado"] == "OK"
+    assert r["uso_trafo_pct"] > 0
+    assert r["estado_trafo"] == "OK"
