@@ -13,20 +13,21 @@ from calculos import (
     capacidad_corregida, calcular_potencia,
     calcular_caida_tension, clasificar_caida, sugerir_conductor
 )
-from excel import leer_circuitos_excel, leer_transformador_excel, guardar_txt, exportar_excel
+from excel import (
+    leer_circuitos_excel, leer_transformador_excel,
+    leer_balance_excel, leer_tableros_excel,
+    guardar_txt, exportar_excel
+)
 from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
 from icc_punto import calcular_icc_todos_circuitos
 from protecciones import verificar_circuito_completo, leer_protecciones_excel
+from balance import calcular_balance_tableros, reporte_balance
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
 # ============================================================
 
 def generar_seccion_transformador(datos_trafo):
-    """
-    Genera la sección del transformador para el reporte.
-    Retorna líneas del reporte y diccionario con Icc y Zt.
-    """
     lineas    = []
     resultado = {}
 
@@ -39,9 +40,7 @@ def generar_seccion_transformador(datos_trafo):
 
     if modo == "A":
         Icc_kA, Zt_ohm, info = calcular_icc_transformador(
-            datos_trafo["kVA"],
-            datos_trafo["Vn_BT"],
-            datos_trafo["Ucc_pct"]
+            datos_trafo["kVA"], datos_trafo["Vn_BT"], datos_trafo["Ucc_pct"]
         )
         lineas_trafo = reporte_transformador(info, "A", Icc_kA)
     else:
@@ -59,21 +58,17 @@ def generar_seccion_transformador(datos_trafo):
         lineas_trafo.append(f"  Referencia tabla: {kVA_ref} kVA (IEC 60076)")
 
     lineas += lineas_trafo
-
     resultado = {
-        "Icc_kA":  Icc_kA,
-        "Zt_ohm":  Zt_ohm,
-        "nivel":   clasificar_icc(Icc_kA),
-        "nombre":  datos_trafo["nombre"],
-        "modo":    modo,
+        "Icc_kA": Icc_kA, "Zt_ohm": Zt_ohm,
+        "nivel": clasificar_icc(Icc_kA),
+        "nombre": datos_trafo["nombre"], "modo": modo,
     }
-
     return lineas, resultado
 
 
 def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
-                        datos_trafo=None, protecciones=None):
-    """Genera reporte completo como lista de líneas de texto."""
+                        datos_trafo=None, protecciones=None,
+                        balance_datos=None, tableros_datos=None):
     lineas      = []
     total_ok    = 0
     total_falla = 0
@@ -89,18 +84,18 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
     lineas.append(f"  Circuitos    : {len(circuitos)}")
     lineas.append("=" * 60)
 
-    # --- SECCIÓN TRANSFORMADOR ---
+    # --- TRANSFORMADOR ---
     lineas.append("")
     lineas_trafo, resultado_trafo = generar_seccion_transformador(datos_trafo)
     lineas += lineas_trafo
 
-    # --- CALCULAR Icc POR PUNTO — M2 ---
+    # --- Icc POR PUNTO — M2 ---
     if resultado_trafo and "Zt_ohm" in resultado_trafo:
         circuitos = calcular_icc_todos_circuitos(
             resultado_trafo["Zt_ohm"], circuitos
         )
 
-    # --- SECCIÓN CIRCUITOS ---
+    # --- CIRCUITOS ---
     lineas.append("")
     lineas.append("=" * 60)
     lineas.append("  CIRCUITOS — CAÍDA DE TENSIÓN, Icc Y PROTECCIONES")
@@ -114,7 +109,6 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
         )
         estado_dV = clasificar_caida(dV_pct)
         estado_I  = "OK" if c["I_diseno"] <= I_cap else "SUPERA"
-
         desc_cond = (
             f"{c['paralelos']}x{c['conductor']} (S={c['S_mm2']*c['paralelos']}mm2)"
             if c["paralelos"] > 1
@@ -130,20 +124,14 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
         lineas.append(f"  Potencia  : {P_watts} W")
         lineas.append(f"  Caida dV  : {dV_V}V ({dV_pct}%) -> {estado_dV}")
 
-        # --- Icc en el punto — M2 ---
         if "Icc_kA" in c:
             lineas.append(f"  Icc punto : {c['Icc_kA']} kA  -> {c['nivel_icc']}")
 
-        # --- Verificación de protección — M3 ---
         if protecciones and c["nombre"] in protecciones:
             p = protecciones[c["nombre"]]
             r = verificar_circuito_completo(
-                c["nombre"],
-                p["In_A"],
-                p["curva"],
-                p["poder_corte_kA"],
-                c.get("Icc_kA", 0),
-                V_nom
+                c["nombre"], p["In_A"], p["curva"],
+                p["poder_corte_kA"], c.get("Icc_kA", 0), V_nom
             )
             lineas.append(
                 f"  Proteccion: {p['curva']}{int(p['In_A'])}A / "
@@ -158,7 +146,6 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
             else:
                 prot_falla += 1
 
-        # --- Sugerencia conductor ---
         if estado_dV == "FALLA" or estado_I == "SUPERA":
             cond, mm2, dv = sugerir_conductor(
                 c["L_m"], c["I_diseno"], c["paralelos"],
@@ -173,6 +160,16 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
         else:
             total_ok += 1
 
+    # --- BALANCE DE CARGA — M4 ---
+    resultado_balance = None
+    if balance_datos and tableros_datos:
+        kVA_trafo = datos_trafo["kVA"] if datos_trafo else 1000
+        resultado_balance = calcular_balance_tableros(
+            circuitos, balance_datos, tableros_datos, kVA_trafo
+        )
+        lineas.append("")
+        lineas += reporte_balance(resultado_balance)
+
     # --- RESUMEN FINAL ---
     lineas.append("")
     lineas.append("=" * 60)
@@ -184,6 +181,9 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
     if protecciones:
         lineas.append(f"  Protecciones OK : {prot_ok}")
         lineas.append(f"  Protec. FALLA   : {prot_falla}")
+    if resultado_balance:
+        lineas.append(f"  Uso transf.     : {resultado_balance['uso_trafo_pct']}%"
+                      f" -> {resultado_balance['estado_trafo']}")
     lineas.append("=" * 60)
 
     return lineas, total_ok, total_falla
@@ -194,7 +194,7 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
 
 print("=" * 60)
 print("  MOTOR DE CALCULO BT — VERSION MODULAR")
-print("  1F / 2F / 3F | Paralelos | Temp | Icc | Protecciones")
+print("  ΔV | Icc | Protecciones | Balance de carga")
 print("  Normativa: SEC RIC N10 / NEC / IEC 60364")
 print("=" * 60)
 
@@ -208,20 +208,25 @@ archivo_excel   = input("  Archivo Excel       : ").strip()
 if not archivo_excel.endswith(".xlsx"):
     archivo_excel += ".xlsx"
 
-# --- LEER TRANSFORMADOR ---
-datos_trafo = leer_transformador_excel(archivo_excel)
-
-# --- LEER PROTECCIONES ---
+# --- LEER TODAS LAS HOJAS ---
+datos_trafo        = leer_transformador_excel(archivo_excel)
 protecciones_excel = {}
+balance_datos      = {}
+tableros_datos     = {}
+
 try:
     _libro = openpyxl.load_workbook(archivo_excel, data_only=True)
     protecciones_excel = leer_protecciones_excel(_libro)
+    balance_datos      = leer_balance_excel(_libro)
+    tableros_datos     = leer_tableros_excel(_libro)
+
     if protecciones_excel:
-        print(f"\n  Protecciones encontradas: {len(protecciones_excel)}")
-    else:
-        print("\n  INFO: no se encontró hoja 'Protecciones' — omitiendo verificación")
-except Exception:
-    pass
+        print(f"  Protecciones  : {len(protecciones_excel)} circuitos")
+    if balance_datos:
+        print(f"  Balance       : {len(balance_datos)} circuitos / "
+              f"{len(tableros_datos)} tableros")
+except Exception as e:
+    print(f"  AVISO lectura hojas opcionales: {e}")
 
 # --- LEER CIRCUITOS ---
 try:
@@ -244,26 +249,23 @@ except Exception as e:
     input("\n  Presiona Enter para cerrar...")
     sys.exit()
 
-# --- VALIDAR ---
 if len(circuitos) == 0:
     print("\n  ERROR: no se procesó ningún circuito válido.")
-    print("  Revisa las advertencias anteriores y corrige el Excel.")
     input("\n  Presiona Enter para cerrar...")
     sys.exit()
 
-if len(circuitos) < 10:
-    print(f"\n  Continuando con {len(circuitos)} circuitos válidos...")
-
 # --- GENERAR Y MOSTRAR REPORTE ---
 lineas, total_ok, total_falla = generar_reporte_txt(
-    nombre_proyecto, circuitos, fecha, datos_trafo, protecciones_excel
+    nombre_proyecto, circuitos, fecha,
+    datos_trafo, protecciones_excel,
+    balance_datos, tableros_datos
 )
 
 print()
 for linea in lineas:
     print(linea)
 
-# --- GUARDAR ARCHIVOS ---
+# --- GUARDAR ---
 nombre_txt  = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.txt"
 nombre_xlsx = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.xlsx"
 
