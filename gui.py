@@ -27,6 +27,8 @@ from transformador import calcular_icc_transformador, icc_desde_tabla, clasifica
 from icc_punto import calcular_icc_todos_circuitos
 from protecciones import verificar_circuito_completo, leer_protecciones_excel
 from balance import calcular_balance_tableros, obtener_fs
+from perfiles import (PERFILES, PERFIL_DEFAULT, obtener_perfil, lista_perfiles,
+    validar_perfil_vs_datos, hay_bloqueo, NIVEL_OK, NIVEL_ADVERTENCIA, NIVEL_BLOQUEO)
 from datetime import datetime
 
 # ============================================================
@@ -145,6 +147,8 @@ class MotorCalculoBT:
         self.archivo_excel   = tk.StringVar(value="")
         self.nombre_proyecto = tk.StringVar(value="")
         self.estado_texto    = tk.StringVar(value="● Listo — carga un archivo Excel")
+        self.var_perfil      = tk.StringVar(value=PERFIL_DEFAULT)
+        self.perfil_activo   = obtener_perfil(PERFIL_DEFAULT)
 
         # Datos calculados
         self.circuitos       = []
@@ -201,6 +205,50 @@ class MotorCalculoBT:
             bg=COLORES["panel"], fg=COLORES["acento"],
             font=FUENTES["titulo"], pady=12
         ).pack(fill="x")
+
+        tk.Frame(panel, bg=COLORES["borde"], height=1).pack(fill="x", padx=10)
+
+        # --- PERFIL DE PROYECTO ---
+        self._seccion_label(panel, "PERFIL")
+
+        self.rb_perfil_widgets = []   # guardar refs para bloquear/liberar
+        for clave, label in lista_perfiles():
+            rb = tk.Radiobutton(
+                panel,
+                text=label,
+                variable=self.var_perfil,
+                value=clave,
+                command=self._cambiar_perfil,
+                bg=COLORES["panel"],
+                fg=COLORES["texto"],
+                selectcolor=COLORES["acento"],
+                activebackground=COLORES["panel"],
+                activeforeground=COLORES["texto"],
+                font=FUENTES["pequeño"],
+                anchor="w",
+                cursor="hand2"
+            )
+            rb.pack(fill="x", padx=14, pady=1)
+            self.rb_perfil_widgets.append(rb)
+
+        # Descripción del perfil activo
+        self.lbl_perfil_desc = tk.Label(
+            panel,
+            text=self.perfil_activo["descripcion"],
+            bg=COLORES["panel"], fg=COLORES["texto_gris"],
+            font=FUENTES["pequeño"], wraplength=200,
+            anchor="w", justify="left"
+        )
+        self.lbl_perfil_desc.pack(fill="x", padx=14, pady=(2, 2))
+
+        # Etiqueta de estado del selector (bloqueado/libre)
+        self.lbl_perfil_lock = tk.Label(
+            panel, text="",
+            bg=COLORES["panel"], fg=COLORES["texto_gris"],
+            font=FUENTES["pequeño"], wraplength=200,
+            anchor="w", justify="left"
+        )
+        self.lbl_perfil_lock.pack(fill="x", padx=14, pady=(0, 6))
 
         tk.Frame(panel, bg=COLORES["borde"], height=1).pack(fill="x", padx=10)
 
@@ -449,7 +497,7 @@ class MotorCalculoBT:
     # ----------------------------------------------------------
 
     def _cargar_excel(self):
-        """Abre selector de archivo y carga datos."""
+        """Abre selector de archivo, carga datos y detecta perfil."""
         ruta = filedialog.askopenfilename(
             title="Seleccionar archivo Excel",
             filetypes=[("Excel", "*.xlsx"), ("Todos", "*.*")]
@@ -461,39 +509,249 @@ class MotorCalculoBT:
         nombre = os.path.basename(ruta)
         self.lbl_archivo.config(text=nombre, fg=COLORES["texto"])
 
-        # Nombre del proyecto desde el nombre del archivo (sin extensión)
-        if not self.nombre_proyecto.get():
-            self.nombre_proyecto.set(os.path.splitext(nombre)[0].upper())
+        # --- DETECCIÓN AUTOMÁTICA DE PERFIL ---
+        try:
+            libro = openpyxl.load_workbook(ruta, data_only=True)
+            from excel import leer_perfil_excel
+            datos_perfil = leer_perfil_excel(libro)
 
-        self._set_estado(f"● Archivo cargado: {nombre}")
+            if datos_perfil:
+                perfil_clave = datos_perfil["perfil"]
+                perfil_obj   = obtener_perfil(perfil_clave)
+
+                # Sincronizar selector de perfil en la GUI
+                self.var_perfil.set(perfil_clave)
+                self.perfil_activo = perfil_obj
+                self.lbl_perfil_desc.config(
+                    text=perfil_obj["descripcion"],
+                    fg=COLORES["ok"]
+                )
+                self.root.after(3000, lambda: self.lbl_perfil_desc.config(
+                    fg=COLORES["texto_gris"]
+                ))
+
+                # Nombre del proyecto desde la hoja perfil
+                nombre_proy = datos_perfil.get("nombre_proyecto", "")
+                if nombre_proy:
+                    self.nombre_proyecto.set(nombre_proy.upper())
+
+                # Bloquear selector — perfil definido por el Excel
+                self._bloquear_perfil(perfil_obj["label"])
+
+                self._set_estado(
+                    f"✓ Perfil detectado: {perfil_obj['label']} "
+                    f"— {nombre_proy.upper()}"
+                )
+            else:
+                # Sin hoja perfil — liberar selector
+                self._liberar_perfil()
+                if not self.nombre_proyecto.get():
+                    self.nombre_proyecto.set(
+                        os.path.splitext(nombre)[0].upper()
+                    )
+                self._set_estado(
+                    f"● Archivo cargado: {nombre} "
+                    f"(sin hoja 'perfil' — perfil libre)"
+                )
+        except Exception as e:
+            self._liberar_perfil()
+            if not self.nombre_proyecto.get():
+                self.nombre_proyecto.set(
+                    os.path.splitext(nombre)[0].upper()
+                )
+            self._set_estado(f"● Archivo cargado: {nombre}")
+
+    def _bloquear_perfil(self, label_perfil):
+        """
+        Deshabilita el selector de perfil cuando el Excel
+        tiene hoja 'perfil'. El perfil lo define el Excel.
+        """
+        for rb in self.rb_perfil_widgets:
+            rb.config(state="disabled", cursor="arrow",
+                      fg=COLORES["texto_gris"])
+        self.lbl_perfil_lock.config(
+            text="🔒 Definido en hoja 'perfil'",
+            fg=COLORES["acento"]
+        )
+
+    def _liberar_perfil(self):
+        """
+        Habilita el selector cuando no hay hoja perfil en el Excel.
+        """
+        for rb in self.rb_perfil_widgets:
+            rb.config(state="normal", cursor="hand2",
+                      fg=COLORES["texto"])
+        self.lbl_perfil_lock.config(text="", fg=COLORES["texto_gris"])
+
+    def _cambiar_perfil(self):
+        """Actualiza el perfil activo. No toca los tabs."""
+        clave = self.var_perfil.get()
+        self.perfil_activo = obtener_perfil(clave)
+        self.lbl_perfil_desc.config(
+            text=self.perfil_activo["descripcion"]
+        )
+        self._set_estado(f"● Perfil: {self.perfil_activo['label']}")
 
     def _calcular(self):
-        """Ejecuta todos los cálculos en un hilo separado."""
+        """Lee datos, valida perfil y abre ventana de confirmación."""
         if not self.archivo_excel.get():
             messagebox.showwarning("Sin archivo",
                 "Carga un archivo Excel antes de calcular.")
             return
 
-        self._set_estado("⏳ Calculando...")
+        self._set_estado("⏳ Leyendo datos...")
         self.root.update()
 
-        # Ejecutar en hilo para no bloquear la GUI
-        hilo = threading.Thread(target=self._ejecutar_calculos, daemon=True)
-        hilo.start()
-
-    def _ejecutar_calculos(self):
-        """Lógica de cálculo — se ejecuta en hilo separado."""
+        # Leer datos primero para poder validar
+        archivo = self.archivo_excel.get()
         try:
-            archivo = self.archivo_excel.get()
-
-            # Leer todas las hojas
-            self.datos_trafo = leer_transformador_excel(archivo)
-            libro = openpyxl.load_workbook(archivo, data_only=True)
+            self.datos_trafo    = leer_transformador_excel(archivo)
+            libro               = openpyxl.load_workbook(archivo, data_only=True)
             self.protecciones   = leer_protecciones_excel(libro)
             self.balance_datos  = leer_balance_excel(libro)
             self.tableros_datos = leer_tableros_excel(libro)
             self.circuitos      = leer_circuitos_excel(archivo)
+        except Exception as e:
+            self._set_estado(f"✗ Error al leer: {e}")
+            return
 
+        # Validar perfil vs datos
+        perfil_clave = self.var_perfil.get()
+        resultados   = validar_perfil_vs_datos(
+            perfil_clave, self.circuitos, self.datos_trafo,
+            self.protecciones, self.balance_datos, self.tableros_datos
+        )
+
+        # Mostrar ventana de validación
+        self._mostrar_ventana_validacion(resultados)
+
+    def _mostrar_ventana_validacion(self, resultados):
+        """
+        Ventana modal con resumen de validación.
+        Si hay BLOQUEO → solo CANCELAR disponible.
+        Si solo hay ADVERTENCIAS → puede continuar.
+        """
+        bloqueado = hay_bloqueo(resultados)
+        perfil    = self.perfil_activo
+
+        # Crear ventana modal
+        ventana = tk.Toplevel(self.root)
+        ventana.title("Validación de datos")
+        ventana.geometry("500x420")
+        ventana.configure(bg=COLORES["fondo"])
+        ventana.resizable(False, False)
+        ventana.grab_set()   # modal — bloquea la ventana principal
+
+        # Centrar respecto a la ventana principal
+        x = self.root.winfo_x() + (self.root.winfo_width() - 500) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 420) // 2
+        ventana.geometry(f"500x420+{x}+{y}")
+
+        # --- Encabezado ---
+        tk.Label(
+            ventana,
+            text="VALIDACIÓN DE DATOS",
+            bg=COLORES["fondo"], fg=COLORES["acento"],
+            font=FUENTES["titulo"], pady=12
+        ).pack(fill="x")
+
+        tk.Label(
+            ventana,
+            text=f"Perfil: {perfil['label']}  |  "
+                 f"Circuitos: {len(self.circuitos)}",
+            bg=COLORES["fondo"], fg=COLORES["texto_gris"],
+            font=FUENTES["pequeño"]
+        ).pack()
+
+        tk.Frame(ventana, bg=COLORES["borde"],
+                 height=1).pack(fill="x", padx=16, pady=8)
+
+        # --- Resultados de validación ---
+        frame_scroll = tk.Frame(ventana, bg=COLORES["fondo"])
+        frame_scroll.pack(fill="both", expand=True, padx=16)
+
+        for i, (nivel, mensaje) in enumerate(resultados):
+            if nivel == NIVEL_BLOQUEO:
+                icono = "✗"
+                color = COLORES["falla"]
+                bg    = "#3A1A1A"
+            elif nivel == NIVEL_ADVERTENCIA:
+                icono = "⚠"
+                color = COLORES["precaucion"]
+                bg    = "#2A1A0A"
+            else:
+                icono = "✓"
+                color = COLORES["ok"]
+                bg    = "#1A3A1A"
+
+            fila = tk.Frame(frame_scroll, bg=bg,
+                            relief="flat", bd=0)
+            fila.pack(fill="x", pady=2)
+
+            # Icono
+            tk.Label(
+                fila, text=f"  {icono}  ",
+                bg=bg, fg=color,
+                font=FUENTES["subtitulo"]
+            ).pack(side="left", anchor="n", pady=6)
+
+            # Mensaje (puede tener saltos de línea)
+            tk.Label(
+                fila, text=mensaje,
+                bg=bg, fg=COLORES["texto"],
+                font=FUENTES["pequeño"],
+                justify="left", anchor="w",
+                wraplength=400
+            ).pack(side="left", fill="x", pady=6, padx=(0, 8))
+
+        tk.Frame(ventana, bg=COLORES["borde"],
+                 height=1).pack(fill="x", padx=16, pady=8)
+
+        # --- Botones ---
+        frame_btns = tk.Frame(ventana, bg=COLORES["fondo"])
+        frame_btns.pack(pady=8)
+
+        def continuar():
+            ventana.destroy()
+            self._set_estado("⏳ Calculando...")
+            self.root.update()
+            hilo = threading.Thread(
+                target=self._ejecutar_calculos_post_validacion,
+                daemon=True
+            )
+            hilo.start()
+
+        def cancelar():
+            ventana.destroy()
+            self._set_estado("● Cálculo cancelado")
+
+        if not bloqueado:
+            tk.Button(
+                frame_btns,
+                text="▶  CONTINUAR",
+                command=continuar,
+                bg=COLORES["boton"], fg="#FFFFFF",
+                font=FUENTES["normal"],
+                relief="flat", cursor="hand2",
+                padx=20, pady=6
+            ).pack(side="left", padx=8)
+
+        tk.Button(
+            frame_btns,
+            text="✗  CANCELAR",
+            command=cancelar,
+            bg=COLORES["encabezado"], fg="#FFFFFF",
+            font=FUENTES["normal"],
+            relief="flat", cursor="hand2",
+            padx=20, pady=6
+        ).pack(side="left", padx=8)
+
+    def _ejecutar_calculos_post_validacion(self):
+        """
+        Ejecuta los cálculos. Los datos ya fueron leídos en _calcular().
+        Solo procesa los cálculos matemáticos y actualiza la GUI.
+        """
+        try:
             if not self.circuitos:
                 self.root.after(0, lambda: self._set_estado(
                     "✗ No se encontraron circuitos válidos"))
@@ -542,7 +800,7 @@ class MotorCalculoBT:
         self._set_estado("✓ Cálculo completado")
 
     def _exportar(self):
-        """Exporta reporte TXT y Excel con selector de destino."""
+        """Exporta reporte TXT y Excel con selector de carpeta."""
         if not self.circuitos:
             messagebox.showwarning("Sin datos",
                 "Ejecuta el cálculo antes de exportar.")
@@ -555,12 +813,11 @@ class MotorCalculoBT:
         nombre        = self.nombre_proyecto.get() or "PROYECTO"
         nombre_base   = f"REPORTE_{nombre.upper()}_{fecha_archivo}"
 
-        # --- Selector de carpeta de destino ---
         carpeta = filedialog.askdirectory(
             title="Seleccionar carpeta de destino"
         )
         if not carpeta:
-            return   # usuario canceló
+            return
 
         nombre_txt  = os.path.join(carpeta, f"{nombre_base}.txt")
         nombre_xlsx = os.path.join(carpeta, f"{nombre_base}.xlsx")

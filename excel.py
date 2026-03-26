@@ -213,6 +213,56 @@ def leer_circuitos_excel(nombre_archivo):
 
     return circuitos
 
+
+# ============================================================
+# LECTURA — PERFIL DE PROYECTO
+# ============================================================
+
+def leer_perfil_excel(libro_openpyxl):
+    """
+    Lee la hoja 'perfil' del libro Excel — modo híbrido.
+    Estructura: columna A = campo, columna B = valor
+
+    Campos:
+        perfil             : domestico / comercial / industrial
+        nombre_proyecto    : nombre del proyecto
+        usar_transformador : si / no
+        usar_protecciones  : si / no
+        usar_balance       : si / no
+
+    Retorna diccionario o None si no existe la hoja.
+    """
+    hoja_nombre = None
+    for nombre in libro_openpyxl.sheetnames:
+        if nombre.lower() == "perfil":
+            hoja_nombre = nombre
+            break
+
+    if not hoja_nombre:
+        return None
+
+    hoja  = libro_openpyxl[hoja_nombre]
+    datos = {}
+
+    for fila in hoja.iter_rows(min_row=2, values_only=True):
+        if not fila[0]:
+            continue
+        campo = str(fila[0]).strip().lower()
+        # Normalizar campo — sin tildes
+        for orig, repl in [("á","a"),("é","e"),("í","i"),("ó","o"),("ú","u"),("ñ","n")]:
+            campo = campo.replace(orig, repl)
+        valor = str(fila[1]).strip().lower() if fila[1] is not None else ""
+        datos[campo] = valor
+
+    return {
+        "perfil":             datos.get("perfil", "industrial"),
+        "nombre_proyecto":    datos.get("nombre_proyecto", ""),
+        "usar_transformador": datos.get("usar_transformador", "si") == "si",
+        "usar_protecciones":  datos.get("usar_protecciones", "si") == "si",
+        "usar_balance":       datos.get("usar_balance", "si") == "si",
+    }
+
+
 # ============================================================
 # EXPORTAR — TXT
 # ============================================================
@@ -325,11 +375,6 @@ def exportar_excel(nombre_proyecto, circuitos, fecha, nombre_archivo):
 
     libro.save(nombre_archivo)
     print(f"  Excel guardado: {nombre_archivo}")
-# ============================================================
-# Funciones para agregar a excel.py
-# Pegar antes de la función guardar_txt()
-# ============================================================
-
 def leer_balance_excel(libro_openpyxl):
     """
     Lee la hoja 'balance' del libro Excel.
