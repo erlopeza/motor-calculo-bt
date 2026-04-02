@@ -1,87 +1,138 @@
 # ============================================================
 # calculos.py
-# Responsabilidad: fórmulas de cálculo eléctrico
-# Razón para cambiar: corrección o ampliación de fórmulas
+# Responsabilidad: fórmulas eléctricas de baja tensión
+# Razón para cambiar: actualizar fórmulas o límites normativos
 # ============================================================
 
-# Importa los datos que necesita desde conductores.py
-# "from módulo import nombre" trae solo lo que necesitamos
+import math
 from conductores import (
-    RHO_CU, LIMITE_DV,
-    TENSION_SISTEMA, FACTOR_SISTEMA,
-    CONDUCTORES, FACTORES_TEMP
+    CONDUCTORES, FACTOR_SISTEMA, TENSION_SISTEMA,
+    LIMITE_DV, FACTORES_TEMP
 )
 
-def factor_temperatura(temp_amb):
-    """
-    Retorna el factor de corrección por temperatura.
-    Si la temperatura no está en la tabla usa 1.00 (30°C base).
-    """
-    return FACTORES_TEMP.get(int(temp_amb), 1.00)
+# ============================================================
+# RESISTIVIDAD DEL COBRE
+# ============================================================
+RHO_CU = 0.0175   # Ω·mm²/m — cobre a 20°C (IEC 60228)
 
-def capacidad_corregida(I_max, paralelos, temp_amb):
-    """
-    Capacidad real del conjunto de conductores.
-    Aplica corrección por temperatura y cantidad de paralelos.
-    Fórmula: I_cap = I_max × paralelos × factor_temperatura
-    """
-    factor = factor_temperatura(temp_amb)
-    return round(I_max * paralelos * factor, 1)
 
 def calcular_potencia(I_diseno, cos_phi, sistema):
     """
-    Potencia activa según tipo de sistema.
-    3F: P = √3 × V × I × cosφ
-    1F/2F: P = V × I × cosφ
+    Calcula potencia activa en Watts.
+
+    Parámetros:
+        I_diseno : float — corriente de diseño en A
+        cos_phi  : float — factor de potencia
+        sistema  : str   — "1F", "2F" o "3F"
+
+    Retorna:
+        int — potencia en W
     """
-    V = TENSION_SISTEMA.get(sistema, 380)
+    V = TENSION_SISTEMA[sistema]
     if sistema == "3F":
         return round(1.732 * V * I_diseno * cos_phi)
     return round(V * I_diseno * cos_phi)
 
+
 def calcular_caida_tension(L_m, S_mm2, I_diseno, paralelos, sistema):
     """
-    Caída de tensión según tipo de sistema y conductores en paralelo.
-    Sección equivalente = S_mm2 × paralelos
+    Calcula caída de tensión en un conductor.
     Fórmula: ΔV = (factor × ρ × L × I) / S_eq
-    Retorna: (dV_voltios, dV_porcentaje)
+
+    Parámetros:
+        L_m      : float — longitud del tramo en metros
+        S_mm2    : float — sección del conductor en mm²
+        I_diseno : float — corriente de diseño en A
+        paralelos: int   — número de conductores en paralelo
+        sistema  : str   — "1F", "2F" o "3F"
+
+    Retorna:
+        (dV_V, dV_pct) — tupla (caída en V, caída en %)
     """
-    S_eq   = S_mm2 * paralelos
-    factor = FACTOR_SISTEMA.get(sistema, 1.732)
-    V_nom  = TENSION_SISTEMA.get(sistema, 380)
+    factor = FACTOR_SISTEMA[sistema]   # 2 para 1F/2F, √3 para 3F
+    S_eq   = S_mm2 * paralelos          # sección equivalente
+
     dV_V   = (factor * RHO_CU * L_m * I_diseno) / S_eq
-    dV_pct = (dV_V / V_nom) * 100
+    V_nom  = TENSION_SISTEMA[sistema]
+    dV_pct = dV_V / V_nom * 100
+
     return round(dV_V, 3), round(dV_pct, 3)
+
 
 def clasificar_caida(dV_pct):
     """
-    Clasifica el estado normativo según SEC RIC N°10 / IEC 60364.
-    Retorna: string con el estado
+    Clasifica la caída de tensión según normativa SEC RIC N°10.
+
+    Límites:
+        ≤ 1.5% → ÓPTIMO
+        ≤ 3.0% → ACEPTABLE
+        ≤ 5.0% → PRECAUCIÓN
+        > 5.0% → FALLA
+
+    Retorna:
+        str — clasificación
     """
     if dV_pct <= 1.5:
         return "ÓPTIMO"
-    elif dV_pct <= 3.0:
+    elif dV_pct <= LIMITE_DV:
         return "ACEPTABLE"
     elif dV_pct <= 5.0:
         return "PRECAUCIÓN"
     else:
         return "FALLA"
 
+
+def capacidad_corregida(I_max, paralelos, temp_amb):
+    """
+    Calcula la capacidad de corriente corregida por temperatura
+    y número de conductores en paralelo.
+
+    Parámetros:
+        I_max    : float — capacidad nominal del conductor en A
+        paralelos: int   — número de conductores en paralelo
+        temp_amb : float — temperatura ambiente en °C
+
+    Retorna:
+        float — capacidad corregida en A
+    """
+    factor_temp = FACTORES_TEMP.get(int(temp_amb), 1.0)
+    return round(I_max * paralelos * factor_temp, 1)
+
+
 def sugerir_conductor(L_m, I_diseno, paralelos, sistema, temp_amb):
     """
-    Busca el conductor mínimo que cumple simultáneamente:
-    1. ΔV ≤ límite normativo (3%)
-    2. I_cap ≥ corriente de diseño
-    Recorre la tabla de menor a mayor sección.
-    Retorna: (nombre_conductor, mm2, dv_pct) o (None, None, None)
-    """
-    for nombre, datos in CONDUCTORES.items():
-        _, dV_pct = calcular_caida_tension(
-            L_m, datos["mm2"], I_diseno, paralelos, sistema
-        )
-        I_cap = capacidad_corregida(datos["I_max"], paralelos, temp_amb)
+    Busca el conductor mínimo que cumple ΔV ≤ LIMITE_DV
+    y capacidad ≥ I_diseno.
 
-        if dV_pct <= LIMITE_DV and I_cap >= I_diseno:
-            return nombre, datos["mm2"], round(dV_pct, 3)
+    Parámetros:
+        L_m      : float — longitud en metros
+        I_diseno : float — corriente de diseño en A
+        paralelos: int   — número de conductores en paralelo
+        sistema  : str   — "1F", "2F" o "3F"
+        temp_amb : float — temperatura ambiente en °C
+
+    Retorna:
+        (conductor, mm2, dV_pct) o (None, None, None) si no hay
+    """
+    # Ordenar conductores de menor a mayor sección
+    conductores_ordenados = sorted(
+        CONDUCTORES.items(),
+        key=lambda x: x[1]["mm2"]
+    )
+
+    for nombre, datos in conductores_ordenados:
+        S_mm2  = datos["mm2"]
+        I_max  = datos["I_max"]
+        I_cap  = capacidad_corregida(I_max, paralelos, temp_amb)
+
+        if I_cap < I_diseno:
+            continue
+
+        _, dV_pct = calcular_caida_tension(
+            L_m, S_mm2, I_diseno, paralelos, sistema
+        )
+
+        if dV_pct <= LIMITE_DV:
+            return nombre, S_mm2, dV_pct
 
     return None, None, None

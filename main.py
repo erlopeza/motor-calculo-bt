@@ -22,6 +22,11 @@ from transformador import calcular_icc_transformador, icc_desde_tabla, clasifica
 from icc_punto import calcular_icc_todos_circuitos
 from protecciones import verificar_circuito_completo, leer_protecciones_excel
 from balance import calcular_balance_tableros, reporte_balance
+from demanda import (
+    calcular_demanda, seleccionar_transformador,
+    dimensionar_acometida_sec, reporte_demanda
+)
+from excel import leer_demanda_excel
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
@@ -68,7 +73,8 @@ def generar_seccion_transformador(datos_trafo):
 
 def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
                         datos_trafo=None, protecciones=None,
-                        balance_datos=None, tableros_datos=None):
+                        balance_datos=None, tableros_datos=None,
+                        params_demanda=None):
     lineas      = []
     total_ok    = 0
     total_falla = 0
@@ -170,6 +176,32 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
         lineas.append("")
         lineas += reporte_balance(resultado_balance)
 
+    # --- DEMANDA MÁXIMA — M6 ---
+    resultado_demanda = None
+    if params_demanda and balance_datos:
+        resultado_demanda = calcular_demanda(
+            circuitos, balance_datos, params_demanda
+        )
+        resultado_trafo_m6 = None
+        resultado_sec_m6   = None
+
+        if params_demanda.get("tipo_alimentador") == "transformador":
+            resultado_trafo_m6 = seleccionar_transformador(
+                resultado_demanda["S_futuro_kva"]
+            )
+        else:
+            resultado_sec_m6 = dimensionar_acometida_sec(
+                resultado_demanda["S_futuro_kva"],
+                params_demanda["tension_alim"],
+                params_demanda["sistema_alim"],
+                params_demanda.get("zona_sec", "urbana")
+            )
+
+        lineas.append("")
+        lineas += reporte_demanda(
+            resultado_demanda, resultado_trafo_m6, resultado_sec_m6
+        )
+
     # --- RESUMEN FINAL ---
     lineas.append("")
     lineas.append("=" * 60)
@@ -213,6 +245,7 @@ datos_trafo        = leer_transformador_excel(archivo_excel)
 protecciones_excel = {}
 balance_datos      = {}
 tableros_datos     = {}
+params_demanda     = None
 
 try:
     _libro = openpyxl.load_workbook(archivo_excel, data_only=True)
@@ -225,8 +258,13 @@ try:
     if balance_datos:
         print(f"  Balance       : {len(balance_datos)} circuitos / "
               f"{len(tableros_datos)} tableros")
+    params_demanda = leer_demanda_excel(_libro)
+    if params_demanda:
+        print(f"  Demanda M6    : {params_demanda['tipo_instalacion']} / "
+              f"{params_demanda['tipo_alimentador']}")
 except Exception as e:
     print(f"  AVISO lectura hojas opcionales: {e}")
+    params_demanda = None
 
 # --- LEER CIRCUITOS ---
 try:
@@ -258,7 +296,8 @@ if len(circuitos) == 0:
 lineas, total_ok, total_falla = generar_reporte_txt(
     nombre_proyecto, circuitos, fecha,
     datos_trafo, protecciones_excel,
-    balance_datos, tableros_datos
+    balance_datos, tableros_datos,
+    params_demanda
 )
 
 print()

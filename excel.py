@@ -438,3 +438,70 @@ def leer_tableros_excel(libro_openpyxl):
         tableros[nombre] = cap_kva
 
     return tableros
+
+def leer_demanda_excel(libro_openpyxl):
+    """
+    Lee la hoja 'demanda' del libro Excel — parámetros M6.
+    Estructura: columna A = campo, columna B = valor
+
+    Campos esperados:
+        tipo_instalacion   : residencial/comercial/industrial/datacenter
+        tipo_alimentador   : transformador/sec
+        tension_alim       : float — V (220 o 380)
+        sistema_alim       : 1F/3F
+        cos_phi_global     : float — 0.0 a 1.0
+        factor_crecimiento : float — ej: 1.25
+        zona_sec           : urbana/suburbana/rural
+
+    Retorna dict con parámetros normalizados, o None si no hay hoja.
+    """
+    hoja_nombre = None
+    for nombre in libro_openpyxl.sheetnames:
+        if nombre.lower() == "demanda":
+            hoja_nombre = nombre
+            break
+
+    if not hoja_nombre:
+        return None
+
+    hoja  = libro_openpyxl[hoja_nombre]
+    datos = {}
+
+    for fila in hoja.iter_rows(min_row=2, values_only=True):
+        if not fila[0]:
+            continue
+        campo = str(fila[0]).strip().lower()
+        # Normalizar — sin tildes
+        for orig, repl in [("á","a"),("é","e"),("í","i"),
+                           ("ó","o"),("ú","u"),("ñ","n")]:
+            campo = campo.replace(orig, repl)
+        valor = str(fila[1]).strip() if fila[1] is not None else ""
+        datos[campo] = valor
+
+    # Construir resultado con tipos correctos y valores por defecto
+    try:
+        tension = float(datos.get("tension_alim", 380))
+    except ValueError:
+        tension = 380.0
+
+    try:
+        cos_phi = float(datos.get("cos_phi_global", 0.85))
+        cos_phi = max(0.1, min(1.0, cos_phi))   # clamp 0.1-1.0
+    except ValueError:
+        cos_phi = 0.85
+
+    try:
+        f_crec = float(datos.get("factor_crecimiento", 1.0))
+        f_crec = max(1.0, f_crec)               # mínimo 1.0
+    except ValueError:
+        f_crec = 1.0
+
+    return {
+        "tipo_instalacion":   datos.get("tipo_instalacion",  "industrial").lower(),
+        "tipo_alimentador":   datos.get("tipo_alimentador",  "transformador").lower(),
+        "tension_alim":       tension,
+        "sistema_alim":       datos.get("sistema_alim",      "3F").upper(),
+        "cos_phi_global":     cos_phi,
+        "factor_crecimiento": f_crec,
+        "zona_sec":           datos.get("zona_sec",          "urbana").lower(),
+    }
