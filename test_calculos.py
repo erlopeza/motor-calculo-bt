@@ -330,3 +330,123 @@ def test_balance_mcp():
     assert r["tableros"]["MDP"]["estado"] == "OK"
     assert r["uso_trafo_pct"] > 0
     assert r["estado_trafo"] == "OK"
+# ============================================================
+# TESTS DE DEMANDA — MÓDULO 6
+# ============================================================
+from demanda import (
+    obtener_fd, calcular_corriente_alimentador,
+    seleccionar_transformador, dimensionar_acometida_sec,
+    calcular_demanda, FACTORES_DEMANDA
+)
+
+# --- Factor de demanda ---
+
+def test_fd_datacenter_critica():
+    assert obtener_fd("datacenter", "critica") == 1.0
+
+def test_fd_datacenter_tomacorriente():
+    assert obtener_fd("datacenter", "tomacorriente") == 0.50
+
+def test_fd_comercial_hvac():
+    assert obtener_fd("comercial", "hvac") == 0.85
+
+def test_fd_industrial_motor():
+    assert obtener_fd("industrial", "motor") == 0.75
+
+def test_fd_residencial_alumbrado():
+    assert obtener_fd("residencial", "alumbrado") == 0.66
+
+def test_fd_desconocido_fallback():
+    """Tipo desconocido retorna 1.0 — criterio conservador."""
+    assert obtener_fd("industrial", "inexistente") == 1.0
+
+def test_fd_insensible_mayusculas():
+    assert obtener_fd("DATACENTER", "CRITICA") == 1.0
+
+# --- Corriente alimentador ---
+
+def test_corriente_3F_1000kva():
+    """1000 kVA / 380V trifásico → 1519.3 A"""
+    I = calcular_corriente_alimentador(1000, 380, "3F")
+    assert abs(I - 1519.3) < 1.0
+
+def test_corriente_1F_10kva():
+    """10 kVA / 220V monofásico → 45.5 A"""
+    I = calcular_corriente_alimentador(10, 220, "1F")
+    assert abs(I - 45.5) < 1.0
+
+def test_corriente_cero():
+    assert calcular_corriente_alimentador(0, 380, "3F") == 0.0
+
+# --- Selección transformador ---
+
+def test_trafo_876kva_selecciona_1250():
+    """876.7 kVA / 0.80 = 1095.9 → próximo IEC = 1250 kVA"""
+    r = seleccionar_transformador(876.7)
+    assert r["kVA_seleccionado"] == 1250
+
+def test_trafo_uso_dentro_80():
+    """500 kVA selecciona 630 → uso = 79.4% → OK"""
+    r = seleccionar_transformador(500)
+    assert r["kVA_seleccionado"] == 630
+    assert r["estado"] == "OK"
+
+def test_trafo_kva_minimo_correcto():
+    """kVA_minimo = S / 0.80"""
+    r = seleccionar_transformador(800)
+    assert abs(r["kVA_minimo"] - 1000.0) < 0.1
+
+# --- Acometida SEC ---
+
+def test_sec_urbana_icc():
+    r = dimensionar_acometida_sec(100, 220, "1F", "urbana")
+    assert r["Icc_kA"] == 6.0
+
+def test_sec_rural_icc():
+    r = dimensionar_acometida_sec(100, 220, "1F", "rural")
+    assert r["Icc_kA"] == 2.0
+
+def test_sec_proteccion_125pct():
+    """Protección mínima = I_alim × 1.25"""
+    r = dimensionar_acometida_sec(100, 220, "1F", "urbana")
+    I = calcular_corriente_alimentador(100, 220, "1F")
+    assert abs(r["I_prot_min_A"] - round(I * 1.25, 1)) < 0.1
+
+# --- Integración calcular_demanda ---
+
+def test_demanda_integracion_basica():
+    """
+    Proyecto básico: 2 circuitos datacenter.
+    CRAC 3F 63A → critica Fd=1.0
+    Tomacorriente 1F 20A → tomacorriente Fd=0.5
+    """
+    circuitos = [
+        {"nombre": "CRAC-1", "sistema": "3F", "I_diseno": 63,
+         "cos_phi": 0.85, "S_mm2": 13.3, "paralelos": 1,
+         "L_m": 10, "temp_amb": 30, "I_max": 65,
+         "conductor": "6AWG"},
+        {"nombre": "TOM-1", "sistema": "1F", "I_diseno": 20,
+         "cos_phi": 1.0, "S_mm2": 5.26, "paralelos": 1,
+         "L_m": 25, "temp_amb": 30, "I_max": 35,
+         "conductor": "10AWG"},
+    ]
+    balance_datos = {
+        "CRAC-1": {"tablero": "MDP", "fase": "L1", "tipo_carga": "critica"},
+        "TOM-1":  {"tablero": "MDP", "fase": "L2", "tipo_carga": "tomacorriente"},
+    }
+    params = {
+        "tipo_instalacion":   "datacenter",
+        "cos_phi_global":     0.85,
+        "factor_crecimiento": 1.0,
+        "tension_alim":       380,
+        "sistema_alim":       "3F",
+    }
+
+    r = calcular_demanda(circuitos, balance_datos, params)
+
+    assert r["S_total_kva"] > 0
+    assert r["I_alim_A"] > 0
+    # CRAC Fd=1.0, TOM Fd=0.5 → demanda TOM = mitad
+    tom = next(d for d in r["detalle"] if d["nombre"] == "TOM-1")
+    assert tom["Fd"] == 0.5
+    assert tom["P_dem_kw"] == round(tom["P_inst_kw"] * 0.5, 3)
