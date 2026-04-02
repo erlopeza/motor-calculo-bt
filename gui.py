@@ -27,6 +27,11 @@ from transformador import calcular_icc_transformador, icc_desde_tabla, clasifica
 from icc_punto import calcular_icc_todos_circuitos
 from protecciones import verificar_circuito_completo, leer_protecciones_excel
 from balance import calcular_balance_tableros, obtener_fs
+from demanda import (
+    calcular_demanda, seleccionar_transformador,
+    dimensionar_acometida_sec, reporte_demanda
+)
+from excel import leer_demanda_excel
 from perfiles import (PERFILES, PERFIL_DEFAULT, obtener_perfil, lista_perfiles,
     validar_perfil_vs_datos, hay_bloqueo, NIVEL_OK, NIVEL_ADVERTENCIA, NIVEL_BLOQUEO)
 from datetime import datetime
@@ -151,12 +156,14 @@ class MotorCalculoBT:
         self.perfil_activo   = obtener_perfil(PERFIL_DEFAULT)
 
         # Datos calculados
-        self.circuitos       = []
-        self.datos_trafo     = None
-        self.protecciones    = {}
-        self.balance_datos   = {}
-        self.tableros_datos  = {}
-        self.resultado_calc  = None
+        self.circuitos        = []
+        self.datos_trafo      = None
+        self.protecciones     = {}
+        self.balance_datos    = {}
+        self.tableros_datos   = {}
+        self.resultado_calc   = None
+        self.params_demanda   = None
+        self.resultado_demanda = None
 
         # Contadores resumen
         self.var_circ_ok     = tk.StringVar(value="—")
@@ -299,6 +306,11 @@ class MotorCalculoBT:
                     color=COLORES["boton"]).pack(fill="x", padx=14, pady=2)
         self._boton(panel, "💾  EXPORTAR REPORTE", self._exportar,
                     color=COLORES["encabezado"]).pack(fill="x", padx=14, pady=2)
+        self.btn_demanda = self._boton(
+                    panel, "📊  DEMANDA M6", self._abrir_ventana_demanda,
+                    color=COLORES["encabezado"])
+        self.btn_demanda.pack(fill="x", padx=14, pady=2)
+        self.btn_demanda.config(state="disabled")   # habilitado tras calcular
 
         tk.Frame(panel, bg=COLORES["borde"], height=1).pack(fill="x", padx=10, pady=8)
 
@@ -611,6 +623,7 @@ class MotorCalculoBT:
             self.balance_datos  = leer_balance_excel(libro)
             self.tableros_datos = leer_tableros_excel(libro)
             self.circuitos      = leer_circuitos_excel(archivo)
+            self.params_demanda = leer_demanda_excel(libro)
         except Exception as e:
             self._set_estado(f"✗ Error al leer: {e}")
             return
@@ -784,6 +797,13 @@ class MotorCalculoBT:
                     self.tableros_datos, kVA
                 )
 
+            # Demanda M6
+            self.resultado_demanda = None
+            if self.params_demanda and self.balance_datos:
+                self.resultado_demanda = calcular_demanda(
+                    self.circuitos, self.balance_datos, self.params_demanda
+                )
+
             # Actualizar GUI desde el hilo principal
             self.root.after(0, self._actualizar_gui)
 
@@ -797,6 +817,9 @@ class MotorCalculoBT:
         self._poblar_tab_protecciones()
         self._poblar_tab_balance()
         self._actualizar_resumen()
+        # Habilitar botón Demanda M6 si hay datos
+        if self.resultado_demanda:
+            self.btn_demanda.config(state="normal")
         self._set_estado("✓ Cálculo completado")
 
     def _exportar(self):
@@ -1199,6 +1222,199 @@ class MotorCalculoBT:
             )["estado"] == "OK"
         )
         self.var_prot_ok.set(f"{prot_ok}/{len(self.protecciones)}")
+
+
+    def _abrir_ventana_demanda(self):
+        """
+        Abre ventana separada con resultados de demanda M6.
+        No modal — coexiste con la ventana principal.
+        Se recrea cada vez — evita estados inconsistentes.
+        """
+        if not self.resultado_demanda:
+            return
+
+        r   = self.resultado_demanda
+        p   = self.params_demanda
+
+        # Calcular trafo o SEC según tipo
+        resultado_trafo = None
+        resultado_sec   = None
+        if p.get("tipo_alimentador") == "transformador":
+            resultado_trafo = seleccionar_transformador(r["S_futuro_kva"])
+        else:
+            resultado_sec = dimensionar_acometida_sec(
+                r["S_futuro_kva"],
+                p["tension_alim"],
+                p["sistema_alim"],
+                p.get("zona_sec", "urbana")
+            )
+
+        # --- Crear ventana ---
+        ventana = tk.Toplevel(self.root)
+        ventana.title(f"Demanda M6 — {self.nombre_proyecto.get()}")
+        ventana.geometry("860x620")
+        ventana.configure(bg=COLORES["fondo"])
+        ventana.resizable(True, True)
+        # No grab_set() — no modal, coexiste con ventana principal
+
+        # Centrar
+        x = self.root.winfo_x() + (self.root.winfo_width()  - 860) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 620) // 2
+        ventana.geometry(f"860x620+{x}+{y}")
+
+        # Título
+        tk.Label(
+            ventana,
+            text="DEMANDA MÁXIMA Y DIMENSIONAMIENTO — M6",
+            bg=COLORES["fondo"], fg=COLORES["acento"],
+            font=FUENTES["titulo"], pady=10
+        ).pack(fill="x")
+        tk.Label(
+            ventana,
+            text=f"Instalación: {r['tipo_instalacion'].upper()}  |  "
+                 f"Normativa: RIC N°03 SEC / IEC 60076",
+            bg=COLORES["fondo"], fg=COLORES["texto_gris"],
+            font=FUENTES["pequeño"]
+        ).pack()
+        tk.Frame(ventana, bg=COLORES["borde"],
+                 height=1).pack(fill="x", padx=16, pady=6)
+
+        # Notebook interno
+        style = ttk.Style()
+        style.configure("M6.TNotebook",
+                         background=COLORES["fondo"], borderwidth=0)
+        style.configure("M6.TNotebook.Tab",
+                         background=COLORES["panel"],
+                         foreground=COLORES["texto_gris"],
+                         font=FUENTES["pequeño"], padding=[12, 5])
+        style.map("M6.TNotebook.Tab",
+                  background=[("selected", COLORES["acento"])],
+                  foreground=[("selected", "#FFFFFF")])
+
+        nb = ttk.Notebook(ventana, style="M6.TNotebook")
+        nb.pack(fill="both", expand=True, padx=0, pady=0)
+
+        # --- TAB 1: Detalle por circuito ---
+        tab_det = tk.Frame(nb, bg=COLORES["fondo"])
+        nb.add(tab_det, text="📋  Detalle circuitos")
+
+        cols_det = {
+            "Circuito": 200, "Tipo_carga": 130,
+            "Fd": 50, "P_inst(kW)": 90,
+            "P_dem(kW)": 90, "S_dem(kVA)": 90
+        }
+        self._tabla_en_frame(tab_det, cols_det, [
+            (d["nombre"], d["tipo_carga"], d["Fd"],
+             d["P_inst_kw"], d["P_dem_kw"], d["S_dem_kva"])
+            for d in r["detalle"]
+        ])
+
+        # --- TAB 2: Resumen ejecutivo ---
+        tab_res = tk.Frame(nb, bg=COLORES["fondo"])
+        nb.add(tab_res, text="📊  Resumen")
+
+        filas_res = [
+            ("Tipo instalación",  r["tipo_instalacion"].upper()),
+            ("Demanda total",     f"{r['S_total_kva']} kVA  ({r['P_total_kw']} kW)"),
+            ("Corriente alim.",   f"{r['I_alim_A']} A  ({r['sistema_alim']} / {r['Vn_alim']} V)"),
+            ("Factor crecimiento",f"×{r['factor_crecimiento']}"),
+            ("Demanda futura",    f"{r['S_futuro_kva']} kVA  →  {r['I_futuro_A']} A"),
+        ]
+        self._filas_info(tab_res, filas_res)
+
+        # --- TAB 3: Transformador o SEC ---
+        tab_dim = tk.Frame(nb, bg=COLORES["fondo"])
+        tipo_alim = p.get("tipo_alimentador", "transformador")
+        nb.add(tab_dim, text="🔌  Transformador" if tipo_alim == "transformador" else "🔌  Acometida SEC")
+
+        if resultado_trafo:
+            t = resultado_trafo
+            color_t = (COLORES["falla"]     if "FALLA" in t["estado"] else
+                       COLORES["precaucion"] if "PRECAUCIÓN" in t["estado"] else
+                       COLORES["ok"])
+            filas_t = [
+                ("kVA mínimo requerido", f"{t['kVA_minimo']} kVA"),
+                ("kVA seleccionado",     f"{t['kVA_seleccionado']} kVA  (estándar IEC 60076)"),
+                ("Uso del transformador",f"{t['uso_pct']}%"),
+                ("Estado",               t["estado"]),
+                ("",                     ""),
+                ("Transformador actual",
+                 f"{self.datos_trafo['kVA']} kVA  →  "
+                 f"{'SUFICIENTE' if self.datos_trafo['kVA'] >= t['kVA_minimo'] else 'INSUFICIENTE para demanda futura'}"
+                 if self.datos_trafo else "—"),
+            ]
+            self._filas_info(tab_dim, filas_t, color_estado=color_t)
+
+        elif resultado_sec:
+            s = resultado_sec
+            filas_s = [
+                ("Corriente alimentador", f"{s['I_alim_A']} A"),
+                ("Icc empalme SEC",       f"{s['Icc_kA']} kA  (zona {s['zona']})"),
+                ("Protección mínima",     f"{s['I_prot_min_A']} A  (125% I_alim — RIC N°03)"),
+                ("Nota",                  s["nota"]),
+            ]
+            self._filas_info(tab_dim, filas_s)
+
+        # Botón cerrar
+        tk.Frame(ventana, bg=COLORES["borde"],
+                 height=1).pack(fill="x", padx=16, pady=6)
+        self._boton(ventana, "✗  Cerrar", ventana.destroy,
+                    color=COLORES["encabezado"]).pack(pady=8)
+
+    def _tabla_en_frame(self, parent, columnas, datos):
+        """Crea Treeview dentro de un frame."""
+        frame = tk.Frame(parent, bg=COLORES["fondo"])
+        frame.pack(fill="both", expand=True, padx=16, pady=8)
+
+        style = ttk.Style()
+        style.configure("M6.Treeview",
+            background=COLORES["fila_par"],
+            foreground=COLORES["texto"],
+            fieldbackground=COLORES["fila_par"],
+            font=FUENTES["mono"], rowheight=22)
+        style.configure("M6.Treeview.Heading",
+            background=COLORES["encabezado"],
+            foreground=COLORES["texto"],
+            font=FUENTES["subtitulo"], relief="flat")
+
+        tree = ttk.Treeview(frame,
+            columns=list(columnas.keys()),
+            show="headings", style="M6.Treeview")
+        for col, ancho in columnas.items():
+            tree.heading(col, text=col)
+            tree.column(col, width=ancho, anchor="center")
+        tree.tag_configure("par",  background=COLORES["fila_par"])
+        tree.tag_configure("impar",background=COLORES["fila_impar"])
+
+        for i, fila in enumerate(datos):
+            tree.insert("", "end", values=fila,
+                        tags=("impar" if i % 2 else "par",))
+
+        scroll_x = ttk.Scrollbar(frame, orient="horizontal",
+                                  command=tree.xview)
+        tree.configure(xscrollcommand=scroll_x.set)
+        tree.pack(fill="both", expand=True)
+        scroll_x.pack(fill="x")
+
+    def _filas_info(self, parent, filas, color_estado=None):
+        """Muestra pares campo/valor como filas estilizadas."""
+        for i, (campo, valor) in enumerate(filas):
+            if not campo:
+                tk.Frame(parent, bg=COLORES["borde"],
+                         height=1).pack(fill="x", padx=16, pady=4)
+                continue
+            f = tk.Frame(parent,
+                         bg=COLORES["fila_impar"] if i % 2 else COLORES["fila_par"])
+            f.pack(fill="x", padx=16, pady=1)
+            tk.Label(f, text=f"  {campo}", width=22, anchor="w",
+                     bg=f["bg"], fg=COLORES["texto_gris"],
+                     font=FUENTES["pequeño"]).pack(side="left", pady=5)
+            # Color especial para fila Estado
+            color_val = (color_estado if campo == "Estado" and color_estado
+                         else COLORES["texto"])
+            tk.Label(f, text=valor, anchor="w",
+                     bg=f["bg"], fg=color_val,
+                     font=FUENTES["normal"]).pack(side="left", pady=5)
 
     def _set_estado(self, texto):
         self.estado_texto.set(texto)
