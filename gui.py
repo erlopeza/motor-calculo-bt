@@ -31,7 +31,8 @@ from demanda import (
     calcular_demanda, seleccionar_transformador,
     dimensionar_acometida_sec, reporte_demanda
 )
-from excel import leer_demanda_excel
+from excel import leer_demanda_excel, leer_cadena_excel
+from coordinacion import verificar_cadena, reporte_coordinacion
 from perfiles import (PERFILES, PERFIL_DEFAULT, obtener_perfil, lista_perfiles,
     validar_perfil_vs_datos, hay_bloqueo, NIVEL_OK, NIVEL_ADVERTENCIA, NIVEL_BLOQUEO)
 from datetime import datetime
@@ -162,8 +163,10 @@ class MotorCalculoBT:
         self.balance_datos    = {}
         self.tableros_datos   = {}
         self.resultado_calc   = None
-        self.params_demanda   = None
+        self.params_demanda    = None
         self.resultado_demanda = None
+        self.cadena_datos      = []
+        self.resultados_m7     = {}
 
         # Contadores resumen
         self.var_circ_ok     = tk.StringVar(value="—")
@@ -311,6 +314,11 @@ class MotorCalculoBT:
                     color=COLORES["encabezado"])
         self.btn_demanda.pack(fill="x", padx=14, pady=2)
         self.btn_demanda.config(state="disabled")   # habilitado tras calcular
+        self.btn_coord = self._boton(
+                    panel, "⚡  COORDINACIÓN M7", self._abrir_ventana_coordinacion,
+                    color=COLORES["encabezado"])
+        self.btn_coord.pack(fill="x", padx=14, pady=2)
+        self.btn_coord.config(state="disabled")     # habilitado tras calcular
 
         tk.Frame(panel, bg=COLORES["borde"], height=1).pack(fill="x", padx=10, pady=8)
 
@@ -624,6 +632,7 @@ class MotorCalculoBT:
             self.tableros_datos = leer_tableros_excel(libro)
             self.circuitos      = leer_circuitos_excel(archivo)
             self.params_demanda = leer_demanda_excel(libro)
+            self.cadena_datos   = leer_cadena_excel(libro)
         except Exception as e:
             self._set_estado(f"✗ Error al leer: {e}")
             return
@@ -804,6 +813,25 @@ class MotorCalculoBT:
                     self.circuitos, self.balance_datos, self.params_demanda
                 )
 
+            # Coordinación TCC — M7
+            self.resultados_m7 = {}
+            if self.cadena_datos:
+                modos = {}
+                for d in self.cadena_datos:
+                    m = d.get("modo", "red")
+                    modos.setdefault(m, []).append(d)
+                for modo, dispositivos in modos.items():
+                    dispositivos_ord = sorted(dispositivos, key=lambda x: x["nivel"])
+                    Icc_A = 0
+                    for d in reversed(dispositivos_ord):
+                        if d.get("Icc_kA"):
+                            Icc_A = d["Icc_kA"] * 1000
+                            break
+                    if Icc_A > 0:
+                        self.resultados_m7[modo] = verificar_cadena(
+                            dispositivos_ord, Icc_A, sistema="3F_380"
+                        )
+
             # Actualizar GUI desde el hilo principal
             self.root.after(0, self._actualizar_gui)
 
@@ -820,6 +848,8 @@ class MotorCalculoBT:
         # Habilitar botón Demanda M6 si hay datos
         if self.resultado_demanda:
             self.btn_demanda.config(state="normal")
+        if self.resultados_m7:
+            self.btn_coord.config(state="normal")
         self._set_estado("✓ Cálculo completado")
 
     def _exportar(self):
@@ -1415,6 +1445,133 @@ class MotorCalculoBT:
             tk.Label(f, text=valor, anchor="w",
                      bg=f["bg"], fg=color_val,
                      font=FUENTES["normal"]).pack(side="left", pady=5)
+
+
+    def _abrir_ventana_coordinacion(self):
+        """
+        Abre ventana separada con resultados de coordinación TCC M7.
+        Patrón idéntico a _abrir_ventana_demanda — Toplevel no modal.
+        """
+        if not self.resultados_m7:
+            return
+
+        ventana = tk.Toplevel(self.root)
+        ventana.title(f"Coordinación TCC M7 — {self.nombre_proyecto.get()}")
+        ventana.geometry("900x640")
+        ventana.configure(bg=COLORES["fondo"])
+        ventana.resizable(True, True)
+
+        x = self.root.winfo_x() + (self.root.winfo_width()  - 900) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 640) // 2
+        ventana.geometry(f"900x640+{x}+{y}")
+
+        # Título
+        tk.Label(
+            ventana,
+            text="COORDINACIÓN TCC — M7",
+            bg=COLORES["fondo"], fg=COLORES["acento"],
+            font=FUENTES["titulo"], pady=10
+        ).pack(fill="x")
+        tk.Label(
+            ventana,
+            text="Normativa: IEC 60947-2 / IEC 60898-1 / IEC 60364-4-41  |  "
+                 "Limitación: región térmica ETU no modelada → usar SIMARIS",
+            bg=COLORES["fondo"], fg=COLORES["texto_gris"],
+            font=FUENTES["pequeño"]
+        ).pack()
+        tk.Frame(ventana, bg=COLORES["borde"],
+                 height=1).pack(fill="x", padx=16, pady=6)
+
+        # Notebook por modo
+        style = ttk.Style()
+        style.configure("M7.TNotebook",
+                         background=COLORES["fondo"], borderwidth=0)
+        style.configure("M7.TNotebook.Tab",
+                         background=COLORES["panel"],
+                         foreground=COLORES["texto_gris"],
+                         font=FUENTES["pequeño"], padding=[12, 5])
+        style.map("M7.TNotebook.Tab",
+                  background=[("selected", COLORES["acento"])],
+                  foreground=[("selected", "#FFFFFF")])
+
+        nb = ttk.Notebook(ventana, style="M7.TNotebook")
+        nb.pack(fill="both", expand=True, padx=0, pady=0)
+
+        for modo, resultado in self.resultados_m7.items():
+            tab = tk.Frame(nb, bg=COLORES["fondo"])
+            icono = "🔌" if modo == "red" else "⚡"
+            nb.add(tab, text=f"{icono}  Modo {modo.capitalize()}")
+            self._construir_tab_coordinacion(tab, resultado, modo)
+
+        # Botón cerrar
+        tk.Frame(ventana, bg=COLORES["borde"],
+                 height=1).pack(fill="x", padx=16, pady=6)
+        self._boton(ventana, "✗  Cerrar", ventana.destroy,
+                    color=COLORES["encabezado"]).pack(pady=8)
+
+    def _construir_tab_coordinacion(self, parent, resultado, modo):
+        """Construye el contenido de un tab de coordinación."""
+
+        # --- Resumen global ---
+        sel = resultado["selectividad_global"]
+        iec = resultado["iec60364_final"]
+        color_sel = (COLORES["ok"]        if sel == "TOTAL" else
+                     COLORES["precaucion"] if sel in ("PARCIAL","INDETERMINADA") else
+                     COLORES["falla"])
+        color_iec = (COLORES["ok"]   if iec["cumple"] == True else
+                     COLORES["falla"] if iec["cumple"] == False else
+                     COLORES["precaucion"])
+
+        frame_res = tk.Frame(parent, bg=COLORES["panel"])
+        frame_res.pack(fill="x", padx=16, pady=8)
+
+        tk.Label(frame_res,
+                 text=f"  Selectividad global: {sel}",
+                 bg=COLORES["panel"], fg=color_sel,
+                 font=FUENTES["subtitulo"], anchor="w"
+                 ).pack(side="left", padx=8, pady=6)
+        tk.Label(frame_res,
+                 text=f"  IEC 60364-4-41: {iec['estado']}  ({iec['nota']})",
+                 bg=COLORES["panel"], fg=color_iec,
+                 font=FUENTES["pequeño"], anchor="w"
+                 ).pack(side="left", padx=8, pady=6)
+
+        # --- Tabla tiempos de disparo ---
+        tk.Label(parent, text="  Tiempos de disparo",
+                 bg=COLORES["fondo"], fg=COLORES["texto_gris"],
+                 font=FUENTES["pequeño"], anchor="w"
+                 ).pack(fill="x", padx=16, pady=(8, 2))
+
+        cols_disp = {
+            "Dispositivo": 180, "Nivel": 55,
+            "t_disparo(s)": 100, "Región": 160, "Nota": 350
+        }
+        filas_disp = []
+        for d in resultado["resultados_disparo"]:
+            t_str = f"{d['t_s']:.3f}" if d["t_s"] is not None else "—"
+            filas_disp.append((
+                d["nombre"], d["nivel"], t_str,
+                d["region"], d["nota"]
+            ))
+        self._tabla_en_frame(parent, cols_disp, filas_disp)
+
+        # --- Tabla selectividad por par ---
+        tk.Label(parent, text="  Selectividad por par",
+                 bg=COLORES["fondo"], fg=COLORES["texto_gris"],
+                 font=FUENTES["pequeño"], anchor="w"
+                 ).pack(fill="x", padx=16, pady=(8, 2))
+
+        cols_par = {
+            "Inferior": 160, "Superior": 160,
+            "Selectividad": 120, "Nota": 380
+        }
+        filas_par = []
+        for p in resultado["selectividad_pares"]:
+            filas_par.append((
+                p["inferior"], p["superior"],
+                p["selectividad"], p["nota"]
+            ))
+        self._tabla_en_frame(parent, cols_par, filas_par)
 
     def _set_estado(self, texto):
         self.estado_texto.set(texto)
