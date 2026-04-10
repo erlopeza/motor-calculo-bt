@@ -26,7 +26,8 @@ from demanda import (
     calcular_demanda, seleccionar_transformador,
     dimensionar_acometida_sec, reporte_demanda
 )
-from excel import leer_demanda_excel
+from excel import leer_demanda_excel, leer_cadena_excel
+from coordinacion import verificar_cadena, reporte_coordinacion
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
@@ -74,7 +75,8 @@ def generar_seccion_transformador(datos_trafo):
 def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
                         datos_trafo=None, protecciones=None,
                         balance_datos=None, tableros_datos=None,
-                        params_demanda=None):
+                        params_demanda=None,
+                        cadena_datos=None):
     lineas      = []
     total_ok    = 0
     total_falla = 0
@@ -202,6 +204,32 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
             resultado_demanda, resultado_trafo_m6, resultado_sec_m6
         )
 
+    # --- COORDINACIÓN TCC — M7 ---
+    if cadena_datos:
+        # Agrupar dispositivos por modo
+        modos = {}
+        for d in cadena_datos:
+            m = d.get("modo", "red")
+            modos.setdefault(m, []).append(d)
+
+        for modo, dispositivos in modos.items():
+            # Ordenar por nivel
+            dispositivos_ord = sorted(dispositivos, key=lambda x: x["nivel"])
+            # Usar Icc del primer dispositivo disponible, o 0
+            Icc_A = 0
+            for d in reversed(dispositivos_ord):
+                if d.get("Icc_kA"):
+                    Icc_A = d["Icc_kA"] * 1000
+                    break
+            if Icc_A > 0:
+                res_cadena = verificar_cadena(
+                    dispositivos_ord, Icc_A, sistema="3F_380"
+                )
+                lineas.append("")
+                lineas += reporte_coordinacion(
+                    res_cadena, f"Modo {modo}"
+                )
+
     # --- RESUMEN FINAL ---
     lineas.append("")
     lineas.append("=" * 60)
@@ -246,6 +274,7 @@ protecciones_excel = {}
 balance_datos      = {}
 tableros_datos     = {}
 params_demanda     = None
+cadena_datos       = []
 
 try:
     _libro = openpyxl.load_workbook(archivo_excel, data_only=True)
@@ -262,9 +291,13 @@ try:
     if params_demanda:
         print(f"  Demanda M6    : {params_demanda['tipo_instalacion']} / "
               f"{params_demanda['tipo_alimentador']}")
+    cadena_datos = leer_cadena_excel(_libro)
+    if cadena_datos:
+        print(f"  Coordinación  : {len(cadena_datos)} dispositivos en cadena")
 except Exception as e:
     print(f"  AVISO lectura hojas opcionales: {e}")
     params_demanda = None
+    cadena_datos   = []
 
 # --- LEER CIRCUITOS ---
 try:
@@ -297,7 +330,7 @@ lineas, total_ok, total_falla = generar_reporte_txt(
     nombre_proyecto, circuitos, fecha,
     datos_trafo, protecciones_excel,
     balance_datos, tableros_datos,
-    params_demanda
+    params_demanda, cadena_datos
 )
 
 print()

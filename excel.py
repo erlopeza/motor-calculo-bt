@@ -505,3 +505,91 @@ def leer_demanda_excel(libro_openpyxl):
         "factor_crecimiento": f_crec,
         "zona_sec":           datos.get("zona_sec",          "urbana").lower(),
     }
+
+def leer_cadena_excel(libro_openpyxl):
+    """
+    Lee la hoja 'cadena' del libro Excel — dispositivos para M7.
+
+    Estructura: fila 1 puede ser título, encabezados en fila 1 o 2.
+    Detecta automáticamente buscando la columna 'nombre'.
+
+    Retorna lista de dicts, uno por dispositivo.
+    Retorna lista vacía si no hay hoja 'cadena'.
+    """
+    hoja_nombre = None
+    for nombre in libro_openpyxl.sheetnames:
+        if nombre.lower() == "cadena":
+            hoja_nombre = nombre
+            break
+
+    if not hoja_nombre:
+        return []
+
+    hoja = libro_openpyxl[hoja_nombre]
+
+    # Detectar fila de encabezados — fila 1 o fila 2
+    fila1 = [str(c.value).strip().lower() if c.value else "" for c in hoja[1]]
+    fila2 = [str(c.value).strip().lower() if c.value else "" for c in hoja[2]]
+
+    if "nombre" in fila2:
+        encabezados   = fila2
+        datos_min_row = 3
+    elif "nombre" in fila1:
+        encabezados   = fila1
+        datos_min_row = 2
+    else:
+        return []
+
+    dispositivos = []
+    for fila in hoja.iter_rows(min_row=datos_min_row, values_only=True):
+        if not any(v is not None for v in fila):
+            continue
+
+        d = {}
+        for i, val in enumerate(fila):
+            if i >= len(encabezados):
+                break
+            d[encabezados[i]] = val
+
+        nombre_val = str(d.get("nombre") or "").strip()
+        # Ignorar filas de notas/metadata (nombre muy largo o símbolo especial)
+        if not nombre_val or len(nombre_val) > 40 or nombre_val.startswith("⚡"):
+            continue
+
+        def _float(key, default=None):
+            v = d.get(key)
+            if v is None or str(v).strip() in ("", "—", "-", "None"):
+                return default
+            try:
+                return float(v)
+            except (ValueError, TypeError):
+                return default
+
+        def _int(key, default=0):
+            v = d.get(key)
+            try:
+                return int(float(v)) if v is not None else default
+            except (ValueError, TypeError):
+                return default
+
+        def _str(key, default=""):
+            v = d.get(key)
+            return str(v).strip() if v is not None else default
+
+        dispositivos.append({
+            "nombre":       _str("nombre"),
+            "designacion":  _str("designacion"),
+            "circuito_ref": _str("circuito_ref"),
+            "nivel":        _int("nivel", 0),
+            "In_A":         _float("in_a", 0),
+            "curva":        _str("curva", "C").upper(),
+            "Ir_xIn":       _float("ir_xin",  1.0),
+            "Isd_xIr":      _float("isd_xir", None),
+            "tsd_s":        _float("tsd_s",   None),
+            "Ii_xIn":       _float("ii_xin",  None),
+            "modo":         _str("modo", "red").lower(),
+            "upstream":     _str("upstream"),
+            "Icc_kA":       _float("icc_ka",  None),
+        })
+
+    return dispositivos
