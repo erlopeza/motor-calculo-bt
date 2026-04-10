@@ -450,3 +450,155 @@ def test_demanda_integracion_basica():
     tom = next(d for d in r["detalle"] if d["nombre"] == "TOM-1")
     assert tom["Fd"] == 0.5
     assert tom["P_dem_kw"] == round(tom["P_inst_kw"] * 0.5, 3)
+# ============================================================
+# TESTS DE COORDINACIÓN TCC — MÓDULO 7
+# ============================================================
+from coordinacion import (
+    calcular_tiempo_disparo, verificar_selectividad_par,
+    verificar_iec60364, verificar_cadena
+)
+
+# --- Tiempos de disparo ---
+
+def test_disparo_curva_c_instantaneo():
+    """Curva C 32A — Icc=1000A > Ii_max(10×In=320A) → instantáneo"""
+    r = calcular_tiempo_disparo(1000, 32, "C", Ii_xIn=10)
+    assert r["dispara"] == True
+    assert r["t_s"] == 0.02
+    assert r["region"] == "instantaneo"
+
+def test_disparo_curva_c_termico():
+    """Curva C 32A — Icc=100A en región térmica"""
+    r = calcular_tiempo_disparo(100, 32, "C", Ir_xIn=1.0)
+    assert r["dispara"] == True
+    assert r["region"] == "termico"
+    assert r["t_s"] > 0
+
+def test_disparo_etu_tiempo_corto():
+    """ETU600 1600A — Icc=5000A > Isd=2.5×In=4000A → tsd=0.30s"""
+    r = calcular_tiempo_disparo(
+        5000, 1600, "ETU600",
+        Ir_xIn=1.0, Isd_xIr=2.5, tsd_s=0.30, Ii_xIn=10
+    )
+    assert r["dispara"] == True
+    assert r["t_s"] == 0.30
+    assert r["region"] == "tiempo_corto"
+
+def test_disparo_etu_instantaneo():
+    """ETU600 1600A — Icc=20000A > Ii=10×In=16000A → instantáneo"""
+    r = calcular_tiempo_disparo(
+        20000, 1600, "ETU600",
+        Ir_xIn=1.0, Isd_xIr=2.5, tsd_s=0.30, Ii_xIn=10
+    )
+    assert r["t_s"] == 0.02
+    assert r["region"] == "instantaneo"
+
+def test_disparo_etu_region_termica_no_modelada():
+    """ETU — Icc en región térmica → verificar_simaris"""
+    r = calcular_tiempo_disparo(
+        2000, 1600, "ETU600",
+        Ir_xIn=1.0, Isd_xIr=2.5, tsd_s=0.30, Ii_xIn=10
+    )
+    assert r["region"] == "verificar_simaris"
+    assert r["t_s"] is None
+
+def test_disparo_no_dispara():
+    """Curva C — Icc < Ir → no dispara"""
+    r = calcular_tiempo_disparo(10, 32, "C", Ir_xIn=1.0)
+    assert r["dispara"] == False
+    assert r["region"] == "no_dispara"
+
+# --- Selectividad entre pares ---
+
+def test_selectividad_total():
+    """Inferior dispara en 0.02s, superior en 0.30s → TOTAL"""
+    inf = {"t_s": 0.02, "region": "instantaneo", "dispara": True, "nota": ""}
+    sup = {"t_s": 0.30, "region": "tiempo_corto", "dispara": True, "nota": ""}
+    r = verificar_selectividad_par(inf, sup)
+    assert r["selectividad"] == "TOTAL"
+
+def test_selectividad_ninguna():
+    """Inferior dispara en 0.30s, superior en 0.02s → NINGUNA"""
+    inf = {"t_s": 0.30, "region": "tiempo_corto", "dispara": True, "nota": ""}
+    sup = {"t_s": 0.02, "region": "instantaneo",  "dispara": True, "nota": ""}
+    r = verificar_selectividad_par(inf, sup)
+    assert r["selectividad"] == "NINGUNA"
+
+def test_selectividad_indeterminada():
+    """Región no modelada → INDETERMINADA"""
+    inf = {"t_s": None, "region": "verificar_simaris", "dispara": None, "nota": ""}
+    sup = {"t_s": 0.30, "region": "tiempo_corto",      "dispara": True, "nota": ""}
+    r = verificar_selectividad_par(inf, sup)
+    assert r["selectividad"] == "INDETERMINADA"
+
+# --- IEC 60364-4-41 ---
+
+def test_iec60364_cumple():
+    assert verificar_iec60364(0.02, "3F_380")["cumple"] == True
+
+def test_iec60364_falla():
+    """ta-cur=10.622s > t_max=5s → FALLA (caso real BTDP 4.1)"""
+    r = verificar_iec60364(10.622, "3F_380")
+    assert r["cumple"] == False
+    assert r["estado"] == "FALLA"
+
+def test_iec60364_monofasico():
+    """t_max = 0.4s para 1F_220"""
+    assert verificar_iec60364(0.3, "1F_220")["cumple"] == True
+    assert verificar_iec60364(0.5, "1F_220")["cumple"] == False
+
+# --- Cadena completa — caso LEO ARICA Cadena A ---
+
+def test_cadena_leo_arica_modo_red():
+    """
+    Cadena A Modo Red LEO ARICA:
+        G0A: ETU600 1600A  Isd=2.5×In=4000A  tsd=0.30s  Ii=10×In=16000A
+        G1A: ETU320  630A  Ii=9×In=5670A
+        C2A: Curva C  32A  Ii=10×In=320A
+
+    Icc en punto final = 4490A (circuito antena — dato real M2)
+
+    Con Icc=4490A:
+        G0A: Icc(4490) > Isd(4000) → tiempo_corto t=0.30s
+        G1A: Icc(4490) < Ii(5670)  → región térmica ETU → verificar_simaris
+        C2A: Icc(4490) >> Ii(320)  → instantáneo t=0.02s
+    """
+    dispositivos = [
+        {
+            "nombre": "G0A_3WA1600", "nivel": 0,
+            "In_A": 1600, "curva": "ETU600",
+            "Ir_xIn": 1.0, "Isd_xIr": 2.5, "tsd_s": 0.30, "Ii_xIn": 10
+        },
+        {
+            "nombre": "G1A_3VA630", "nivel": 1,
+            "In_A": 630, "curva": "ETU320",
+            "Ir_xIn": 0.8, "Isd_xIr": None, "tsd_s": None, "Ii_xIn": 9
+        },
+        {
+            "nombre": "C2A_5SY32", "nivel": 2,
+            "In_A": 32, "curva": "C",
+            "Ir_xIn": 1.0, "Ii_xIn": 10
+        },
+    ]
+
+    r = verificar_cadena(dispositivos, Icc_A=4490, sistema="3F_380")
+
+    # C2A (Curva C 32A): Icc=4490 >> Ii_max=320A → instantáneo
+    final = r["resultados_disparo"][-1]
+    assert final["t_s"] == 0.02
+    assert final["region"] == "instantaneo"
+
+    # G0A (ETU600 1600A): Icc=4490 > Isd=4000A → tiempo_corto t=0.30s
+    cabecera = r["resultados_disparo"][0]
+    assert cabecera["region"] == "tiempo_corto"
+    assert cabecera["t_s"] == 0.30
+
+    # G1A (ETU320 630A): Icc=4490 < Ii=5670A, sin Isd → verificar_simaris
+    nivel1 = r["resultados_disparo"][1]
+    assert nivel1["region"] == "verificar_simaris"
+
+    # Selectividad global: hay región no modelada → INDETERMINADA
+    assert r["selectividad_global"] == "INDETERMINADA"
+
+    # IEC 60364-4-41: t_final=0.02s < 5s → OK
+    assert r["iec60364_final"]["cumple"] == True
