@@ -103,7 +103,7 @@ def capacidad_corregida(I_max, paralelos, temp_amb):
     return round(I_max * paralelos * factor_temp, 1)
 
 
-def sugerir_conductor(L_m, I_diseno, paralelos, sistema, temp_amb):
+def sugerir_conductor(L_m, I_diseno, paralelos, sistema, temp_amb, norma: str = "AWG"):
     """
     Busca el conductor mínimo que cumple ΔV ≤ LIMITE_DV
     y capacidad ≥ I_diseno.
@@ -118,9 +118,10 @@ def sugerir_conductor(L_m, I_diseno, paralelos, sistema, temp_amb):
     Retorna:
         (conductor, mm2, dV_pct) o (None, None, None) si no hay
     """
+    tabla = get_tabla_conductores(norma)
     # Ordenar conductores de menor a mayor sección
     conductores_ordenados = sorted(
-        CONDUCTORES.items(),
+        tabla.items(),
         key=lambda x: x[1]["mm2"]
     )
 
