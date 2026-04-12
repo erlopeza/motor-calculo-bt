@@ -157,7 +157,11 @@ def leer_circuitos_excel(nombre_archivo):
             )
             continue
 
-        if conductor not in CONDUCTORES:
+        _tabla_validacion = {
+            **get_tabla_conductores("AWG"),
+            **get_tabla_conductores("MM2")
+        }
+        if conductor not in _tabla_validacion:
             errores.append(
                 f"Fila {num_fila} '{nombre}': "
                 f"conductor '{conductor}' no existe en tabla"
