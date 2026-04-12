@@ -602,3 +602,49 @@ def test_cadena_leo_arica_modo_red():
 
     # IEC 60364-4-41: t_final=0.02s < 5s → OK
     assert r["iec60364_final"]["cumple"] == True
+# ============================================================
+# TESTS TRANSFORMADOR — IEC 60909 c_max/c_min + tolerancia %Z
+# ============================================================
+from transformador import reporte_transformador
+
+def test_icc_max_mayor_que_nominal():
+    """Icc_max (c=1.1 · %Z mín) > Icc_nominal"""
+    _, _, d = calcular_icc_transformador(1000, 380, 5.0)
+    assert d["Icc_max_kA"] > d["Icc_kA"]
+
+def test_icc_min_menor_que_nominal():
+    """Icc_min (c=0.95 · %Z máx) < Icc_nominal"""
+    _, _, d = calcular_icc_transformador(1000, 380, 5.0)
+    assert d["Icc_min_kA"] < d["Icc_kA"]
+
+def test_icc_max_leo_arica():
+    """LEO ARICA: Icc_max ≈ 36.14 kA con c=1.1 y tol=7.5%"""
+    _, _, d = calcular_icc_transformador(1000, 380, 5.0)
+    assert 35.0 < d["Icc_max_kA"] < 38.0
+
+def test_icc_min_leo_arica():
+    """LEO ARICA: Icc_min ≈ 26.85 kA con c=0.95 y tol=7.5%"""
+    _, _, d = calcular_icc_transformador(1000, 380, 5.0)
+    assert 25.0 < d["Icc_min_kA"] < 29.0
+
+def test_tolerancia_cero_sin_efecto_en_zt():
+    """Sin tolerancia: Zt_min = Zt_max = Zt_nominal"""
+    _, _, d = calcular_icc_transformador(1000, 380, 5.0, tolerancia_ucc_pct=0)
+    assert d["Zt_min_ohm"] == d["Zt_ohm"]
+    assert d["Zt_max_ohm"] == d["Zt_ohm"]
+
+def test_compatibilidad_hacia_atras():
+    """Retorno (Icc_kA, Zt_ohm) compatible con código existente"""
+    Icc_kA, Zt_ohm, _ = calcular_icc_transformador(1000, 380, 5.0)
+    assert isinstance(Icc_kA, float)
+    assert isinstance(Zt_ohm, float)
+    assert 30.0 <= Icc_kA <= 31.0
+
+def test_reporte_incluye_icc_max_min():
+    """El reporte muestra Icc máxima y mínima"""
+    _, _, d = calcular_icc_transformador(1000, 380, 5.0)
+    lineas = reporte_transformador(d, "A", d["Icc_kA"])
+    texto = "\n".join(lineas)
+    assert "máxima" in texto
+    assert "mínima" in texto
+    assert "IEC 60909" in texto
