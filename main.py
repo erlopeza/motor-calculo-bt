@@ -16,7 +16,8 @@ from calculos import (
 from excel import (
     leer_circuitos_excel, leer_transformador_excel,
     leer_balance_excel, leer_tableros_excel,
-    guardar_txt, exportar_excel, leer_perfil_excel
+    guardar_txt, exportar_excel, leer_perfil_excel,
+    enriquecer_circuitos
 )
 from perfiles import obtener_perfil
 from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
@@ -323,6 +324,9 @@ except Exception as e:
 # --- LEER CIRCUITOS ---
 try:
     circuitos = leer_circuitos_excel(archivo_excel)
+    circuitos = enriquecer_circuitos(
+        circuitos, norma=perfil.get("norma", "AWG")
+    )
 except FileNotFoundError as e:
     print(f"\n  ERROR: {e}")
     input("\n  Presiona Enter para cerrar...")

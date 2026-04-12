@@ -217,6 +217,20 @@ def leer_circuitos_excel(nombre_archivo):
     return circuitos
 
 
+def enriquecer_circuitos(circuitos: list, norma: str = "AWG") -> list:
+    """
+    Resuelve S_mm2 e I_max usando la tabla correcta según norma.
+    Debe llamarse después de leer_circuitos_excel().
+    """
+    tabla = get_tabla_conductores(norma)
+    for c in circuitos:
+        conductor = c["conductor"]
+        if conductor in tabla:
+            c["S_mm2"] = tabla[conductor]["mm2"]
+            c["I_max"]  = tabla[conductor]["I_max"]
+    return circuitos
+
+
 # ============================================================
 # LECTURA — PERFIL DE PROYECTO
 # ============================================================

@@ -631,6 +631,11 @@ class MotorCalculoBT:
             self.balance_datos  = leer_balance_excel(libro)
             self.tableros_datos = leer_tableros_excel(libro)
             self.circuitos      = leer_circuitos_excel(archivo)
+            from excel import enriquecer_circuitos
+            self.circuitos = enriquecer_circuitos(
+                self.circuitos,
+                norma=self.perfil_activo.get("norma", "AWG")
+            )
             self.params_demanda = leer_demanda_excel(libro)
             self.cadena_datos   = leer_cadena_excel(libro)
         except Exception as e:
