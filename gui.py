@@ -922,7 +922,8 @@ class MotorCalculoBT:
             if estado_dV == "FALLA" or estado_I == "SUPERA":
                 cond, mm2, dv = sugerir_conductor(
                     c["L_m"], c["I_diseno"], c["paralelos"],
-                    c["sistema"], c["temp_amb"]
+                    c["sistema"], c["temp_amb"],
+                    norma=self.perfil_activo.get("norma", "AWG")
                 )
                 if cond:
                     sugerencia = f"→ {cond} ({dv}%)"
