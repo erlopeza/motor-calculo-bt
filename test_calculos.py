@@ -202,7 +202,7 @@ def test_reduccion_icc():
     reduccion = reduccion_icc(30.39, 15.0)
     assert 0 < reduccion < 100
     assert 50.0 <= reduccion <= 51.0   # rango — tolerancia redondeo
-    # ============================================================
+# ============================================================
 # TESTS DE PROTECCIONES — MÓDULO 3
 # ============================================================
 from protecciones import (
@@ -281,7 +281,7 @@ def test_verificacion_completa_falla_disparo():
     """Caso extremo: Icc muy baja — no puede disparar."""
     r = verificar_circuito_completo("Prueba", 200, "TM", 36, 0.05, 380)
     assert "FALLA DISPARO" in r["estado"]
-    # ============================================================
+# ============================================================
 # TESTS DE BALANCE — MÓDULO 4
 # ============================================================
 from balance import obtener_fs, calcular_balance_tableros, FACTORES_SIMULTANEIDAD
@@ -648,3 +648,32 @@ def test_reporte_incluye_icc_max_min():
     assert "máxima" in texto
     assert "mínima" in texto
     assert "IEC 60909" in texto
+
+# ============================================================
+# TESTS A-3/A-4 — NORMA POR PERFIL
+# ============================================================
+from perfiles import obtener_perfil
+
+def test_perfil_industrial_norma_awg():
+    assert obtener_perfil("industrial")["norma"] == "AWG"
+
+def test_perfil_comercial_norma_mm2():
+    assert obtener_perfil("comercial")["norma"] == "MM2"
+
+def test_perfil_domestico_norma_mm2():
+    assert obtener_perfil("domestico")["norma"] == "MM2"
+
+def test_sugerir_conductor_norma_awg_explicito():
+    cond, mm2, dv = sugerir_conductor(10, 30, 1, "3F", 30, norma="AWG")
+    assert cond is not None
+    assert "AWG" in cond or "MCM" in cond
+
+def test_sugerir_conductor_norma_mm2():
+    cond, mm2, dv = sugerir_conductor(10, 30, 1, "3F", 30, norma="MM2")
+    assert cond is not None
+    assert "mm2" in cond
+
+def test_sugerir_conductor_mm2_tramo_largo():
+    cond, mm2, dv = sugerir_conductor(200, 50, 1, "3F", 30, norma="MM2")
+    assert cond is not None
+    assert dv <= 3.0
