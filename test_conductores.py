@@ -9,8 +9,8 @@ def test_tabla_awg_carga():
 
 def test_tabla_mm2_carga():
     t = get_tabla_conductores("MM2")
-    assert "2.5mm2" in t
-    assert t["2.5mm2"]["I_max"] == 21
+    assert "2.5MM2" in t
+    assert t["2.5MM2"]["I_max"] == 21
 
 def test_orden_ascendente_mm2():
     t = get_tabla_conductores("MM2")

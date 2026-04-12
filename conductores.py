@@ -111,28 +111,30 @@ CONDUCTORES_AWG = {
 # Capacidad: XLPE Cu en conduit, 30°C (IEC 60364-5-52 Método B2)
 # Orden ascendente de sección (requerido por sugerencia automática)
 CONDUCTORES_MM2 = {
-    "1.5mm2":  {"mm2": 1.5,   "I_max": 15},
-    "2.5mm2":  {"mm2": 2.5,   "I_max": 21},
-    "4mm2":    {"mm2": 4.0,   "I_max": 28},
-    "6mm2":    {"mm2": 6.0,   "I_max": 36},
-    "10mm2":   {"mm2": 10.0,  "I_max": 50},
-    "16mm2":   {"mm2": 16.0,  "I_max": 68},
-    "25mm2":   {"mm2": 25.0,  "I_max": 89},
-    "35mm2":   {"mm2": 35.0,  "I_max": 110},
-    "50mm2":   {"mm2": 50.0,  "I_max": 134},
-    "70mm2":   {"mm2": 70.0,  "I_max": 171},
-    "95mm2":   {"mm2": 95.0,  "I_max": 207},
-    "120mm2":  {"mm2": 120.0, "I_max": 239},
-    "150mm2":  {"mm2": 150.0, "I_max": 275},
-    "185mm2":  {"mm2": 185.0, "I_max": 314},
-    "240mm2":  {"mm2": 240.0, "I_max": 370},
-    "300mm2":  {"mm2": 300.0, "I_max": 421},
+    "1.5MM2":  {"mm2": 1.5,   "I_max": 15},
+    "2.5MM2":  {"mm2": 2.5,   "I_max": 21},
+    "4MM2":    {"mm2": 4.0,   "I_max": 28},
+    "6MM2":    {"mm2": 6.0,   "I_max": 36},
+    "10MM2":   {"mm2": 10.0,  "I_max": 50},
+    "16MM2":   {"mm2": 16.0,  "I_max": 68},
+    "25MM2":   {"mm2": 25.0,  "I_max": 89},
+    "35MM2":   {"mm2": 35.0,  "I_max": 110},
+    "50MM2":   {"mm2": 50.0,  "I_max": 134},
+    "70MM2":   {"mm2": 70.0,  "I_max": 171},
+    "95MM2":   {"mm2": 95.0,  "I_max": 207},
+    "120MM2":  {"mm2": 120.0, "I_max": 239},
+    "150MM2":  {"mm2": 150.0, "I_max": 275},
+    "185MM2":  {"mm2": 185.0, "I_max": 314},
+    "240MM2":  {"mm2": 240.0, "I_max": 370},
+    "300MM2":  {"mm2": 300.0, "I_max": 421},
 }
 
 # --- SELECTOR DE TABLA POR NORMA ---
 # Uso: get_tabla_conductores(perfil["norma"])
 # Valores válidos: "AWG" | "MM2"
 CONDUCTORES = {
+    **CONDUCTORES_AWG,
+    **CONDUCTORES_MM2,
     "AWG": CONDUCTORES_AWG,
     "MM2": CONDUCTORES_MM2,
 }

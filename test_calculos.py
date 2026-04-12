@@ -671,9 +671,30 @@ def test_sugerir_conductor_norma_awg_explicito():
 def test_sugerir_conductor_norma_mm2():
     cond, mm2, dv = sugerir_conductor(10, 30, 1, "3F", 30, norma="MM2")
     assert cond is not None
-    assert "mm2" in cond
+    assert "MM2" in cond
 
 def test_sugerir_conductor_mm2_tramo_largo():
     cond, mm2, dv = sugerir_conductor(200, 50, 1, "3F", 30, norma="MM2")
     assert cond is not None
     assert dv <= 3.0
+
+# ============================================================
+# TESTS A-8 — INTEGRACIÓN EXCEL + MM2
+# ============================================================
+import os
+from excel import leer_circuitos_excel, enriquecer_circuitos
+
+def test_leer_circuitos_excel_conductor_mm2():
+    ruta = os.path.join(os.path.dirname(__file__),
+                        "tests", "circuitos_test_mm2.xlsx")
+    circuitos = leer_circuitos_excel(ruta)
+    assert len(circuitos) == 1
+    assert circuitos[0]["conductor"] == "10MM2"
+
+def test_enriquecer_circuitos_mm2():
+    ruta = os.path.join(os.path.dirname(__file__),
+                        "tests", "circuitos_test_mm2.xlsx")
+    circuitos = leer_circuitos_excel(ruta)
+    circuitos = enriquecer_circuitos(circuitos, norma="MM2")
+    assert circuitos[0]["S_mm2"] == 10.0
+    assert circuitos[0]["I_max"] == 50
