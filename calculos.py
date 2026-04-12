@@ -3,13 +3,17 @@
 # Responsabilidad: fórmulas eléctricas de baja tensión
 # Razón para cambiar: actualizar fórmulas o límites normativos
 # ============================================================
-
-import math
+# calculos.py — import actualizado
 from conductores import (
-    CONDUCTORES, FACTOR_SISTEMA, TENSION_SISTEMA,
+    get_tabla_conductores, FACTOR_SISTEMA, TENSION_SISTEMA,
     LIMITE_DV, FACTORES_TEMP
 )
 
+# sugerir_conductor — firma actualizada
+def sugerir_conductor(L_m, I_diseno, paralelos, sistema, temp_amb, norma="AWG"):
+    tabla = get_tabla_conductores(norma)
+    conductores_ordenados = sorted(tabla.items(), key=lambda x: x[1]["mm2"])
+    # ... resto sin cambios
 # ============================================================
 # RESISTIVIDAD DEL COBRE
 # ============================================================
