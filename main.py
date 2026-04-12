@@ -16,8 +16,9 @@ from calculos import (
 from excel import (
     leer_circuitos_excel, leer_transformador_excel,
     leer_balance_excel, leer_tableros_excel,
-    guardar_txt, exportar_excel
+    guardar_txt, exportar_excel, leer_perfil_excel
 )
+from perfiles import obtener_perfil
 from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
 from icc_punto import calcular_icc_todos_circuitos
 from protecciones import verificar_circuito_completo, leer_protecciones_excel
@@ -76,7 +77,8 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
                         datos_trafo=None, protecciones=None,
                         balance_datos=None, tableros_datos=None,
                         params_demanda=None,
-                        cadena_datos=None):
+                        cadena_datos=None, perfil=None):
+    perfil = perfil or {}
     lineas      = []
     total_ok    = 0
     total_falla = 0
@@ -157,7 +159,8 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
         if estado_dV == "FALLA" or estado_I == "SUPERA":
             cond, mm2, dv = sugerir_conductor(
                 c["L_m"], c["I_diseno"], c["paralelos"],
-                c["sistema"], c["temp_amb"]
+                c["sistema"], c["temp_amb"],
+                norma=perfil.get("norma", "AWG")
             )
             lineas.append(
                 f"  SUGERENCIA: usar {cond} ({mm2}mm2) -> dV={dv}%"
@@ -275,9 +278,27 @@ balance_datos      = {}
 tableros_datos     = {}
 params_demanda     = None
 cadena_datos       = []
+perfil             = obtener_perfil("industrial").copy()
 
 try:
     _libro = openpyxl.load_workbook(archivo_excel, data_only=True)
+    datos_perfil = leer_perfil_excel(_libro) or {}
+    perfil_clave = datos_perfil.get("perfil", "industrial")
+    perfil = obtener_perfil(perfil_clave).copy()
+
+    hoja_perfil = next(
+        (_libro[nombre] for nombre in _libro.sheetnames if nombre.lower() == "perfil"),
+        None
+    )
+    norma_explicitada = False
+    if hoja_perfil:
+        for fila in hoja_perfil.iter_rows(min_row=2, values_only=True):
+            if fila[0] and str(fila[0]).strip().lower() == "norma":
+                norma_explicitada = True
+                break
+    if norma_explicitada:
+        perfil["norma"] = datos_perfil.get("norma", "AWG").upper()
+
     protecciones_excel = leer_protecciones_excel(_libro)
     balance_datos      = leer_balance_excel(_libro)
     tableros_datos     = leer_tableros_excel(_libro)
@@ -330,7 +351,8 @@ lineas, total_ok, total_falla = generar_reporte_txt(
     nombre_proyecto, circuitos, fecha,
     datos_trafo, protecciones_excel,
     balance_datos, tableros_datos,
-    params_demanda, cadena_datos
+    params_demanda, cadena_datos,
+    perfil=perfil
 )
 
 print()
@@ -342,7 +364,7 @@ nombre_txt  = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.txt"
 nombre_xlsx = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.xlsx"
 
 guardar_txt(lineas, nombre_txt)
-exportar_excel(nombre_proyecto, circuitos, fecha, nombre_xlsx)
+exportar_excel(nombre_proyecto, circuitos, fecha, nombre_xlsx, perfil=perfil)
 
 print(f"\n  Proyecto  : {nombre_proyecto}")
 print(f"  OK        : {total_ok}")

@@ -257,6 +257,7 @@ def leer_perfil_excel(libro_openpyxl):
     return {
         "perfil":             datos.get("perfil", "industrial"),
         "nombre_proyecto":    datos.get("nombre_proyecto", ""),
+        "norma":              datos.get("norma", "AWG"),
         "usar_transformador": datos.get("usar_transformador", "si") == "si",
         "usar_protecciones":  datos.get("usar_protecciones", "si") == "si",
         "usar_balance":       datos.get("usar_balance", "si") == "si",
@@ -278,12 +279,13 @@ def guardar_txt(lineas, nombre_archivo):
 # EXPORTAR — EXCEL FORMATEADO
 # ============================================================
 
-def exportar_excel(nombre_proyecto, circuitos, fecha, nombre_archivo):
+def exportar_excel(nombre_proyecto, circuitos, fecha, nombre_archivo, perfil=None):
     """
     Exporta resultados a Excel con formato profesional.
     Colores por estado: verde ÓPTIMO, amarillo ACEPTABLE,
     naranja PRECAUCIÓN, rojo FALLA.
     """
+    perfil = perfil or {}
     COLORES = {
         "ÓPTIMO":     "FF92D050",
         "ACEPTABLE":  "FFFFFF00",
@@ -344,7 +346,8 @@ def exportar_excel(nombre_proyecto, circuitos, fecha, nombre_archivo):
         if estado_dV == "FALLA" or estado_I == "SUPERA":
             cond, mm2, dv = sugerir_conductor(
                 c["L_m"], c["I_diseno"], c["paralelos"],
-                c["sistema"], c["temp_amb"]
+                c["sistema"], c["temp_amb"],
+                norma=perfil.get("norma", "AWG")
             )
             if cond:
                 sugerencia = f"→ Usar {cond} ({dv}%)"
