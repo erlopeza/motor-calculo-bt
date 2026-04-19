@@ -849,3 +849,125 @@ def leer_sts_excel(libro_openpyxl):
     if any(resultado.get(k) in (None, "") for k in faltantes):
         return None
     return resultado
+
+
+def leer_trafo_iso_excel(libro_openpyxl):
+    """
+    Lee datos de trafo de aislamiento desde hoja 'trafo_iso' (campo/valor).
+    Retorna dict o None.
+    """
+    hoja = next((n for n in libro_openpyxl.sheetnames if n.lower() == "trafo_iso"), None)
+    if not hoja:
+        return None
+
+    ws = libro_openpyxl[hoja]
+    datos = {}
+    for fila in ws.iter_rows(min_row=2, values_only=True):
+        if not fila or fila[0] is None:
+            continue
+        key = str(fila[0]).strip().lower()
+        datos[key] = fila[1]
+
+    def _to_float(v, default=None):
+        if v is None or str(v).strip() == "":
+            return default
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return default
+
+    def _to_int(v, default=None):
+        if v is None or str(v).strip() == "":
+            return default
+        try:
+            return int(float(v))
+        except (TypeError, ValueError):
+            return default
+
+    def _to_str(v, default=""):
+        if v is None:
+            return default
+        return str(v).strip()
+
+    r = {
+        "TISO_nombre": _to_str(datos.get("tiso_nombre"), ""),
+        "TISO_P_kVA": _to_float(datos.get("tiso_p_kva"), None),
+        "TISO_V_primario": _to_float(datos.get("tiso_v_primario"), None),
+        "TISO_V_secundario": _to_float(datos.get("tiso_v_secundario"), None),
+        "TISO_conexion": _to_str(datos.get("tiso_conexion"), "Dyn5"),
+        "TISO_P_carga_kVA": _to_float(datos.get("tiso_p_carga_kva"), None),
+        "TISO_cos_phi": _to_float(datos.get("tiso_cos_phi"), 0.9),
+        "TISO_Ucc_pct": _to_float(datos.get("tiso_ucc_pct"), 5.0),
+        "TISO_n_trafos": _to_int(datos.get("tiso_n_trafos"), 1),
+        "TISO_modo": _to_str(datos.get("tiso_modo"), "servicio").lower() or "servicio",
+    }
+    faltantes = [
+        "TISO_nombre", "TISO_P_kVA", "TISO_V_primario",
+        "TISO_V_secundario", "TISO_P_carga_kVA"
+    ]
+    if any(r.get(k) in (None, "") for k in faltantes):
+        return None
+    return r
+
+
+def leer_ups_excel(libro_openpyxl):
+    """
+    Lee datos de UPS desde hoja 'ups' (campo/valor).
+    Retorna dict o None.
+    """
+    hoja = next((n for n in libro_openpyxl.sheetnames if n.lower() == "ups"), None)
+    if not hoja:
+        return None
+
+    ws = libro_openpyxl[hoja]
+    datos = {}
+    for fila in ws.iter_rows(min_row=2, values_only=True):
+        if not fila or fila[0] is None:
+            continue
+        key = str(fila[0]).strip().lower()
+        datos[key] = fila[1]
+
+    def _to_float(v, default=None):
+        if v is None or str(v).strip() == "":
+            return default
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return default
+
+    def _to_int(v, default=None):
+        if v is None or str(v).strip() == "":
+            return default
+        try:
+            return int(float(v))
+        except (TypeError, ValueError):
+            return default
+
+    def _to_str(v, default=""):
+        if v is None:
+            return default
+        return str(v).strip()
+
+    r = {
+        "UPS_nombre": _to_str(datos.get("ups_nombre"), ""),
+        "UPS_modelo": _to_str(datos.get("ups_modelo"), ""),
+        "UPS_tipo": _to_str(datos.get("ups_tipo"), "VFI").upper(),
+        "UPS_P_kVA": _to_float(datos.get("ups_p_kva"), None),
+        "UPS_V_nominal": _to_float(datos.get("ups_v_nominal"), 380.0),
+        "UPS_P_carga_kW": _to_float(datos.get("ups_p_carga_kw"), None),
+        "UPS_cos_phi": _to_float(datos.get("ups_cos_phi"), 0.9),
+        "UPS_tipo_carga": _to_str(datos.get("ups_tipo_carga"), "general").lower(),
+        "UPS_nivel_infraestructura": _to_str(datos.get("ups_nivel_infraestructura"), "critico").lower(),
+        "UPS_n_baterias_serie": _to_int(datos.get("ups_n_baterias_serie"), None),
+        "UPS_V_bat": _to_float(datos.get("ups_v_bat"), None),
+        "UPS_Ah_bat": _to_float(datos.get("ups_ah_bat"), None),
+        "UPS_n_strings": _to_int(datos.get("ups_n_strings"), None),
+        "UPS_temperatura": _to_float(datos.get("ups_temperatura"), 25.0),
+    }
+    faltantes = [
+        "UPS_nombre", "UPS_modelo", "UPS_P_kVA", "UPS_P_carga_kW",
+        "UPS_n_baterias_serie", "UPS_V_bat", "UPS_Ah_bat", "UPS_n_strings"
+    ]
+    if any(r.get(k) in (None, "") for k in faltantes):
+        return None
+    return r

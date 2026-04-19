@@ -18,7 +18,8 @@ from excel import (
     leer_circuitos_excel, leer_transformador_excel,
     leer_balance_excel, leer_tableros_excel,
     guardar_txt, exportar_excel, leer_perfil_excel,
-    enriquecer_circuitos, leer_generador_excel, leer_sts_excel
+    enriquecer_circuitos, leer_generador_excel, leer_sts_excel,
+    leer_trafo_iso_excel, leer_ups_excel
 )
 from perfiles import obtener_perfil
 from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
@@ -34,6 +35,8 @@ from coordinacion import verificar_cadena, reporte_coordinacion
 from motores import calcular_motor
 from generador import calcular_generador
 from sts import calcular_sts
+from trafo_iso import calcular_trafo_iso
+from ups import calcular_ups
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
@@ -352,12 +355,114 @@ def generar_seccion_sts(datos_sts):
     return lineas
 
 
+def generar_seccion_trafo_iso(datos_trafo_iso):
+    if not datos_trafo_iso:
+        return []
+
+    r = calcular_trafo_iso(
+        nombre=datos_trafo_iso["TISO_nombre"],
+        P_trafo_kVA=datos_trafo_iso["TISO_P_kVA"],
+        V_primario=datos_trafo_iso["TISO_V_primario"],
+        V_secundario=datos_trafo_iso["TISO_V_secundario"],
+        conexion=datos_trafo_iso.get("TISO_conexion", "Dyn5"),
+        P_carga_kVA=datos_trafo_iso["TISO_P_carga_kVA"],
+        cos_phi=datos_trafo_iso.get("TISO_cos_phi", 0.9),
+        Ucc_pct=datos_trafo_iso.get("TISO_Ucc_pct", 5.0),
+        n_trafos=datos_trafo_iso.get("TISO_n_trafos", 1),
+        modo=datos_trafo_iso.get("TISO_modo", "servicio"),
+    )
+    cap = r["capacidad"]
+    icc = r["icc_secundario"]
+    dv = r["dv_trafo"]
+
+    lineas = []
+    lineas.append("")
+    lineas.append("=" * 60)
+    lineas.append("  TRANSFORMADOR DE AISLAMIENTO")
+    lineas.append("  Normativa: IEC 60076-1 / IEC 61558-2-4 / RIC N10")
+    lineas.append("=" * 60)
+    lineas.append(f"  Trafo         : {r['nombre']} ({r['conexion']})")
+    lineas.append(f"  Configuracion : {r['n_trafos']} unidad(es) - {r['modo']}")
+    lineas.append(f"  P nominal     : {r['P_total_kVA']}kVA | V: {r['V_primario']}/{r['V_secundario']}V")
+    lineas.append(f"  P carga       : {r['P_carga_kVA']}kVA")
+    lineas.append(f"  Uso           : {cap['uso_pct']}% -> {'OK' if cap['ok'] else 'REVISAR'}")
+    lineas.append(f"  I_nominal sec : {r['I_nominal_sec_A']}A")
+    lineas.append(f"  Ucc%          : {r['Ucc_pct']}% (tol. +-7.5%)")
+    lineas.append(
+        f"  Icc sec nom   : {icc['Icc_nominal_kA']}kA | max: {icc['Icc_max_kA']}kA | min: {icc['Icc_min_kA']}kA"
+    )
+    lineas.append(f"  dV trafo      : {dv['dv_pct']}% -> {'OK' if dv['ok'] else 'REVISAR'}")
+    lineas.append("=" * 60)
+    return lineas
+
+
+def generar_seccion_ups(datos_ups):
+    if not datos_ups:
+        return []
+
+    r = calcular_ups(
+        nombre=datos_ups["UPS_nombre"],
+        modelo_ups=datos_ups["UPS_modelo"],
+        tipo_ups=datos_ups.get("UPS_tipo", "VFI"),
+        P_ups_kVA=datos_ups["UPS_P_kVA"],
+        V_nominal=datos_ups.get("UPS_V_nominal", 380.0),
+        P_carga_kW=datos_ups["UPS_P_carga_kW"],
+        cos_phi_carga=datos_ups.get("UPS_cos_phi", 0.9),
+        tipo_carga=datos_ups.get("UPS_tipo_carga", "general"),
+        nivel_infraestructura=datos_ups.get("UPS_nivel_infraestructura", "critico"),
+        n_baterias_serie=datos_ups["UPS_n_baterias_serie"],
+        V_bat_unitaria=datos_ups["UPS_V_bat"],
+        Ah_bat=datos_ups["UPS_Ah_bat"],
+        n_strings=datos_ups["UPS_n_strings"],
+        temperatura=datos_ups.get("UPS_temperatura", 25.0),
+    )
+
+    cap = r["capacidad"]
+    bat = r["banco_baterias"]
+    aut = r["autonomia"]
+    rec = r["recarga"]
+    tv = r["tipo_validacion"]
+
+    lineas = []
+    lineas.append("")
+    lineas.append("=" * 60)
+    lineas.append("  UPS - SISTEMA DE ALIMENTACION ININTERRUMPIDA")
+    lineas.append("  Normativa: IEC 62040-1/2/3/4 / TIA-942")
+    lineas.append("=" * 60)
+    lineas.append(f"  UPS           : {r['nombre']} ({r['modelo_ups']})")
+    lineas.append(f"  Tipo IEC      : {r['tipo_ups']} - {tv['tipo_descripcion']}")
+    lineas.append(f"  P nominal     : {r['P_ups_kVA']}kVA | V: {r['V_nominal']}V")
+    lineas.append(f"  P carga       : {r['P_carga_kW']}kW ({cap['uso_pct']}%) -> {'OK' if cap['ok'] else 'REVISAR'}")
+    lineas.append("")
+    lineas.append("  BANCO BATERIAS")
+    lineas.append(
+        f"  Config        : {r['n_strings']} strings x {r['n_baterias_serie']} baterias x {r['V_bat_unitaria']}V/{r['Ah_bat']}Ah"
+    )
+    lineas.append(f"  V string      : {bat['V_string']}V DC")
+    lineas.append(f"  Ah efectivos  : {bat['Ah_efectivo']}Ah (temp {r['temperatura']}C, factor {bat['factor_temp']})")
+    lineas.append(f"  Energia total : {bat['E_kWh']}kWh")
+    lineas.append("")
+    lineas.append("  AUTONOMIA")
+    lineas.append(f"  P en baterias : {aut['P_baterias_kW']}kW (eta_ups={r['eta_ups']})")
+    lineas.append(f"  Autonomia     : {aut['t_min']} min -> {aut['estado']}")
+    lineas.append(f"  Minimo normado: {aut['t_minimo_normado']} min ({aut['norma_aplicada']})")
+    lineas.append("")
+    lineas.append("  RECARGA")
+    lineas.append(f"  I recarga     : {rec['I_carga_A']}A")
+    lineas.append(
+        f"  Tiempo recarga: {rec['t_recarga_hr']}hr -> {'OK' if rec['ok'] else 'REVISAR'} (IEC 62040-4: <= 12hr)"
+    )
+    lineas.append("=" * 60)
+    return lineas
+
+
 def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
                         datos_trafo=None, protecciones=None,
                         balance_datos=None, tableros_datos=None,
                         params_demanda=None,
                         cadena_datos=None, perfil=None,
-                        datos_generador=None, datos_sts=None):
+                        datos_generador=None, datos_sts=None,
+                        datos_trafo_iso=None, datos_ups=None):
     perfil = perfil or {}
     lineas      = []
     total_ok    = 0
@@ -527,6 +632,12 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
     # --- STS --- M11
     lineas += generar_seccion_sts(datos_sts)
 
+    # --- TRAFO ISO --- M12A
+    lineas += generar_seccion_trafo_iso(datos_trafo_iso)
+
+    # --- UPS --- M12B
+    lineas += generar_seccion_ups(datos_ups)
+
     # --- RESUMEN FINAL ---
     lineas.append("")
     lineas.append("=" * 60)
@@ -574,6 +685,8 @@ params_demanda     = None
 cadena_datos       = []
 datos_generador    = None
 datos_sts          = None
+datos_trafo_iso    = None
+datos_ups          = None
 perfil             = obtener_perfil("industrial").copy()
 
 try:
@@ -611,6 +724,8 @@ try:
     cadena_datos = leer_cadena_excel(_libro)
     datos_generador = leer_generador_excel(_libro)
     datos_sts = leer_sts_excel(_libro)
+    datos_trafo_iso = leer_trafo_iso_excel(_libro)
+    datos_ups = leer_ups_excel(_libro)
     if datos_generador:
         print(
             f"  Generador M9  : {datos_generador['GE_nombre']} ({datos_generador['GE_modelo']})"
@@ -618,6 +733,14 @@ try:
     if datos_sts:
         print(
             f"  STS M11       : {datos_sts['STS_nombre']} ({datos_sts['STS_modelo']})"
+        )
+    if datos_trafo_iso:
+        print(
+            f"  Trafo ISO M12 : {datos_trafo_iso['TISO_nombre']} ({datos_trafo_iso['TISO_conexion']})"
+        )
+    if datos_ups:
+        print(
+            f"  UPS M12       : {datos_ups['UPS_nombre']} ({datos_ups['UPS_modelo']})"
         )
     if cadena_datos:
         print(f"  Coordinación  : {len(cadena_datos)} dispositivos en cadena")
@@ -627,6 +750,8 @@ except Exception as e:
     cadena_datos   = []
     datos_generador = None
     datos_sts = None
+    datos_trafo_iso = None
+    datos_ups = None
 
 # --- LEER CIRCUITOS ---
 try:
@@ -663,7 +788,8 @@ lineas, total_ok, total_falla = generar_reporte_txt(
     datos_trafo, protecciones_excel,
     balance_datos, tableros_datos,
     params_demanda, cadena_datos,
-    perfil=perfil, datos_generador=datos_generador, datos_sts=datos_sts
+    perfil=perfil, datos_generador=datos_generador, datos_sts=datos_sts,
+    datos_trafo_iso=datos_trafo_iso, datos_ups=datos_ups
 )
 
 print()
