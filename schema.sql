@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE TABLE IF NOT EXISTS run_reports (
     report_id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,
-    report_type TEXT NOT NULL CHECK (report_type IN ('TXT', 'XLSX')),
+    report_type TEXT NOT NULL CHECK (report_type IN ('TXT', 'XLSX', 'DOCX', 'PDF')),
     file_path TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE,
@@ -60,3 +60,28 @@ CREATE INDEX IF NOT EXISTS idx_run_reports_report_type ON run_reports(report_typ
 CREATE INDEX IF NOT EXISTS idx_technical_events_project_id ON technical_events(project_id);
 CREATE INDEX IF NOT EXISTS idx_technical_events_timestamp ON technical_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_technical_events_event_type ON technical_events(event_type);
+
+CREATE TABLE IF NOT EXISTS run_circuits (
+    circuit_id      TEXT PRIMARY KEY,
+    run_id          TEXT NOT NULL,
+    nombre          TEXT NOT NULL,
+    conductor       TEXT,
+    norma           TEXT,
+    S_mm2           REAL,
+    I_diseno        REAL,
+    I_max           REAL,
+    cos_phi         REAL,
+    L_m             REAL,
+    paralelos       INTEGER,
+    sistema         TEXT,
+    dv_v            REAL,
+    dv_pct          REAL,
+    icc_ka          REAL,
+    estado          TEXT,
+    observaciones   TEXT,
+    FOREIGN KEY (run_id) REFERENCES runs(run_id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_run_circuits_run_id
+    ON run_circuits(run_id);

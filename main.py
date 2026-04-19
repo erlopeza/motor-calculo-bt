@@ -6,6 +6,7 @@
 
 import sys
 import math
+import os
 import openpyxl
 from datetime import datetime
 from conductores import LIMITE_DV, TENSION_SISTEMA
@@ -375,9 +376,34 @@ try:
 
     max_dv_pct = 0.0
     max_icc_ka = 0.0
+    circuitos_persistencia = []
     for c in circuitos:
-        _, dV_pct = calcular_caida_tension(
+        dV_V, dV_pct = calcular_caida_tension(
             c["L_m"], c["S_mm2"], c["I_diseno"], c["paralelos"], c["sistema"]
+        )
+        I_cap = capacidad_corregida(c["I_max"], c["paralelos"], c["temp_amb"])
+        estado_dV = clasificar_caida(dV_pct)
+        estado_I = "OK" if c["I_diseno"] <= I_cap else "SUPERA"
+        estado = "OK" if (estado_dV != "FALLA" and estado_I == "OK") else "CON_FALLAS"
+
+        circuitos_persistencia.append(
+            {
+                "nombre": c.get("nombre"),
+                "conductor": c.get("conductor"),
+                "norma": perfil.get("norma", "AWG"),
+                "S_mm2": c.get("S_mm2"),
+                "I_diseno": c.get("I_diseno"),
+                "I_max": c.get("I_max"),
+                "cos_phi": c.get("cos_phi"),
+                "L_m": c.get("L_m"),
+                "paralelos": c.get("paralelos"),
+                "sistema": c.get("sistema"),
+                "dv_v": round(dV_V, 3),
+                "dv_pct": round(dV_pct, 3),
+                "icc_ka": c.get("Icc_kA"),
+                "estado": estado,
+                "observaciones": c.get("nivel_icc"),
+            }
         )
         if dV_pct > max_dv_pct:
             max_dv_pct = dV_pct
@@ -398,7 +424,23 @@ try:
         "status": "OK" if total_falla == 0 else "CON_FALLAS",
         "ruta_reporte_txt": nombre_txt,
         "ruta_reporte_xlsx": nombre_xlsx,
+        "circuitos": circuitos_persistencia,
     }
+
+    # Reporteria SEC adicional (sin interrumpir flujo principal).
+    try:
+        from reporteria_sec import generar_memoria_docx, generar_reporte_pdf
+
+        carpeta_salida = os.getcwd()
+        ruta_docx = generar_memoria_docx(datos_run, circuitos_persistencia, carpeta_salida)
+        ruta_pdf = generar_reporte_pdf(datos_run, circuitos_persistencia, carpeta_salida)
+        datos_run["ruta_reporte_docx"] = ruta_docx
+        datos_run["ruta_reporte_pdf"] = ruta_pdf
+        print(f"  Memoria SEC : {ruta_docx}")
+        print(f"  Reporte PDF : {ruta_pdf}")
+    except Exception as e:
+        print(f"  Advertencia reporteria: {e}")
+
     registrar_ejecucion(datos_run)
 except Exception as e:
     print(f"  Aviso persistencia: {e}")

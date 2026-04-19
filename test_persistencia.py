@@ -4,8 +4,10 @@ from pathlib import Path
 
 from persistencia import (
     inicializar_db,
+    obtener_circuitos,
     obtener_ejecuciones,
     obtener_eventos,
+    registrar_circuitos,
     registrar_ejecucion,
     registrar_evento,
 )
@@ -47,6 +49,7 @@ def test_crear_tabla():
     assert "runs" in tablas
     assert "run_reports" in tablas
     assert "technical_events" in tablas
+    assert "run_circuits" in tablas
 
 
 def test_registrar_ejecucion():
@@ -150,3 +153,66 @@ def test_obtener_eventos():
     eventos_p1 = obtener_eventos(project_id="P1", ruta_db=ruta_db)
     assert len(eventos_p1) == 1
     assert eventos_p1[0]["project_id"] == "P1"
+
+
+def test_registrar_circuitos():
+    ruta_db = _ruta_db_local("registrar_circuitos")
+    run_id = registrar_ejecucion(_datos_base(), ruta_db=ruta_db)
+
+    n = registrar_circuitos(
+        run_id=run_id,
+        circuitos=[
+            {
+                "nombre": "C-01",
+                "conductor": "6AWG",
+                "norma": "AWG",
+                "S_mm2": 13.3,
+                "I_diseno": 50.0,
+                "I_max": 65.0,
+                "cos_phi": 0.9,
+                "L_m": 20.0,
+                "paralelos": 1,
+                "sistema": "3F",
+                "dv_v": 1.2,
+                "dv_pct": 0.31,
+                "icc_ka": 12.3,
+                "estado": "OK",
+                "observaciones": "sin observaciones",
+            }
+        ],
+        ruta_db=ruta_db,
+    )
+
+    assert n == 1
+    circuitos = obtener_circuitos(run_id=run_id, ruta_db=ruta_db)
+    assert len(circuitos) == 1
+    assert circuitos[0]["nombre"] == "C-01"
+
+
+def test_circuitos_en_registrar_ejecucion():
+    ruta_db = _ruta_db_local("circuitos_en_run")
+    datos = _datos_base()
+    datos["circuitos"] = [
+        {
+            "nombre": "C-02",
+            "conductor": "4AWG",
+            "norma": "AWG",
+            "S_mm2": 21.1,
+            "I_diseno": 60.0,
+            "I_max": 85.0,
+            "cos_phi": 0.92,
+            "L_m": 18.0,
+            "paralelos": 1,
+            "sistema": "3F",
+            "dv_v": 1.1,
+            "dv_pct": 0.29,
+            "icc_ka": 14.2,
+            "estado": "OK",
+            "observaciones": "ok",
+        }
+    ]
+
+    run_id = registrar_ejecucion(datos, ruta_db=ruta_db)
+    circuitos = obtener_circuitos(run_id=run_id, ruta_db=ruta_db)
+    assert len(circuitos) == 1
+    assert circuitos[0]["nombre"] == "C-02"

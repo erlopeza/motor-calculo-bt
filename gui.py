@@ -1,8 +1,8 @@
-# ============================================================
+﻿# ============================================================
 # gui.py
-# Responsabilidad: interfaz gráfica — Motor de Cálculo BT
-# Estructura: panel lateral + área de resultados con tabs
-# Razón para cambiar: modificar layout o agregar tabs
+# Responsabilidad: interfaz grÃ¡fica â€” Motor de CÃ¡lculo BT
+# Estructura: panel lateral + Ã¡rea de resultados con tabs
+# RazÃ³n para cambiar: modificar layout o agregar tabs
 # ============================================================
 
 import tkinter as tk
@@ -12,7 +12,7 @@ import threading
 import sys
 import os
 
-# --- IMPORTS DE MÓDULOS DEL PROYECTO ---
+# --- IMPORTS DE MÃ“DULOS DEL PROYECTO ---
 from conductores import CONDUCTORES, TENSION_SISTEMA, LIMITE_DV
 from calculos import (
     capacidad_corregida, calcular_potencia,
@@ -38,7 +38,7 @@ from perfiles import (PERFILES, PERFIL_DEFAULT, obtener_perfil, lista_perfiles,
 from datetime import datetime
 
 # ============================================================
-# COLORES Y ESTILOS — TEMA INDUSTRIAL
+# COLORES Y ESTILOS â€” TEMA INDUSTRIAL
 # ============================================================
 
 COLORES = {
@@ -53,11 +53,11 @@ COLORES = {
     "acento":       "#5E81F4",   # azul acento
     "ok":           "#4CAF50",   # verde OK
     "falla":        "#F44336",   # rojo FALLA
-    "precaucion":   "#FF9800",   # naranja PRECAUCIÓN
-    "optimo":       "#4CAF50",   # verde ÓPTIMO
+    "precaucion":   "#FF9800",   # naranja PRECAUCIÃ“N
+    "optimo":       "#4CAF50",   # verde Ã“PTIMO
     "aceptable":    "#FFC107",   # amarillo ACEPTABLE
-    "boton":        "#5E81F4",   # botón principal
-    "boton_hover":  "#7B9FF7",   # botón hover
+    "boton":        "#5E81F4",   # botÃ³n principal
+    "boton_hover":  "#7B9FF7",   # botÃ³n hover
     "borde":        "#3A3A5C",   # bordes
 }
 
@@ -65,17 +65,17 @@ FUENTES = {
     "titulo":   ("Consolas", 11, "bold"),
     "subtitulo":("Consolas", 9, "bold"),
     "normal":   ("Consolas", 9),
-    "pequeño":  ("Consolas", 8),
+    "pequeÃ±o":  ("Consolas", 8),
     "mono":     ("Courier New", 9),
 }
 
 # ============================================================
-# AUTOTEST — verificar módulos antes de abrir ventana
+# AUTOTEST â€” verificar mÃ³dulos antes de abrir ventana
 # ============================================================
 
 def ejecutar_autotest():
     """
-    Verifica que todos los módulos críticos funcionan
+    Verifica que todos los mÃ³dulos crÃ­ticos funcionan
     antes de abrir la interfaz.
     Retorna lista de (nombre, ok, mensaje).
     """
@@ -87,46 +87,46 @@ def ejecutar_autotest():
 
     tests = []
 
-    # Test 1 — conductores
+    # Test 1 â€” conductores
     try:
         assert len(CONDUCTORES) > 10
         tests.append(("conductores.py", True, f"{len(CONDUCTORES)} conductores cargados"))
     except Exception as e:
         tests.append(("conductores.py", False, str(e)))
 
-    # Test 2 — caída de tensión
+    # Test 2 â€” caÃ­da de tensiÃ³n
     try:
         dV_V, dV_pct = calcular_caida_tension(10, 13.3, 63, 1, "3F")
         assert dV_V == 1.436 and dV_pct == 0.378
-        tests.append(("calculos.py", True, f"CRAC 1-A → {dV_V}V / {dV_pct}%"))
+        tests.append(("calculos.py", True, f"CRAC 1-A â†’ {dV_V}V / {dV_pct}%"))
     except Exception as e:
         tests.append(("calculos.py", False, str(e)))
 
-    # Test 3 — transformador
+    # Test 3 â€” transformador
     try:
         Icc_kA, _, _ = calcular_icc_transformador(1000, 380, 5.0)
         assert 30.0 <= Icc_kA <= 31.0
-        tests.append(("transformador.py", True, f"1000kVA → {Icc_kA} kA"))
+        tests.append(("transformador.py", True, f"1000kVA â†’ {Icc_kA} kA"))
     except Exception as e:
         tests.append(("transformador.py", False, str(e)))
 
-    # Test 4 — impedancia cable
+    # Test 4 â€” impedancia cable
     try:
         Zt = calcular_zt_cable(10, 13.3, 1)
         assert Zt > 0
-        tests.append(("icc_punto.py", True, f"6AWG 10m → {Zt} Ω"))
+        tests.append(("icc_punto.py", True, f"6AWG 10m â†’ {Zt} Î©"))
     except Exception as e:
         tests.append(("icc_punto.py", False, str(e)))
 
-    # Test 5 — protecciones
+    # Test 5 â€” protecciones
     try:
         puede, margen, Im = verificar_disparo(10000, 63, "C")
         assert puede == True
-        tests.append(("protecciones.py", True, f"C63A / 10kA → dispara OK"))
+        tests.append(("protecciones.py", True, f"C63A / 10kA â†’ dispara OK"))
     except Exception as e:
         tests.append(("protecciones.py", False, str(e)))
 
-    # Test 6 — balance
+    # Test 6 â€” balance
     try:
         fs = obtener_fs("critica")
         assert fs == 1.0
@@ -137,22 +137,22 @@ def ejecutar_autotest():
     return tests
 
 # ============================================================
-# CLASE PRINCIPAL — VENTANA
+# CLASE PRINCIPAL â€” VENTANA
 # ============================================================
 
 class MotorCalculoBT:
 
     def __init__(self, root):
         self.root = root
-        self.root.title("Motor de Cálculo BT  v3.0")
+        self.root.title("Motor de CÃ¡lculo BT  v3.0")
         self.root.geometry("1200x750")
         self.root.minsize(1000, 600)
         self.root.configure(bg=COLORES["fondo"])
 
-        # Estado de la aplicación
+        # Estado de la aplicaciÃ³n
         self.archivo_excel   = tk.StringVar(value="")
         self.nombre_proyecto = tk.StringVar(value="")
-        self.estado_texto    = tk.StringVar(value="● Listo — carga un archivo Excel")
+        self.estado_texto    = tk.StringVar(value="â— Listo â€” carga un archivo Excel")
         self.var_perfil      = tk.StringVar(value=PERFIL_DEFAULT)
         self.perfil_activo   = obtener_perfil(PERFIL_DEFAULT)
 
@@ -167,25 +167,26 @@ class MotorCalculoBT:
         self.resultado_demanda = None
         self.cadena_datos      = []
         self.resultados_m7     = {}
+        self.ultimo_run_id      = None
 
         # Contadores resumen
-        self.var_circ_ok     = tk.StringVar(value="—")
-        self.var_circ_falla  = tk.StringVar(value="—")
-        self.var_icc         = tk.StringVar(value="—")
-        self.var_trafo_uso   = tk.StringVar(value="—")
-        self.var_prot_ok     = tk.StringVar(value="—")
+        self.var_circ_ok     = tk.StringVar(value="â€”")
+        self.var_circ_falla  = tk.StringVar(value="â€”")
+        self.var_icc         = tk.StringVar(value="â€”")
+        self.var_trafo_uso   = tk.StringVar(value="â€”")
+        self.var_prot_ok     = tk.StringVar(value="â€”")
 
         self._construir_ui()
         self._mostrar_autotest()
 
     # ----------------------------------------------------------
-    # CONSTRUCCIÓN DE LA INTERFAZ
+    # CONSTRUCCIÃ“N DE LA INTERFAZ
     # ----------------------------------------------------------
 
     def _construir_ui(self):
-        """Construye el layout principal: panel lateral + área tabs."""
+        """Construye el layout principal: panel lateral + Ã¡rea tabs."""
 
-        # Frame raíz con dos columnas
+        # Frame raÃ­z con dos columnas
         self.frame_principal = tk.Frame(self.root, bg=COLORES["fondo"])
         self.frame_principal.pack(fill="both", expand=True)
 
@@ -196,7 +197,7 @@ class MotorCalculoBT:
         sep = tk.Frame(self.frame_principal, bg=COLORES["borde"], width=1)
         sep.pack(side="left", fill="y")
 
-        # Área de resultados (expansible)
+        # Ãrea de resultados (expansible)
         self._construir_area_resultados()
 
     def _construir_panel_lateral(self):
@@ -209,9 +210,9 @@ class MotorCalculoBT:
         panel.pack(side="left", fill="y")
         panel.pack_propagate(False)
 
-        # Título
+        # TÃ­tulo
         tk.Label(
-            panel, text="⚡ MOTOR BT",
+            panel, text="âš¡ MOTOR BT",
             bg=COLORES["panel"], fg=COLORES["acento"],
             font=FUENTES["titulo"], pady=12
         ).pack(fill="x")
@@ -234,19 +235,19 @@ class MotorCalculoBT:
                 selectcolor=COLORES["acento"],
                 activebackground=COLORES["panel"],
                 activeforeground=COLORES["texto"],
-                font=FUENTES["pequeño"],
+                font=FUENTES["pequeÃ±o"],
                 anchor="w",
                 cursor="hand2"
             )
             rb.pack(fill="x", padx=14, pady=1)
             self.rb_perfil_widgets.append(rb)
 
-        # Descripción del perfil activo
+        # DescripciÃ³n del perfil activo
         self.lbl_perfil_desc = tk.Label(
             panel,
             text=self.perfil_activo["descripcion"],
             bg=COLORES["panel"], fg=COLORES["texto_gris"],
-            font=FUENTES["pequeño"], wraplength=200,
+            font=FUENTES["pequeÃ±o"], wraplength=200,
             anchor="w", justify="left"
         )
         self.lbl_perfil_desc.pack(fill="x", padx=14, pady=(2, 2))
@@ -255,7 +256,7 @@ class MotorCalculoBT:
         self.lbl_perfil_lock = tk.Label(
             panel, text="",
             bg=COLORES["panel"], fg=COLORES["texto_gris"],
-            font=FUENTES["pequeño"], wraplength=200,
+            font=FUENTES["pequeÃ±o"], wraplength=200,
             anchor="w", justify="left"
         )
         self.lbl_perfil_lock.pack(fill="x", padx=14, pady=(0, 6))
@@ -266,7 +267,7 @@ class MotorCalculoBT:
         self._seccion_label(panel, "PROYECTO")
 
         tk.Label(panel, text="Nombre:", bg=COLORES["panel"],
-                 fg=COLORES["texto_gris"], font=FUENTES["pequeño"],
+                 fg=COLORES["texto_gris"], font=FUENTES["pequeÃ±o"],
                  anchor="w").pack(fill="x", padx=14, pady=(4,0))
         tk.Entry(
             panel, textvariable=self.nombre_proyecto,
@@ -283,12 +284,12 @@ class MotorCalculoBT:
         self.lbl_archivo = tk.Label(
             panel, text="Sin archivo cargado",
             bg=COLORES["panel"], fg=COLORES["texto_gris"],
-            font=FUENTES["pequeño"], wraplength=200,
+            font=FUENTES["pequeÃ±o"], wraplength=200,
             anchor="w", justify="left"
         )
         self.lbl_archivo.pack(fill="x", padx=14, pady=(4,4))
 
-        self._boton(panel, "📂  Cargar Excel", self._cargar_excel,
+        self._boton(panel, "ðŸ“‚  Cargar Excel", self._cargar_excel,
                     color=COLORES["encabezado"]).pack(fill="x", padx=14, pady=2)
 
         tk.Frame(panel, bg=COLORES["borde"], height=1).pack(fill="x", padx=10, pady=8)
@@ -304,18 +305,20 @@ class MotorCalculoBT:
 
         tk.Frame(panel, bg=COLORES["borde"], height=1).pack(fill="x", padx=10, pady=8)
 
-        # --- BOTONES ACCIÓN ---
-        self._boton(panel, "▶  CALCULAR", self._calcular,
+        # --- BOTONES ACCIÃ“N ---
+        self._boton(panel, "â–¶  CALCULAR", self._calcular,
                     color=COLORES["boton"]).pack(fill="x", padx=14, pady=2)
-        self._boton(panel, "💾  EXPORTAR REPORTE", self._exportar,
+        self._boton(panel, "ðŸ’¾  EXPORTAR REPORTE", self._exportar,
+                    color=COLORES["encabezado"]).pack(fill="x", padx=14, pady=2)
+        self._boton(panel, "ðŸ—‚  REGENERAR REPORTE", self._regenerar_reporte_historial,
                     color=COLORES["encabezado"]).pack(fill="x", padx=14, pady=2)
         self.btn_demanda = self._boton(
-                    panel, "📊  DEMANDA M6", self._abrir_ventana_demanda,
+                    panel, "ðŸ“Š  DEMANDA M6", self._abrir_ventana_demanda,
                     color=COLORES["encabezado"])
         self.btn_demanda.pack(fill="x", padx=14, pady=2)
         self.btn_demanda.config(state="disabled")   # habilitado tras calcular
         self.btn_coord = self._boton(
-                    panel, "⚡  COORDINACIÓN M7", self._abrir_ventana_coordinacion,
+                    panel, "âš¡  COORDINACIÃ“N M7", self._abrir_ventana_coordinacion,
                     color=COLORES["encabezado"])
         self.btn_coord.pack(fill="x", padx=14, pady=2)
         self.btn_coord.config(state="disabled")     # habilitado tras calcular
@@ -326,12 +329,12 @@ class MotorCalculoBT:
         tk.Label(
             panel, textvariable=self.estado_texto,
             bg=COLORES["panel"], fg=COLORES["texto_gris"],
-            font=FUENTES["pequeño"], wraplength=210,
+            font=FUENTES["pequeÃ±o"], wraplength=210,
             anchor="w", justify="left"
         ).pack(fill="x", padx=14, pady=4)
 
     def _construir_area_resultados(self):
-        """Área derecha con Notebook de tabs."""
+        """Ãrea derecha con Notebook de tabs."""
         area = tk.Frame(self.frame_principal, bg=COLORES["fondo"])
         area.pack(side="left", fill="both", expand=True)
 
@@ -360,11 +363,11 @@ class MotorCalculoBT:
         self.notebook.pack(fill="both", expand=True, padx=0, pady=0)
 
         # Crear tabs
-        self.tab_dv    = self._crear_tab("⚡  Caída ΔV")
-        self.tab_icc   = self._crear_tab("⚡  Transf / Icc")
-        self.tab_prot  = self._crear_tab("🛡  Protecciones")
-        self.tab_bal   = self._crear_tab("⚖  Balance")
-        self.tab_test  = self._crear_tab("🔧  Sistema")
+        self.tab_dv    = self._crear_tab("âš¡  CaÃ­da Î”V")
+        self.tab_icc   = self._crear_tab("âš¡  Transf / Icc")
+        self.tab_prot  = self._crear_tab("ðŸ›¡  Protecciones")
+        self.tab_bal   = self._crear_tab("âš–  Balance")
+        self.tab_test  = self._crear_tab("ðŸ”§  Sistema")
 
     def _crear_tab(self, titulo):
         """Crea un frame dentro del notebook y retorna el frame scrollable."""
@@ -403,7 +406,7 @@ class MotorCalculoBT:
         tk.Label(
             parent, text=texto,
             bg=COLORES["panel"], fg=COLORES["acento"],
-            font=FUENTES["pequeño"], anchor="w", pady=2
+            font=FUENTES["pequeÃ±o"], anchor="w", pady=2
         ).pack(fill="x", padx=14)
 
     def _boton(self, parent, texto, comando, color=None):
@@ -424,7 +427,7 @@ class MotorCalculoBT:
         f.pack(fill="x", padx=14, pady=1)
         tk.Label(f, text=etiqueta, bg=COLORES["panel"],
                  fg=COLORES["texto_gris"],
-                 font=FUENTES["pequeño"], anchor="w",
+                 font=FUENTES["pequeÃ±o"], anchor="w",
                  width=16).pack(side="left")
         tk.Label(f, textvariable=variable, bg=COLORES["panel"],
                  fg=color, font=FUENTES["subtitulo"],
@@ -444,7 +447,7 @@ class MotorCalculoBT:
             tk.Label(
                 parent, text=subtitulo,
                 bg=COLORES["fondo"], fg=COLORES["texto_gris"],
-                font=FUENTES["pequeño"], anchor="w", padx=16
+                font=FUENTES["pequeÃ±o"], anchor="w", padx=16
             ).pack(fill="x")
         tk.Frame(parent, bg=COLORES["borde"], height=1).pack(
             fill="x", padx=16, pady=4)
@@ -452,7 +455,7 @@ class MotorCalculoBT:
     def _tabla(self, parent, columnas, datos, colores_fila=None):
         """
         Crea una tabla con Treeview estilizado.
-        colores_fila: función que recibe la fila y retorna color de fondo.
+        colores_fila: funciÃ³n que recibe la fila y retorna color de fondo.
         """
         style = ttk.Style()
         style.configure(
@@ -529,7 +532,7 @@ class MotorCalculoBT:
         nombre = os.path.basename(ruta)
         self.lbl_archivo.config(text=nombre, fg=COLORES["texto"])
 
-        # --- DETECCIÓN AUTOMÁTICA DE PERFIL ---
+        # --- DETECCIÃ“N AUTOMÃTICA DE PERFIL ---
         try:
             libro = openpyxl.load_workbook(ruta, data_only=True)
             from excel import leer_perfil_excel
@@ -555,23 +558,23 @@ class MotorCalculoBT:
                 if nombre_proy:
                     self.nombre_proyecto.set(nombre_proy.upper())
 
-                # Bloquear selector — perfil definido por el Excel
+                # Bloquear selector â€” perfil definido por el Excel
                 self._bloquear_perfil(perfil_obj["label"])
 
                 self._set_estado(
-                    f"✓ Perfil detectado: {perfil_obj['label']} "
-                    f"— {nombre_proy.upper()}"
+                    f"âœ“ Perfil detectado: {perfil_obj['label']} "
+                    f"â€” {nombre_proy.upper()}"
                 )
             else:
-                # Sin hoja perfil — liberar selector
+                # Sin hoja perfil â€” liberar selector
                 self._liberar_perfil()
                 if not self.nombre_proyecto.get():
                     self.nombre_proyecto.set(
                         os.path.splitext(nombre)[0].upper()
                     )
                 self._set_estado(
-                    f"● Archivo cargado: {nombre} "
-                    f"(sin hoja 'perfil' — perfil libre)"
+                    f"â— Archivo cargado: {nombre} "
+                    f"(sin hoja 'perfil' â€” perfil libre)"
                 )
         except Exception as e:
             self._liberar_perfil()
@@ -579,7 +582,7 @@ class MotorCalculoBT:
                 self.nombre_proyecto.set(
                     os.path.splitext(nombre)[0].upper()
                 )
-            self._set_estado(f"● Archivo cargado: {nombre}")
+            self._set_estado(f"â— Archivo cargado: {nombre}")
 
     def _bloquear_perfil(self, label_perfil):
         """
@@ -590,7 +593,7 @@ class MotorCalculoBT:
             rb.config(state="disabled", cursor="arrow",
                       fg=COLORES["texto_gris"])
         self.lbl_perfil_lock.config(
-            text="🔒 Definido en hoja 'perfil'",
+            text="ðŸ”’ Definido en hoja 'perfil'",
             fg=COLORES["acento"]
         )
 
@@ -610,16 +613,16 @@ class MotorCalculoBT:
         self.lbl_perfil_desc.config(
             text=self.perfil_activo["descripcion"]
         )
-        self._set_estado(f"● Perfil: {self.perfil_activo['label']}")
+        self._set_estado(f"â— Perfil: {self.perfil_activo['label']}")
 
     def _calcular(self):
-        """Lee datos, valida perfil y abre ventana de confirmación."""
+        """Lee datos, valida perfil y abre ventana de confirmaciÃ³n."""
         if not self.archivo_excel.get():
             messagebox.showwarning("Sin archivo",
                 "Carga un archivo Excel antes de calcular.")
             return
 
-        self._set_estado("⏳ Leyendo datos...")
+        self._set_estado("â³ Leyendo datos...")
         self.root.update()
 
         # Leer datos primero para poder validar
@@ -639,7 +642,7 @@ class MotorCalculoBT:
             self.params_demanda = leer_demanda_excel(libro)
             self.cadena_datos   = leer_cadena_excel(libro)
         except Exception as e:
-            self._set_estado(f"✗ Error al leer: {e}")
+            self._set_estado(f"âœ— Error al leer: {e}")
             return
 
         # Validar perfil vs datos
@@ -649,25 +652,25 @@ class MotorCalculoBT:
             self.protecciones, self.balance_datos, self.tableros_datos
         )
 
-        # Mostrar ventana de validación
+        # Mostrar ventana de validaciÃ³n
         self._mostrar_ventana_validacion(resultados)
 
     def _mostrar_ventana_validacion(self, resultados):
         """
-        Ventana modal con resumen de validación.
-        Si hay BLOQUEO → solo CANCELAR disponible.
-        Si solo hay ADVERTENCIAS → puede continuar.
+        Ventana modal con resumen de validaciÃ³n.
+        Si hay BLOQUEO â†’ solo CANCELAR disponible.
+        Si solo hay ADVERTENCIAS â†’ puede continuar.
         """
         bloqueado = hay_bloqueo(resultados)
         perfil    = self.perfil_activo
 
         # Crear ventana modal
         ventana = tk.Toplevel(self.root)
-        ventana.title("Validación de datos")
+        ventana.title("ValidaciÃ³n de datos")
         ventana.geometry("500x420")
         ventana.configure(bg=COLORES["fondo"])
         ventana.resizable(False, False)
-        ventana.grab_set()   # modal — bloquea la ventana principal
+        ventana.grab_set()   # modal â€” bloquea la ventana principal
 
         # Centrar respecto a la ventana principal
         x = self.root.winfo_x() + (self.root.winfo_width() - 500) // 2
@@ -677,7 +680,7 @@ class MotorCalculoBT:
         # --- Encabezado ---
         tk.Label(
             ventana,
-            text="VALIDACIÓN DE DATOS",
+            text="VALIDACIÃ“N DE DATOS",
             bg=COLORES["fondo"], fg=COLORES["acento"],
             font=FUENTES["titulo"], pady=12
         ).pack(fill="x")
@@ -687,27 +690,27 @@ class MotorCalculoBT:
             text=f"Perfil: {perfil['label']}  |  "
                  f"Circuitos: {len(self.circuitos)}",
             bg=COLORES["fondo"], fg=COLORES["texto_gris"],
-            font=FUENTES["pequeño"]
+            font=FUENTES["pequeÃ±o"]
         ).pack()
 
         tk.Frame(ventana, bg=COLORES["borde"],
                  height=1).pack(fill="x", padx=16, pady=8)
 
-        # --- Resultados de validación ---
+        # --- Resultados de validaciÃ³n ---
         frame_scroll = tk.Frame(ventana, bg=COLORES["fondo"])
         frame_scroll.pack(fill="both", expand=True, padx=16)
 
         for i, (nivel, mensaje) in enumerate(resultados):
             if nivel == NIVEL_BLOQUEO:
-                icono = "✗"
+                icono = "âœ—"
                 color = COLORES["falla"]
                 bg    = "#3A1A1A"
             elif nivel == NIVEL_ADVERTENCIA:
-                icono = "⚠"
+                icono = "âš "
                 color = COLORES["precaucion"]
                 bg    = "#2A1A0A"
             else:
-                icono = "✓"
+                icono = "âœ“"
                 color = COLORES["ok"]
                 bg    = "#1A3A1A"
 
@@ -722,11 +725,11 @@ class MotorCalculoBT:
                 font=FUENTES["subtitulo"]
             ).pack(side="left", anchor="n", pady=6)
 
-            # Mensaje (puede tener saltos de línea)
+            # Mensaje (puede tener saltos de lÃ­nea)
             tk.Label(
                 fila, text=mensaje,
                 bg=bg, fg=COLORES["texto"],
-                font=FUENTES["pequeño"],
+                font=FUENTES["pequeÃ±o"],
                 justify="left", anchor="w",
                 wraplength=400
             ).pack(side="left", fill="x", pady=6, padx=(0, 8))
@@ -740,7 +743,7 @@ class MotorCalculoBT:
 
         def continuar():
             ventana.destroy()
-            self._set_estado("⏳ Calculando...")
+            self._set_estado("â³ Calculando...")
             self.root.update()
             hilo = threading.Thread(
                 target=self._ejecutar_calculos_post_validacion,
@@ -750,12 +753,12 @@ class MotorCalculoBT:
 
         def cancelar():
             ventana.destroy()
-            self._set_estado("● Cálculo cancelado")
+            self._set_estado("â— CÃ¡lculo cancelado")
 
         if not bloqueado:
             tk.Button(
                 frame_btns,
-                text="▶  CONTINUAR",
+                text="â–¶  CONTINUAR",
                 command=continuar,
                 bg=COLORES["boton"], fg="#FFFFFF",
                 font=FUENTES["normal"],
@@ -765,7 +768,7 @@ class MotorCalculoBT:
 
         tk.Button(
             frame_btns,
-            text="✗  CANCELAR",
+            text="âœ—  CANCELAR",
             command=cancelar,
             bg=COLORES["encabezado"], fg="#FFFFFF",
             font=FUENTES["normal"],
@@ -775,13 +778,13 @@ class MotorCalculoBT:
 
     def _ejecutar_calculos_post_validacion(self):
         """
-        Ejecuta los cálculos. Los datos ya fueron leídos en _calcular().
-        Solo procesa los cálculos matemáticos y actualiza la GUI.
+        Ejecuta los cÃ¡lculos. Los datos ya fueron leÃ­dos en _calcular().
+        Solo procesa los cÃ¡lculos matemÃ¡ticos y actualiza la GUI.
         """
         try:
             if not self.circuitos:
                 self.root.after(0, lambda: self._set_estado(
-                    "✗ No se encontraron circuitos válidos"))
+                    "âœ— No se encontraron circuitos vÃ¡lidos"))
                 return
 
             # Calcular Icc por punto si hay transformador
@@ -818,7 +821,7 @@ class MotorCalculoBT:
                     self.circuitos, self.balance_datos, self.params_demanda
                 )
 
-            # Coordinación TCC — M7
+            # CoordinaciÃ³n TCC â€” M7
             self.resultados_m7 = {}
             if self.cadena_datos:
                 modos = {}
@@ -839,19 +842,42 @@ class MotorCalculoBT:
 
             try:
                 from persistencia import registrar_ejecucion
+                from reporteria_sec import generar_memoria_docx, generar_reporte_pdf
 
                 total_ok = 0
                 total_falla = 0
                 max_dv_pct = 0.0
                 max_icc_ka = 0.0
+                circuitos_persistencia = []
 
                 for c in self.circuitos:
                     I_cap = capacidad_corregida(c["I_max"], c["paralelos"], c["temp_amb"])
-                    _, dV_pct = calcular_caida_tension(
+                    dV_V, dV_pct = calcular_caida_tension(
                         c["L_m"], c["S_mm2"], c["I_diseno"], c["paralelos"], c["sistema"]
                     )
                     estado_dV = clasificar_caida(dV_pct)
                     estado_I = "OK" if c["I_diseno"] <= I_cap else "SUPERA"
+                    estado = "OK" if (estado_dV != "FALLA" and estado_I == "OK") else "CON_FALLAS"
+
+                    circuitos_persistencia.append(
+                        {
+                            "nombre": c.get("nombre"),
+                            "conductor": c.get("conductor"),
+                            "norma": self.perfil_activo.get("norma", "AWG"),
+                            "S_mm2": c.get("S_mm2"),
+                            "I_diseno": c.get("I_diseno"),
+                            "I_max": c.get("I_max"),
+                            "cos_phi": c.get("cos_phi"),
+                            "L_m": c.get("L_m"),
+                            "paralelos": c.get("paralelos"),
+                            "sistema": c.get("sistema"),
+                            "dv_v": round(dV_V, 3),
+                            "dv_pct": round(dV_pct, 3),
+                            "icc_ka": c.get("Icc_kA"),
+                            "estado": estado,
+                            "observaciones": c.get("nivel_icc"),
+                        }
+                    )
 
                     if estado_dV == "FALLA" or estado_I == "SUPERA":
                         total_falla += 1
@@ -877,8 +903,20 @@ class MotorCalculoBT:
                     "status": "OK" if total_falla == 0 else "CON_FALLAS",
                     "ruta_reporte_txt": None,
                     "ruta_reporte_xlsx": None,
+                    "circuitos": circuitos_persistencia,
                 }
-                registrar_ejecucion(datos_run)
+                try:
+                    carpeta_salida = os.getcwd()
+                    ruta_docx = generar_memoria_docx(datos_run, circuitos_persistencia, carpeta_salida)
+                    ruta_pdf = generar_reporte_pdf(datos_run, circuitos_persistencia, carpeta_salida)
+                    datos_run["ruta_reporte_docx"] = ruta_docx
+                    datos_run["ruta_reporte_pdf"] = ruta_pdf
+                    print(f"  Memoria SEC : {ruta_docx}")
+                    print(f"  Reporte PDF : {ruta_pdf}")
+                except Exception as e:
+                    print(f"  Advertencia reporteria: {e}")
+
+                self.ultimo_run_id = registrar_ejecucion(datos_run)
             except Exception as e:
                 print(f"[persistencia][gui] {e}")
 
@@ -886,7 +924,7 @@ class MotorCalculoBT:
             self.root.after(0, self._actualizar_gui)
 
         except Exception as e:
-            self.root.after(0, lambda: self._set_estado(f"✗ Error: {e}"))
+            self.root.after(0, lambda: self._set_estado(f"âœ— Error: {e}"))
 
     def _actualizar_gui(self):
         """Actualiza todos los tabs con los resultados calculados."""
@@ -895,18 +933,18 @@ class MotorCalculoBT:
         self._poblar_tab_protecciones()
         self._poblar_tab_balance()
         self._actualizar_resumen()
-        # Habilitar botón Demanda M6 si hay datos
+        # Habilitar botÃ³n Demanda M6 si hay datos
         if self.resultado_demanda:
             self.btn_demanda.config(state="normal")
         if self.resultados_m7:
             self.btn_coord.config(state="normal")
-        self._set_estado("✓ Cálculo completado")
+        self._set_estado("âœ“ CÃ¡lculo completado")
 
     def _exportar(self):
         """Exporta reporte TXT y Excel con selector de carpeta."""
         if not self.circuitos:
             messagebox.showwarning("Sin datos",
-                "Ejecuta el cálculo antes de exportar.")
+                "Ejecuta el cÃ¡lculo antes de exportar.")
             return
 
         from main import generar_reporte_txt
@@ -938,7 +976,75 @@ class MotorCalculoBT:
             f"Archivos guardados en:\n{carpeta}\n\n"
             f"{nombre_base}.txt\n"
             f"{nombre_base}.xlsx")
-        self._set_estado(f"✓ Exportado en: {os.path.basename(carpeta)}")
+        self._set_estado(f"âœ“ Exportado en: {os.path.basename(carpeta)}")
+
+    def _regenerar_reporte_historial(self):
+        """Regenera memoria DOCX y reporte PDF desde un run_id historico."""
+        try:
+            from persistencia import obtener_ejecuciones
+            from reporteria_sec import generar_desde_run_id
+
+            ejecuciones = obtener_ejecuciones()
+            if not ejecuciones:
+                messagebox.showinfo("Historial", "No hay ejecuciones registradas.")
+                return
+
+            opciones = [
+                f"{e.get('run_id')} | {e.get('project_id')} | {e.get('revision')} | {e.get('timestamp')}"
+                for e in ejecuciones
+            ]
+
+            win = tk.Toplevel(self.root)
+            win.title("Regenerar Reporte")
+            win.geometry("760x180")
+            win.configure(bg=COLORES["fondo"])
+
+            tk.Label(
+                win,
+                text="Selecciona run_id del historial",
+                bg=COLORES["fondo"],
+                fg=COLORES["texto"],
+                font=FUENTES["normal"],
+            ).pack(pady=(14, 8))
+
+            combo = ttk.Combobox(win, values=opciones, width=95, state="readonly")
+            combo.pack(padx=16, fill="x")
+            combo.current(0)
+
+            salida = tk.StringVar(value="")
+            tk.Label(
+                win,
+                textvariable=salida,
+                bg=COLORES["fondo"],
+                fg=COLORES["texto_gris"],
+                font=FUENTES["normal"],
+                wraplength=720,
+                justify="left",
+            ).pack(padx=16, pady=(12, 6), fill="x")
+
+            def _accion():
+                seleccionado = combo.get().split(" | ")[0].strip()
+                ruta_docx, ruta_pdf = generar_desde_run_id(seleccionado)
+                if ruta_docx and ruta_pdf:
+                    salida.set(f"DOCX: {ruta_docx}\nPDF: {ruta_pdf}")
+                    self._set_estado("âœ“ Reportes regenerados desde historial")
+                else:
+                    salida.set("No se pudieron regenerar reportes para el run seleccionado.")
+
+            tk.Button(
+                win,
+                text="Regenerar",
+                command=_accion,
+                bg=COLORES["boton"],
+                fg="#FFFFFF",
+                font=FUENTES["normal"],
+                relief="flat",
+                cursor="hand2",
+                padx=20,
+                pady=6,
+            ).pack(pady=(4, 10))
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo abrir historial: {e}")
 
     # ----------------------------------------------------------
     # POBLAR TABS
@@ -948,14 +1054,14 @@ class MotorCalculoBT:
         self._limpiar_tab(self.tab_dv)
         self._encabezado_tab(
             self.tab_dv,
-            "CAÍDA DE TENSIÓN POR CIRCUITO",
-            f"Límite: {LIMITE_DV}%  |  Normativa: SEC RIC N°10 / NEC / IEC 60364"
+            "CAÃDA DE TENSIÃ“N POR CIRCUITO",
+            f"LÃ­mite: {LIMITE_DV}%  |  Normativa: SEC RIC NÂ°10 / NEC / IEC 60364"
         )
 
         columnas = {
             "Circuito": 200, "Sistema": 60, "Conductor": 100,
             "I_dis(A)": 70, "I_cap(A)": 70, "Estado_I": 80,
-            "ΔV(V)": 70, "ΔV(%)": 70, "Estado_dV": 100,
+            "Î”V(V)": 70, "Î”V(%)": 70, "Estado_dV": 100,
             "Sugerencia": 160
         }
 
@@ -976,7 +1082,7 @@ class MotorCalculoBT:
                     norma=self.perfil_activo.get("norma", "AWG")
                 )
                 if cond:
-                    sugerencia = f"→ {cond} ({dv}%)"
+                    sugerencia = f"â†’ {cond} ({dv}%)"
 
             desc = (f"{c['paralelos']}x{c['conductor']}"
                     if c["paralelos"] > 1 else c["conductor"])
@@ -992,7 +1098,7 @@ class MotorCalculoBT:
             estado_i  = fila[5]
             if estado_dv == "FALLA" or estado_i == "SUPERA":
                 return "falla"
-            elif estado_dv == "PRECAUCIÓN":
+            elif estado_dv == "PRECAUCIÃ“N":
                 return "precaucion"
             elif estado_dv == "ACEPTABLE":
                 return "aceptable"
@@ -1005,11 +1111,11 @@ class MotorCalculoBT:
         self._encabezado_tab(
             self.tab_icc,
             "TRANSFORMADOR E Icc POR PUNTO",
-            "Método: impedancias IEC 60909"
+            "MÃ©todo: impedancias IEC 60909"
         )
 
         if not self.datos_trafo:
-            tk.Label(self.tab_icc, text="No se encontró hoja 'Transformador'",
+            tk.Label(self.tab_icc, text="No se encontrÃ³ hoja 'Transformador'",
                      bg=COLORES["fondo"], fg=COLORES["texto_gris"],
                      font=FUENTES["normal"], pady=20).pack()
             return
@@ -1033,13 +1139,13 @@ class MotorCalculoBT:
         f_info.pack(fill="x", padx=16, pady=8)
 
         datos_trafo_display = [
-            ("Nombre",      self.datos_trafo.get("nombre", "—")),
-            ("Modo",        f"{'A — datos de placa' if modo=='A' else 'B — tabla típica'}"),
+            ("Nombre",      self.datos_trafo.get("nombre", "â€”")),
+            ("Modo",        f"{'A â€” datos de placa' if modo=='A' else 'B â€” tabla tÃ­pica'}"),
             ("Potencia",    f"{self.datos_trafo['kVA']} kVA"),
-            ("Tensión BT",  f"{self.datos_trafo['Vn_BT']} V"),
-            ("Ucc%",        f"{self.datos_trafo.get('Ucc_pct','—')} %"),
-            ("In BT",       f"{info.get('In_A','—')} A"),
-            ("Zt",          f"{info.get('Zt_ohm','—')} Ω"),
+            ("TensiÃ³n BT",  f"{self.datos_trafo['Vn_BT']} V"),
+            ("Ucc%",        f"{self.datos_trafo.get('Ucc_pct','â€”')} %"),
+            ("In BT",       f"{info.get('In_A','â€”')} A"),
+            ("Zt",          f"{info.get('Zt_ohm','â€”')} Î©"),
             ("Icc bornes",  f"{Icc_kA} kA"),
             ("Nivel Icc",   clasificar_icc(Icc_kA)),
         ]
@@ -1050,7 +1156,7 @@ class MotorCalculoBT:
             fila.pack(fill="x")
             tk.Label(fila, text=f"  {campo}", width=14, anchor="w",
                      bg=fila["bg"], fg=COLORES["texto_gris"],
-                     font=FUENTES["pequeño"]).pack(side="left", pady=3)
+                     font=FUENTES["pequeÃ±o"]).pack(side="left", pady=3)
             color_val = COLORES["acento"] if "Icc" in campo else COLORES["texto"]
             tk.Label(fila, text=valor, anchor="w",
                      bg=fila["bg"], fg=color_val,
@@ -1059,13 +1165,13 @@ class MotorCalculoBT:
         # Tabla Icc por circuito
         tk.Label(self.tab_icc, text="Icc en cada punto del sistema",
                  bg=COLORES["fondo"], fg=COLORES["texto_gris"],
-                 font=FUENTES["pequeño"], anchor="w",
+                 font=FUENTES["pequeÃ±o"], anchor="w",
                  padx=16, pady=8).pack(fill="x")
 
         columnas = {
             "Circuito": 200, "Sistema": 60, "Conductor": 100,
-            "L(m)": 60, "Zt_cable(Ω)": 100,
-            "Icc(kA)": 80, "Reducción(%)": 100, "Nivel": 180
+            "L(m)": 60, "Zt_cable(Î©)": 100,
+            "Icc(kA)": 80, "ReducciÃ³n(%)": 100, "Nivel": 180
         }
 
         datos = []
@@ -1076,7 +1182,7 @@ class MotorCalculoBT:
             red = reduccion_icc(Icc_kA, c["Icc_kA"])
             datos.append((
                 c["nombre"], c["sistema"], c["conductor"],
-                c["L_m"], c.get("Zt_cable", "—"),
+                c["L_m"], c.get("Zt_cable", "â€”"),
                 c["Icc_kA"], f"{red}%", c["nivel_icc"]
             ))
 
@@ -1092,13 +1198,13 @@ class MotorCalculoBT:
         self._limpiar_tab(self.tab_prot)
         self._encabezado_tab(
             self.tab_prot,
-            "VERIFICACIÓN DE PROTECCIONES",
+            "VERIFICACIÃ“N DE PROTECCIONES",
             "IEC 60898 | IEC 60947-2 | IEC 60364-4-41"
         )
 
         if not self.protecciones:
             tk.Label(self.tab_prot,
-                     text="No se encontró hoja 'Protecciones'",
+                     text="No se encontrÃ³ hoja 'Protecciones'",
                      bg=COLORES["fondo"], fg=COLORES["texto_gris"],
                      font=FUENTES["normal"], pady=20).pack()
             return
@@ -1122,14 +1228,14 @@ class MotorCalculoBT:
             )
             datos.append((
                 c["nombre"], p["curva"], int(p["In_A"]),
-                int(p["poder_corte_kA"]), c.get("Icc_kA","—"),
+                int(p["poder_corte_kA"]), c.get("Icc_kA","â€”"),
                 r["Im_min_A"], r["margen_pct"], r["estado"]
             ))
 
         def color_prot(fila):
             estado = str(fila[7])
             if "FALLA"     in estado: return "falla"
-            if "PRECAUCIÓN" in estado: return "precaucion"
+            if "PRECAUCIÃ“N" in estado: return "precaucion"
             return "ok"
 
         self._tabla(self.tab_prot, columnas, datos, color_prot)
@@ -1152,7 +1258,7 @@ class MotorCalculoBT:
         for nombre_t, t in self.resultado_balance["tableros"].items():
             # Encabezado del tablero
             color_estado = (COLORES["falla"] if "FALLA" in t["estado"]
-                           else COLORES["precaucion"] if "PRECAUCIÓN" in t["estado"]
+                           else COLORES["precaucion"] if "PRECAUCIÃ“N" in t["estado"]
                            else COLORES["ok"])
 
             f_header = tk.Frame(self.tab_bal, bg=COLORES["panel"])
@@ -1174,7 +1280,7 @@ class MotorCalculoBT:
                 ("L1",          f"{t['fases']['L1']} kW"),
                 ("L2",          f"{t['fases']['L2']} kW"),
                 ("L3",          f"{t['fases']['L3']} kW"),
-                ("Desequilibrio", f"{t['desequilibrio_pct']}%  →  {t['estado_fases']}"),
+                ("Desequilibrio", f"{t['desequilibrio_pct']}%  â†’  {t['estado_fases']}"),
             ]
 
             f_datos = tk.Frame(self.tab_bal, bg=COLORES["fondo"])
@@ -1186,7 +1292,7 @@ class MotorCalculoBT:
                 fila.pack(fill="x")
                 tk.Label(fila, text=f"  {campo}", width=16, anchor="w",
                          bg=fila["bg"], fg=COLORES["texto_gris"],
-                         font=FUENTES["pequeño"]).pack(side="left", pady=2)
+                         font=FUENTES["pequeÃ±o"]).pack(side="left", pady=2)
                 tk.Label(fila, text=valor, anchor="w",
                          bg=fila["bg"], fg=COLORES["texto"],
                          font=FUENTES["normal"]).pack(side="left", pady=2)
@@ -1194,7 +1300,7 @@ class MotorCalculoBT:
         # Resumen transformador
         r = self.resultado_balance
         color_trafo = (COLORES["falla"] if "FALLA" in r["estado_trafo"]
-                      else COLORES["precaucion"] if "PRECAUCIÓN" in r["estado_trafo"]
+                      else COLORES["precaucion"] if "PRECAUCIÃ“N" in r["estado_trafo"]
                       else COLORES["ok"])
 
         tk.Frame(self.tab_bal, bg=COLORES["borde"],
@@ -1207,7 +1313,7 @@ class MotorCalculoBT:
                  font=FUENTES["subtitulo"]).pack(side="left", pady=6)
         tk.Label(f_trafo,
                  text=f"  {r['uso_trafo_pct']}% de {r['kVA_trafo']} kVA"
-                      f"  →  {r['estado_trafo']}  ",
+                      f"  â†’  {r['estado_trafo']}  ",
                  bg=COLORES["panel"], fg=color_trafo,
                  font=FUENTES["subtitulo"]).pack(side="right", pady=6)
 
@@ -1216,8 +1322,8 @@ class MotorCalculoBT:
         self._limpiar_tab(self.tab_test)
         self._encabezado_tab(
             self.tab_test,
-            "VERIFICACIÓN DEL SISTEMA",
-            "Test automático al arranque — verifica integridad de todos los módulos"
+            "VERIFICACIÃ“N DEL SISTEMA",
+            "Test automÃ¡tico al arranque â€” verifica integridad de todos los mÃ³dulos"
         )
 
         tests = ejecutar_autotest()
@@ -1229,7 +1335,7 @@ class MotorCalculoBT:
                              (nombre,ok,msg))%2 else COLORES["fila_par"])
             f.pack(fill="x", padx=16, pady=1)
 
-            icono = "✓" if ok else "✗"
+            icono = "âœ“" if ok else "âœ—"
             color = COLORES["ok"] if ok else COLORES["falla"]
 
             tk.Label(f, text=f"  {icono}  {nombre}",
@@ -1238,16 +1344,16 @@ class MotorCalculoBT:
                      anchor="w").pack(side="left", pady=4)
             tk.Label(f, text=msg,
                      bg=f["bg"], fg=COLORES["texto_gris"],
-                     font=FUENTES["pequeño"],
+                     font=FUENTES["pequeÃ±o"],
                      anchor="w").pack(side="left", pady=4)
 
         tk.Frame(self.tab_test, bg=COLORES["borde"],
                  height=1).pack(fill="x", padx=16, pady=8)
 
         resumen_color = COLORES["ok"] if todos_ok else COLORES["falla"]
-        resumen_texto = ("✓  Todos los módulos operativos"
+        resumen_texto = ("âœ“  Todos los mÃ³dulos operativos"
                          if todos_ok else
-                         "✗  Hay módulos con errores — revisar instalación")
+                         "âœ—  Hay mÃ³dulos con errores â€” revisar instalaciÃ³n")
         tk.Label(self.tab_test, text=resumen_texto,
                  bg=COLORES["fondo"], fg=resumen_color,
                  font=FUENTES["subtitulo"], pady=8, padx=16,
@@ -1308,8 +1414,8 @@ class MotorCalculoBT:
     def _abrir_ventana_demanda(self):
         """
         Abre ventana separada con resultados de demanda M6.
-        No modal — coexiste con la ventana principal.
-        Se recrea cada vez — evita estados inconsistentes.
+        No modal â€” coexiste con la ventana principal.
+        Se recrea cada vez â€” evita estados inconsistentes.
         """
         if not self.resultado_demanda:
             return
@@ -1317,7 +1423,7 @@ class MotorCalculoBT:
         r   = self.resultado_demanda
         p   = self.params_demanda
 
-        # Calcular trafo o SEC según tipo
+        # Calcular trafo o SEC segÃºn tipo
         resultado_trafo = None
         resultado_sec   = None
         if p.get("tipo_alimentador") == "transformador":
@@ -1332,30 +1438,30 @@ class MotorCalculoBT:
 
         # --- Crear ventana ---
         ventana = tk.Toplevel(self.root)
-        ventana.title(f"Demanda M6 — {self.nombre_proyecto.get()}")
+        ventana.title(f"Demanda M6 â€” {self.nombre_proyecto.get()}")
         ventana.geometry("860x620")
         ventana.configure(bg=COLORES["fondo"])
         ventana.resizable(True, True)
-        # No grab_set() — no modal, coexiste con ventana principal
+        # No grab_set() â€” no modal, coexiste con ventana principal
 
         # Centrar
         x = self.root.winfo_x() + (self.root.winfo_width()  - 860) // 2
         y = self.root.winfo_y() + (self.root.winfo_height() - 620) // 2
         ventana.geometry(f"860x620+{x}+{y}")
 
-        # Título
+        # TÃ­tulo
         tk.Label(
             ventana,
-            text="DEMANDA MÁXIMA Y DIMENSIONAMIENTO — M6",
+            text="DEMANDA MÃXIMA Y DIMENSIONAMIENTO â€” M6",
             bg=COLORES["fondo"], fg=COLORES["acento"],
             font=FUENTES["titulo"], pady=10
         ).pack(fill="x")
         tk.Label(
             ventana,
-            text=f"Instalación: {r['tipo_instalacion'].upper()}  |  "
-                 f"Normativa: RIC N°03 SEC / IEC 60076",
+            text=f"InstalaciÃ³n: {r['tipo_instalacion'].upper()}  |  "
+                 f"Normativa: RIC NÂ°03 SEC / IEC 60076",
             bg=COLORES["fondo"], fg=COLORES["texto_gris"],
-            font=FUENTES["pequeño"]
+            font=FUENTES["pequeÃ±o"]
         ).pack()
         tk.Frame(ventana, bg=COLORES["borde"],
                  height=1).pack(fill="x", padx=16, pady=6)
@@ -1367,7 +1473,7 @@ class MotorCalculoBT:
         style.configure("M6.TNotebook.Tab",
                          background=COLORES["panel"],
                          foreground=COLORES["texto_gris"],
-                         font=FUENTES["pequeño"], padding=[12, 5])
+                         font=FUENTES["pequeÃ±o"], padding=[12, 5])
         style.map("M6.TNotebook.Tab",
                   background=[("selected", COLORES["acento"])],
                   foreground=[("selected", "#FFFFFF")])
@@ -1377,7 +1483,7 @@ class MotorCalculoBT:
 
         # --- TAB 1: Detalle por circuito ---
         tab_det = tk.Frame(nb, bg=COLORES["fondo"])
-        nb.add(tab_det, text="📋  Detalle circuitos")
+        nb.add(tab_det, text="ðŸ“‹  Detalle circuitos")
 
         cols_det = {
             "Circuito": 200, "Tipo_carga": 130,
@@ -1392,37 +1498,37 @@ class MotorCalculoBT:
 
         # --- TAB 2: Resumen ejecutivo ---
         tab_res = tk.Frame(nb, bg=COLORES["fondo"])
-        nb.add(tab_res, text="📊  Resumen")
+        nb.add(tab_res, text="ðŸ“Š  Resumen")
 
         filas_res = [
-            ("Tipo instalación",  r["tipo_instalacion"].upper()),
+            ("Tipo instalaciÃ³n",  r["tipo_instalacion"].upper()),
             ("Demanda total",     f"{r['S_total_kva']} kVA  ({r['P_total_kw']} kW)"),
             ("Corriente alim.",   f"{r['I_alim_A']} A  ({r['sistema_alim']} / {r['Vn_alim']} V)"),
-            ("Factor crecimiento",f"×{r['factor_crecimiento']}"),
-            ("Demanda futura",    f"{r['S_futuro_kva']} kVA  →  {r['I_futuro_A']} A"),
+            ("Factor crecimiento",f"Ã—{r['factor_crecimiento']}"),
+            ("Demanda futura",    f"{r['S_futuro_kva']} kVA  â†’  {r['I_futuro_A']} A"),
         ]
         self._filas_info(tab_res, filas_res)
 
         # --- TAB 3: Transformador o SEC ---
         tab_dim = tk.Frame(nb, bg=COLORES["fondo"])
         tipo_alim = p.get("tipo_alimentador", "transformador")
-        nb.add(tab_dim, text="🔌  Transformador" if tipo_alim == "transformador" else "🔌  Acometida SEC")
+        nb.add(tab_dim, text="ðŸ”Œ  Transformador" if tipo_alim == "transformador" else "ðŸ”Œ  Acometida SEC")
 
         if resultado_trafo:
             t = resultado_trafo
             color_t = (COLORES["falla"]     if "FALLA" in t["estado"] else
-                       COLORES["precaucion"] if "PRECAUCIÓN" in t["estado"] else
+                       COLORES["precaucion"] if "PRECAUCIÃ“N" in t["estado"] else
                        COLORES["ok"])
             filas_t = [
-                ("kVA mínimo requerido", f"{t['kVA_minimo']} kVA"),
-                ("kVA seleccionado",     f"{t['kVA_seleccionado']} kVA  (estándar IEC 60076)"),
+                ("kVA mÃ­nimo requerido", f"{t['kVA_minimo']} kVA"),
+                ("kVA seleccionado",     f"{t['kVA_seleccionado']} kVA  (estÃ¡ndar IEC 60076)"),
                 ("Uso del transformador",f"{t['uso_pct']}%"),
                 ("Estado",               t["estado"]),
                 ("",                     ""),
                 ("Transformador actual",
-                 f"{self.datos_trafo['kVA']} kVA  →  "
+                 f"{self.datos_trafo['kVA']} kVA  â†’  "
                  f"{'SUFICIENTE' if self.datos_trafo['kVA'] >= t['kVA_minimo'] else 'INSUFICIENTE para demanda futura'}"
-                 if self.datos_trafo else "—"),
+                 if self.datos_trafo else "â€”"),
             ]
             self._filas_info(tab_dim, filas_t, color_estado=color_t)
 
@@ -1431,15 +1537,15 @@ class MotorCalculoBT:
             filas_s = [
                 ("Corriente alimentador", f"{s['I_alim_A']} A"),
                 ("Icc empalme SEC",       f"{s['Icc_kA']} kA  (zona {s['zona']})"),
-                ("Protección mínima",     f"{s['I_prot_min_A']} A  (125% I_alim — RIC N°03)"),
+                ("ProtecciÃ³n mÃ­nima",     f"{s['I_prot_min_A']} A  (125% I_alim â€” RIC NÂ°03)"),
                 ("Nota",                  s["nota"]),
             ]
             self._filas_info(tab_dim, filas_s)
 
-        # Botón cerrar
+        # BotÃ³n cerrar
         tk.Frame(ventana, bg=COLORES["borde"],
                  height=1).pack(fill="x", padx=16, pady=6)
-        self._boton(ventana, "✗  Cerrar", ventana.destroy,
+        self._boton(ventana, "âœ—  Cerrar", ventana.destroy,
                     color=COLORES["encabezado"]).pack(pady=8)
 
     def _tabla_en_frame(self, parent, columnas, datos):
@@ -1489,7 +1595,7 @@ class MotorCalculoBT:
             f.pack(fill="x", padx=16, pady=1)
             tk.Label(f, text=f"  {campo}", width=22, anchor="w",
                      bg=f["bg"], fg=COLORES["texto_gris"],
-                     font=FUENTES["pequeño"]).pack(side="left", pady=5)
+                     font=FUENTES["pequeÃ±o"]).pack(side="left", pady=5)
             # Color especial para fila Estado
             color_val = (color_estado if campo == "Estado" and color_estado
                          else COLORES["texto"])
@@ -1500,14 +1606,14 @@ class MotorCalculoBT:
 
     def _abrir_ventana_coordinacion(self):
         """
-        Abre ventana separada con resultados de coordinación TCC M7.
-        Patrón idéntico a _abrir_ventana_demanda — Toplevel no modal.
+        Abre ventana separada con resultados de coordinaciÃ³n TCC M7.
+        PatrÃ³n idÃ©ntico a _abrir_ventana_demanda â€” Toplevel no modal.
         """
         if not self.resultados_m7:
             return
 
         ventana = tk.Toplevel(self.root)
-        ventana.title(f"Coordinación TCC M7 — {self.nombre_proyecto.get()}")
+        ventana.title(f"CoordinaciÃ³n TCC M7 â€” {self.nombre_proyecto.get()}")
         ventana.geometry("900x640")
         ventana.configure(bg=COLORES["fondo"])
         ventana.resizable(True, True)
@@ -1516,19 +1622,19 @@ class MotorCalculoBT:
         y = self.root.winfo_y() + (self.root.winfo_height() - 640) // 2
         ventana.geometry(f"900x640+{x}+{y}")
 
-        # Título
+        # TÃ­tulo
         tk.Label(
             ventana,
-            text="COORDINACIÓN TCC — M7",
+            text="COORDINACIÃ“N TCC â€” M7",
             bg=COLORES["fondo"], fg=COLORES["acento"],
             font=FUENTES["titulo"], pady=10
         ).pack(fill="x")
         tk.Label(
             ventana,
             text="Normativa: IEC 60947-2 / IEC 60898-1 / IEC 60364-4-41  |  "
-                 "Limitación: región térmica ETU no modelada → usar SIMARIS",
+                 "LimitaciÃ³n: regiÃ³n tÃ©rmica ETU no modelada â†’ usar SIMARIS",
             bg=COLORES["fondo"], fg=COLORES["texto_gris"],
-            font=FUENTES["pequeño"]
+            font=FUENTES["pequeÃ±o"]
         ).pack()
         tk.Frame(ventana, bg=COLORES["borde"],
                  height=1).pack(fill="x", padx=16, pady=6)
@@ -1540,7 +1646,7 @@ class MotorCalculoBT:
         style.configure("M7.TNotebook.Tab",
                          background=COLORES["panel"],
                          foreground=COLORES["texto_gris"],
-                         font=FUENTES["pequeño"], padding=[12, 5])
+                         font=FUENTES["pequeÃ±o"], padding=[12, 5])
         style.map("M7.TNotebook.Tab",
                   background=[("selected", COLORES["acento"])],
                   foreground=[("selected", "#FFFFFF")])
@@ -1550,18 +1656,18 @@ class MotorCalculoBT:
 
         for modo, resultado in self.resultados_m7.items():
             tab = tk.Frame(nb, bg=COLORES["fondo"])
-            icono = "🔌" if modo == "red" else "⚡"
+            icono = "ðŸ”Œ" if modo == "red" else "âš¡"
             nb.add(tab, text=f"{icono}  Modo {modo.capitalize()}")
             self._construir_tab_coordinacion(tab, resultado, modo)
 
-        # Botón cerrar
+        # BotÃ³n cerrar
         tk.Frame(ventana, bg=COLORES["borde"],
                  height=1).pack(fill="x", padx=16, pady=6)
-        self._boton(ventana, "✗  Cerrar", ventana.destroy,
+        self._boton(ventana, "âœ—  Cerrar", ventana.destroy,
                     color=COLORES["encabezado"]).pack(pady=8)
 
     def _construir_tab_coordinacion(self, parent, resultado, modo):
-        """Construye el contenido de un tab de coordinación."""
+        """Construye el contenido de un tab de coordinaciÃ³n."""
 
         # --- Resumen global ---
         sel = resultado["selectividad_global"]
@@ -1584,22 +1690,22 @@ class MotorCalculoBT:
         tk.Label(frame_res,
                  text=f"  IEC 60364-4-41: {iec['estado']}  ({iec['nota']})",
                  bg=COLORES["panel"], fg=color_iec,
-                 font=FUENTES["pequeño"], anchor="w"
+                 font=FUENTES["pequeÃ±o"], anchor="w"
                  ).pack(side="left", padx=8, pady=6)
 
         # --- Tabla tiempos de disparo ---
         tk.Label(parent, text="  Tiempos de disparo",
                  bg=COLORES["fondo"], fg=COLORES["texto_gris"],
-                 font=FUENTES["pequeño"], anchor="w"
+                 font=FUENTES["pequeÃ±o"], anchor="w"
                  ).pack(fill="x", padx=16, pady=(8, 2))
 
         cols_disp = {
             "Dispositivo": 180, "Nivel": 55,
-            "t_disparo(s)": 100, "Región": 160, "Nota": 350
+            "t_disparo(s)": 100, "RegiÃ³n": 160, "Nota": 350
         }
         filas_disp = []
         for d in resultado["resultados_disparo"]:
-            t_str = f"{d['t_s']:.3f}" if d["t_s"] is not None else "—"
+            t_str = f"{d['t_s']:.3f}" if d["t_s"] is not None else "â€”"
             filas_disp.append((
                 d["nombre"], d["nivel"], t_str,
                 d["region"], d["nota"]
@@ -1609,7 +1715,7 @@ class MotorCalculoBT:
         # --- Tabla selectividad por par ---
         tk.Label(parent, text="  Selectividad por par",
                  bg=COLORES["fondo"], fg=COLORES["texto_gris"],
-                 font=FUENTES["pequeño"], anchor="w"
+                 font=FUENTES["pequeÃ±o"], anchor="w"
                  ).pack(fill="x", padx=16, pady=(8, 2))
 
         cols_par = {
@@ -1638,3 +1744,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
