@@ -1,4 +1,4 @@
-import pandas as pd
+﻿import pandas as pd
 import streamlit as st
 
 from persistencia import obtener_ejecuciones
@@ -17,11 +17,11 @@ def _normalizar_dataframe(ruta_db: str = "motor_bt.db") -> pd.DataFrame:
 
 def _fmt_val(value):
     if value is None:
-        return "—"
+        return "â€”"
     if isinstance(value, float) and pd.isna(value):
-        return "—"
+        return "â€”"
     if isinstance(value, str) and value.strip() == "":
-        return "—"
+        return "â€”"
     return value
 
 
@@ -35,16 +35,16 @@ def _tabla_presentacion(df: pd.DataFrame, columnas):
 def _estado_gantt_desde_status(status):
     mapa = {
         "OK": "COMPLETADO",
-        "CON_FALLAS": "EN_REVISIÓN",
-        "OBSERVACIONES": "EN_REVISIÓN",
+        "CON_FALLAS": "EN_REVISIÃ“N",
+        "CON_ADVERTENCIAS": "EN_REVISIÃ“N",
         "ERROR": "BLOQUEADO",
     }
-    return mapa.get(status, "EN_REVISIÓN")
+    return mapa.get(status, "EN_REVISIÃ“N")
 
 
 def main():
     st.set_page_config(page_title="Motor BT - Dashboard", layout="wide")
-    st.title("Dashboard técnico - Motor BT")
+    st.title("Dashboard tÃ©cnico - Motor BT")
 
     ruta_db = st.sidebar.text_input("Ruta DB", value="motor_bt.db")
     df = _normalizar_dataframe(ruta_db=ruta_db)
@@ -54,7 +54,7 @@ def main():
         return
 
     tab_resumen, tab_proyecto, tab_detalle, tab_estado = st.tabs(
-        ["Resumen global", "Por proyecto", "Detalle de ejecución", "Estado técnico"]
+        ["Resumen global", "Por proyecto", "Detalle de ejecuciÃ³n", "Estado tÃ©cnico"]
     )
 
     with tab_resumen:
@@ -71,16 +71,16 @@ def main():
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Total runs", total_runs)
-        c2.metric("Última ejecución", str(ultima_ejecucion))
+        c2.metric("Ãšltima ejecuciÃ³n", str(ultima_ejecucion))
         c3.metric("Proyectos activos", int(df["project_id"].dropna().nunique()))
 
         c4, c5, c6, c7 = st.columns(4)
         c4.metric("Tasa OK", f"{tasa_ok:.1f}%")
         c5.metric("Fallas acumuladas", int(fallas_acumuladas))
-        c6.metric("ΔV máximo", "—" if pd.isna(max_dv) else f"{float(max_dv):.3f}%")
-        c7.metric("Icc máximo", "—" if pd.isna(max_icc) else f"{float(max_icc):.3f} kA")
+        c6.metric("Î”V mÃ¡ximo", "â€”" if pd.isna(max_dv) else f"{float(max_dv):.3f}%")
+        c7.metric("Icc mÃ¡ximo", "â€”" if pd.isna(max_icc) else f"{float(max_icc):.3f} kA")
 
-        st.subheader("Últimas 10 ejecuciones")
+        st.subheader("Ãšltimas 10 ejecuciones")
         cols = [
             "timestamp", "run_id", "project_id", "revision", "status",
             "n_ok", "n_fallas", "max_dv_pct", "max_icc_ka",
@@ -99,7 +99,7 @@ def main():
             df_p = df[df["project_id"] == proyecto_sel].copy()
             df_p = df_p.sort_values("timestamp_dt", ascending=True, na_position="last")
 
-            st.subheader("Evolución por revisión")
+            st.subheader("EvoluciÃ³n por revisiÃ³n")
             if "revision" in df_p.columns:
                 evo = df_p[["revision", "max_dv_pct", "n_fallas"]].copy()
                 evo["revision"] = evo["revision"].apply(_fmt_val)
@@ -139,15 +139,15 @@ def main():
         st.text(f"ruta_reporte_xlsx: {_fmt_val(fila.get('ruta_reporte_xlsx'))}")
 
     with tab_estado:
-        st.subheader("Distribución status")
-        status_counts = df["status"].fillna("—").astype(str).value_counts().sort_index()
+        st.subheader("DistribuciÃ³n status")
+        status_counts = df["status"].fillna("â€”").astype(str).value_counts().sort_index()
         st.bar_chart(status_counts)
 
-        st.subheader("Distribución norma")
-        norma_counts = df["norma"].fillna("—").astype(str).value_counts().sort_index()
+        st.subheader("DistribuciÃ³n norma")
+        norma_counts = df["norma"].fillna("â€”").astype(str).value_counts().sort_index()
         st.bar_chart(norma_counts)
 
-        st.subheader("Último control de versión")
+        st.subheader("Ãšltimo control de versiÃ³n")
         ultimo = df.iloc[0].to_dict()
         st.text(f"commit_hash: {_fmt_val(ultimo.get('commit_hash'))}")
         st.text(f"branch: {_fmt_val(ultimo.get('branch'))}")
@@ -156,3 +156,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

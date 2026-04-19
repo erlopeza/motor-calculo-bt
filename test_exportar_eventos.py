@@ -1,9 +1,10 @@
-import csv
+﻿import csv
 import json
+import sqlite3
 import uuid
 from pathlib import Path
 
-from exportar_eventos import derivar_evento, exportar_json, exportar_csv
+from exportar_eventos import derivar_evento, exportar_json, exportar_csv, persistir_eventos
 from persistencia import registrar_ejecucion
 
 
@@ -44,6 +45,8 @@ def test_derivar_evento_ok():
     evento = derivar_evento(run)
     assert evento["estado"] == "COMPLETADO"
     assert evento["event_type"] == "CALCULO_BT"
+    assert "title" in evento
+    assert evento["title"]
 
 
 def test_derivar_evento_falla():
@@ -64,6 +67,7 @@ def test_derivar_evento_falla():
 def test_exportar_json():
     ruta_db = _ruta_local("runs_json", "db")
     registrar_ejecucion(_datos_run_base(), ruta_db=ruta_db)
+    persistir_eventos(ruta_db=ruta_db)
 
     ruta_json = _ruta_local("eventos", "json")
     exportar_json(ruta_json, ruta_db=ruta_db)
@@ -80,6 +84,7 @@ def test_exportar_json():
 def test_exportar_csv():
     ruta_db = _ruta_local("runs_csv", "db")
     registrar_ejecucion(_datos_run_base(), ruta_db=ruta_db)
+    persistir_eventos(ruta_db=ruta_db)
 
     ruta_csv = _ruta_local("eventos", "csv")
     exportar_csv(ruta_csv, ruta_db=ruta_db)
@@ -90,3 +95,19 @@ def test_exportar_csv():
     assert len(rows) == 1
     assert "run_id" in rows[0]
     assert "estado" in rows[0]
+
+
+def test_persistir_eventos():
+    ruta_db = _ruta_local("persistir", "db")
+    registrar_ejecucion(_datos_run_base(), ruta_db=ruta_db)
+
+    n = persistir_eventos(ruta_db=ruta_db)
+    assert n == 1
+
+    # idempotente: segunda corrida no inserta duplicados
+    n2 = persistir_eventos(ruta_db=ruta_db)
+    assert n2 == 0
+
+    with sqlite3.connect(ruta_db) as conn:
+        total = conn.execute("SELECT COUNT(*) FROM technical_events").fetchone()[0]
+    assert total == 1
