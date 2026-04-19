@@ -473,11 +473,7 @@ try:
         estado_dV = clasificar_caida(dV_pct)
         estado_I = "OK" if c["I_diseno"] <= I_cap else "SUPERA"
         estado = "OK" if (estado_dV != "FALLA" and estado_I == "OK") else "CON_FALLAS"
-        icc_ka = c.get("icc_ka")
-        if icc_ka is None:
-            icc_ka = c.get("Icc_kA")
-        if icc_ka is None:
-            icc_ka = icc_por_circuito.get(c.get("nombre"))
+        icc_ka = c.get("icc_ka") or c.get("Icc_kA") or icc_por_circuito.get(c.get("nombre"))
 
         observaciones = c.get("nivel_icc")
         if estado_dV == "FALLA" or estado_I == "SUPERA":
