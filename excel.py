@@ -753,3 +753,99 @@ def leer_generador_excel(libro_openpyxl):
     if any(resultado.get(k) in (None, "") for k in faltantes):
         return None
     return resultado
+
+
+def leer_sts_excel(libro_openpyxl):
+    """
+    Lee datos STS desde hoja 'sts' (campo/valor) o columnas STS_* en 'circuitos'.
+    Retorna dict o None.
+    """
+    def _norm_key(texto):
+        key = str(texto).strip().lower()
+        for orig, repl in [("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ñ", "n")]:
+            key = key.replace(orig, repl)
+        return key
+
+    def _to_float(v, default=None):
+        if v is None or str(v).strip() == "":
+            return default
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return default
+
+    def _to_int(v, default=None):
+        if v is None or str(v).strip() == "":
+            return default
+        try:
+            return int(float(v))
+        except (TypeError, ValueError):
+            return default
+
+    def _to_str(v, default=""):
+        if v is None:
+            return default
+        return str(v).strip()
+
+    datos = {}
+    hoja_sts = next((n for n in libro_openpyxl.sheetnames if n.lower() == "sts"), None)
+    if hoja_sts:
+        hoja = libro_openpyxl[hoja_sts]
+        for fila in hoja.iter_rows(min_row=2, values_only=True):
+            if not fila or fila[0] is None:
+                continue
+            campo = _norm_key(fila[0])
+            datos[campo] = fila[1]
+    else:
+        hoja_circuitos = next((n for n in libro_openpyxl.sheetnames if n.lower() == "circuitos"), None)
+        if not hoja_circuitos:
+            return None
+
+        hoja = libro_openpyxl[hoja_circuitos]
+        headers = [c.value for c in hoja[1]]
+        idx_sts = {}
+        for i, h in enumerate(headers):
+            if h is None:
+                continue
+            txt = str(h).strip()
+            if txt.upper().startswith("STS_"):
+                idx_sts[txt.lower()] = i
+
+        if not idx_sts:
+            return None
+
+        fila2 = [c.value for c in hoja[2]]
+        for key, idx in idx_sts.items():
+            val = fila2[idx] if idx < len(fila2) else None
+            if val is not None and str(val).strip() != "":
+                datos[_norm_key(key)] = val
+
+    if not datos:
+        return None
+
+    resultado = {
+        "STS_nombre": _to_str(datos.get("sts_nombre"), ""),
+        "STS_modelo": _to_str(datos.get("sts_modelo"), ""),
+        "STS_P_modulo_kVA": _to_float(datos.get("sts_p_modulo_kva"), None),
+        "STS_n_modulos": _to_int(datos.get("sts_n_modulos"), 1),
+        "STS_t_transferencia_ms": _to_float(datos.get("sts_t_transferencia_ms"), None),
+        "STS_V_nominal": _to_float(datos.get("sts_v_nominal"), 380.0),
+        "STS_P_carga_kVA": _to_float(datos.get("sts_p_carga_kva"), None),
+        "STS_cos_phi": _to_float(datos.get("sts_cos_phi"), 0.9),
+        "STS_tipo_carga": _to_str(datos.get("sts_tipo_carga"), "general").lower() or "general",
+        "STS_topologia": _to_str(datos.get("sts_topologia"), "simple").lower() or "simple",
+        "STS_n_sts": _to_int(datos.get("sts_n_sts"), 1),
+        "STS_P_no_lineal_kVA": _to_float(datos.get("sts_p_no_lineal_kva"), 0.0),
+        "STS_t_sobrecarga_seg": _to_float(datos.get("sts_t_sobrecarga_seg"), 0.0),
+    }
+
+    faltantes = [
+        "STS_nombre",
+        "STS_modelo",
+        "STS_P_modulo_kVA",
+        "STS_t_transferencia_ms",
+        "STS_P_carga_kVA",
+    ]
+    if any(resultado.get(k) in (None, "") for k in faltantes):
+        return None
+    return resultado

@@ -18,7 +18,7 @@ from excel import (
     leer_circuitos_excel, leer_transformador_excel,
     leer_balance_excel, leer_tableros_excel,
     guardar_txt, exportar_excel, leer_perfil_excel,
-    enriquecer_circuitos, leer_generador_excel
+    enriquecer_circuitos, leer_generador_excel, leer_sts_excel
 )
 from perfiles import obtener_perfil
 from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
@@ -33,6 +33,7 @@ from excel import leer_demanda_excel, leer_cadena_excel
 from coordinacion import verificar_cadena, reporte_coordinacion
 from motores import calcular_motor
 from generador import calcular_generador
+from sts import calcular_sts
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
@@ -268,12 +269,95 @@ def generar_seccion_generador(circuitos, datos_generador, protecciones=None, res
     return lineas
 
 
+def generar_seccion_sts(datos_sts):
+    if not datos_sts:
+        return []
+
+    r = calcular_sts(
+        nombre=datos_sts["STS_nombre"],
+        modelo_sts=datos_sts["STS_modelo"],
+        P_modulo_kVA=datos_sts["STS_P_modulo_kVA"],
+        n_modulos=datos_sts.get("STS_n_modulos", 1),
+        t_transferencia_ms=datos_sts["STS_t_transferencia_ms"],
+        V_nominal=datos_sts.get("STS_V_nominal", 380.0),
+        P_carga_kVA=datos_sts["STS_P_carga_kVA"],
+        cos_phi_carga=datos_sts.get("STS_cos_phi", 0.9),
+        tipo_carga=datos_sts.get("STS_tipo_carga", "general"),
+        topologia=datos_sts.get("STS_topologia", "simple"),
+        n_sts=datos_sts.get("STS_n_sts", 1),
+        P_no_lineal_kVA=datos_sts.get("STS_P_no_lineal_kVA", 0.0),
+        t_sobrecarga_seg=datos_sts.get("STS_t_sobrecarga_seg", 0.0),
+    )
+
+    cap = r["capacidad"]
+    tr = r["transferencia"]
+    ov = r["overload"]
+    red = r.get("redundancia_2N")
+    nl = r.get("carga_no_lineal")
+    topo_txt = "2N" if r["topologia"] == "2n" else r["topologia"]
+
+    lineas = []
+    lineas.append("")
+    lineas.append("=" * 60)
+    lineas.append("  STS - TRANSFERENCIA ESTATICA")
+    lineas.append("  Normativa: IEC 60947-6-1 / IEC 62040-3 / IEC 60364-5-55")
+    lineas.append("=" * 60)
+    lineas.append(f"  STS           : {r['nombre']} ({r['modelo_sts']})")
+    lineas.append(f"  Topologia     : {topo_txt}")
+    lineas.append(
+        f"  Modulos       : {r['n_modulos']} x {r['P_modulo_kVA']}kVA = {r['P_sts_total_kVA']}kVA por STS"
+    )
+    lineas.append(f"  Tension       : {r['V_nominal']}V 3F / 50Hz")
+    lineas.append("")
+    lineas.append("  CAPACIDAD")
+    lineas.append(f"  P_carga total : {r['P_carga_kVA']}kVA")
+    lineas.append(f"  Uso           : {cap['uso_pct']}% -> {'OK' if cap['ok'] else 'REVISAR'}")
+    lineas.append(f"  Margen        : {cap['margen_kVA']}kVA")
+
+    if r["topologia"] == "2n" and red:
+        lineas.append("")
+        lineas.append("  REDUNDANCIA 2N")
+        lineas.append(
+            f"  Uso normal    : {red['uso_normal_pct']}% por STS -> {'OK' if red['ok_normal'] else 'REVISAR'}"
+        )
+        lineas.append(
+            f"  Uso falla BUS : {red['uso_falla_pct']}% en STS sobreviviente -> {'OK' if red['ok_falla'] else 'REVISAR'}"
+        )
+
+    lineas.append("")
+    lineas.append("  TRANSFERENCIA")
+    lineas.append(f"  t_transfer    : {tr['t_transferencia_ms']} ms")
+    lineas.append(f"  Tipo carga    : {r['tipo_carga']}")
+    lineas.append(f"  t_max         : {tr['t_max_ms']}ms ({tr['norma']})")
+    lineas.append(f"  Margen        : {tr['margen_ms']}ms -> {'OK' if tr['ok'] else 'REVISAR'}")
+
+    if nl:
+        lineas.append("")
+        lineas.append("  CARGA NO LINEAL")
+        lineas.append(
+            f"  P_no_lineal   : {r['P_no_lineal_kVA']}kVA / {r['P_carga_kVA']}kVA -> {nl['pct_no_lineal']}%"
+        )
+        lineas.append(f"  Factor cresta : >= {nl['factor_cresta_requerido']}:1 requerido")
+        lineas.append(f"  Estado        : {'OK' if nl['ok'] else 'ALERTAR'}")
+
+    if r["t_sobrecarga_seg"] > 0:
+        lineas.append("")
+        lineas.append("  OVERLOAD")
+        lineas.append(f"  Nivel         : {ov['nivel']} ({ov['sobrecarga_pct']}%)")
+        lineas.append(
+            f"  t_max permit  : {ov['t_max_permitido_seg']}s -> {'OK' if ov['ok'] else 'REVISAR'}"
+        )
+
+    lineas.append("=" * 60)
+    return lineas
+
+
 def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
                         datos_trafo=None, protecciones=None,
                         balance_datos=None, tableros_datos=None,
                         params_demanda=None,
                         cadena_datos=None, perfil=None,
-                        datos_generador=None):
+                        datos_generador=None, datos_sts=None):
     perfil = perfil or {}
     lineas      = []
     total_ok    = 0
@@ -440,6 +524,9 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
         resultado_demanda=resultado_demanda,
     )
 
+    # --- STS --- M11
+    lineas += generar_seccion_sts(datos_sts)
+
     # --- RESUMEN FINAL ---
     lineas.append("")
     lineas.append("=" * 60)
@@ -486,6 +573,7 @@ tableros_datos     = {}
 params_demanda     = None
 cadena_datos       = []
 datos_generador    = None
+datos_sts          = None
 perfil             = obtener_perfil("industrial").copy()
 
 try:
@@ -522,9 +610,14 @@ try:
               f"{params_demanda['tipo_alimentador']}")
     cadena_datos = leer_cadena_excel(_libro)
     datos_generador = leer_generador_excel(_libro)
+    datos_sts = leer_sts_excel(_libro)
     if datos_generador:
         print(
             f"  Generador M9  : {datos_generador['GE_nombre']} ({datos_generador['GE_modelo']})"
+        )
+    if datos_sts:
+        print(
+            f"  STS M11       : {datos_sts['STS_nombre']} ({datos_sts['STS_modelo']})"
         )
     if cadena_datos:
         print(f"  Coordinación  : {len(cadena_datos)} dispositivos en cadena")
@@ -533,6 +626,7 @@ except Exception as e:
     params_demanda = None
     cadena_datos   = []
     datos_generador = None
+    datos_sts = None
 
 # --- LEER CIRCUITOS ---
 try:
@@ -569,7 +663,7 @@ lineas, total_ok, total_falla = generar_reporte_txt(
     datos_trafo, protecciones_excel,
     balance_datos, tableros_datos,
     params_demanda, cadena_datos,
-    perfil=perfil, datos_generador=datos_generador
+    perfil=perfil, datos_generador=datos_generador, datos_sts=datos_sts
 )
 
 print()
