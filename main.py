@@ -31,6 +31,7 @@ from demanda import (
 )
 from excel import leer_demanda_excel, leer_cadena_excel
 from coordinacion import verificar_cadena, reporte_coordinacion
+from motores import calcular_motor
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
@@ -73,6 +74,72 @@ def generar_seccion_transformador(datos_trafo):
         "nombre": datos_trafo["nombre"], "modo": modo,
     }
     return lineas, resultado
+
+
+def generar_seccion_motores(circuitos, perfil=None):
+    perfil = perfil or {}
+    lineas = []
+
+    motores = [c for c in circuitos if str(c.get("tipo_carga", "")).lower() == "motor"]
+    if not motores:
+        return lineas
+
+    lineas.append("")
+    lineas.append("=" * 60)
+    lineas.append("  MOTORES — CORRIENTE, ARRANQUE Y PROTECCIONES")
+    lineas.append("  Normativa: RIC (Pliego Motores) / NCh Elec 4/2003")
+    lineas.append("=" * 60)
+
+    for m in motores:
+        p_kw = m.get("P_kW")
+        if p_kw is None:
+            p_kw = round(calcular_potencia(m["I_diseno"], m["cos_phi"], m["sistema"]) / 1000.0, 2)
+
+        resultado = calcular_motor(
+            nombre=m.get("nombre"),
+            P_kW=p_kw,
+            V_nominal=TENSION_SISTEMA.get(m["sistema"], 380),
+            cos_phi=m.get("cos_phi", 0.85),
+            rendimiento=m.get("rendimiento", 0.92),
+            sistema=m.get("sistema", "3F"),
+            tipo_arranque=m.get("tipo_arranque", "directo"),
+            regimen=m.get("regimen", "permanente"),
+            periodo_min=m.get("periodo_min", 999),
+            norma=perfil.get("norma", "AWG"),
+        )
+        guard = resultado["guardamotor"]
+        prot = resultado["proteccion_arranque"]
+        rango = resultado.get("arranque", {}).get("rango_tipico", (5.0, 8.0))
+        i_n = float(resultado.get("I_n", resultado.get("I_plena_carga", 0.0)))
+        arr_txt = {
+            "directo": "arranque directo × 6",
+            "estrella_triangulo": "arranque estrella-triangulo × 2",
+            "variador": "arranque variador × 1",
+        }.get(m.get("tipo_arranque", "directo"), "arranque directo × 6")
+
+        lineas.append("")
+        lineas.append(f"  Motor     : {resultado['nombre']}")
+        lineas.append(f"  Sistema   : {resultado['sistema']} / {resultado['V_nominal']}V")
+        lineas.append(
+            f"  Potencia  : {resultado['P_kW']} kW  |  cos_phi: {resultado['cos_phi']}  |  η: {resultado['rendimiento']}"
+        )
+        lineas.append(f"  I_plena   : {resultado['I_plena_carga']} A")
+        lineas.append(
+            f"  I_arranque: {resultado['I_arranque']} A  ({arr_txt})"
+            f"  — rango típico [{round(i_n * rango[0], 1)}-{round(i_n * rango[1], 1)}A]"
+        )
+        lineas.append(
+            f"  Conductor : {resultado['conductor']} ({resultado['S_mm2']}mm2) — factor {resultado['factor_aplicado']} RIC"
+        )
+        lineas.append(
+            f"  Guardamotor: {guard['rango_min']}-{guard['rango_max']}A  ajuste: {guard['ajuste_recomendado']}A"
+        )
+        lineas.append(
+            f"  Protección: MA{int(round(guard['rango_max']))}A curva MA → "
+            f"{'OK' if prot['ok'] else 'REVISAR'} (Im={prot['Im_min']}A > I_arr={resultado['I_arranque']}A)"
+        )
+    lineas.append("=" * 60)
+    return lineas
 
 
 def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
@@ -234,6 +301,9 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
                 lineas += reporte_coordinacion(
                     res_cadena, f"Modo {modo}"
                 )
+
+    # --- MOTORES --- M8
+    lineas += generar_seccion_motores(circuitos, perfil=perfil)
 
     # --- RESUMEN FINAL ---
     lineas.append("")

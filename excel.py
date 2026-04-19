@@ -131,18 +131,36 @@ def leer_circuitos_excel(nombre_archivo):
     print(f"\n  Leyendo: {nombre_archivo}")
     print(f"  Circuitos encontrados: {hoja.max_row - 1}")
 
+    # Detectar encabezados reales para soportar columnas extendidas.
+    encabezados_raw = [c.value for c in hoja[1]]
+    encabezados = {}
+    for i, h in enumerate(encabezados_raw):
+        if h is None:
+            continue
+        clave = str(h).strip().lower()
+        for orig, repl in [("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ñ", "n")]:
+            clave = clave.replace(orig, repl)
+        encabezados[clave] = i
+
+    def _get_valor(fila, key, default_idx, default=None):
+        idx = encabezados.get(key, default_idx)
+        if idx is None or idx >= len(fila):
+            return default
+        val = fila[idx]
+        return default if val is None else val
+
     # --- NIVEL 2: verificar cada fila de datos ---
     for num_fila, fila in enumerate(
         hoja.iter_rows(min_row=2, values_only=True), start=2
     ):
-        nombre    = fila[0]
-        sistema   = fila[1]
-        conductor = fila[2]
-        paralelos = fila[3]
-        I_diseno  = fila[4]
-        cos_phi   = fila[5]
-        L_m       = fila[6]
-        temp_amb  = fila[7]
+        nombre    = _get_valor(fila, "nombre", 0)
+        sistema   = _get_valor(fila, "sistema", 1)
+        conductor = _get_valor(fila, "conductor", 2)
+        paralelos = _get_valor(fila, "paralelos", 3)
+        I_diseno  = _get_valor(fila, "i_diseno", 4)
+        cos_phi   = _get_valor(fila, "cos_phi", 5)
+        L_m       = _get_valor(fila, "l_m", 6)
+        temp_amb  = _get_valor(fila, "temp_amb", 7)
 
         if nombre is None:
             continue
@@ -200,6 +218,26 @@ def leer_circuitos_excel(nombre_archivo):
             )
             continue
 
+        tipo_carga = str(_get_valor(fila, "tipo_carga", 8, "general")).strip().lower()
+        p_kw = _get_valor(fila, "p_kw", 9, None)
+        rendimiento = _get_valor(fila, "rendimiento", 10, 0.92)
+        tipo_arranque = str(_get_valor(fila, "tipo_arranque", 11, "directo")).strip().lower()
+        regimen = str(_get_valor(fila, "regimen", 12, "permanente")).strip().lower()
+        periodo_min = _get_valor(fila, "periodo_min", 13, 999)
+
+        try:
+            p_kw = float(p_kw) if p_kw is not None else None
+        except (TypeError, ValueError):
+            p_kw = None
+        try:
+            rendimiento = float(rendimiento)
+        except (TypeError, ValueError):
+            rendimiento = 0.92
+        try:
+            periodo_min = int(float(periodo_min))
+        except (TypeError, ValueError):
+            periodo_min = 999
+
         circuitos.append({
             "nombre":    str(nombre).strip(),
             "sistema":   sistema,
@@ -211,6 +249,12 @@ def leer_circuitos_excel(nombre_archivo):
             "cos_phi":   cos_phi,
             "L_m":       L_m,
             "temp_amb":  temp_amb,
+            "tipo_carga": tipo_carga,
+            "P_kW": p_kw,
+            "rendimiento": rendimiento,
+            "tipo_arranque": tipo_arranque,
+            "regimen": regimen,
+            "periodo_min": periodo_min,
         })
 
     if errores:
