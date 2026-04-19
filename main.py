@@ -18,7 +18,7 @@ from excel import (
     leer_circuitos_excel, leer_transformador_excel,
     leer_balance_excel, leer_tableros_excel,
     guardar_txt, exportar_excel, leer_perfil_excel,
-    enriquecer_circuitos
+    enriquecer_circuitos, leer_generador_excel
 )
 from perfiles import obtener_perfil
 from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
@@ -32,6 +32,7 @@ from demanda import (
 from excel import leer_demanda_excel, leer_cadena_excel
 from coordinacion import verificar_cadena, reporte_coordinacion
 from motores import calcular_motor
+from generador import calcular_generador
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
@@ -142,11 +143,137 @@ def generar_seccion_motores(circuitos, perfil=None):
     return lineas
 
 
+def generar_seccion_generador(circuitos, datos_generador, protecciones=None, resultado_demanda=None):
+    if not datos_generador:
+        return []
+
+    lineas = []
+    p_demanda_kw = 0.0
+    if resultado_demanda and resultado_demanda.get("P_total_kw") is not None:
+        p_demanda_kw = float(resultado_demanda["P_total_kw"])
+    else:
+        p_demanda_kw = sum(
+            calcular_potencia(c["I_diseno"], c["cos_phi"], c["sistema"]) / 1000.0
+            for c in circuitos
+        )
+
+    motores = [c for c in circuitos if str(c.get("tipo_carga", "")).lower() == "motor"]
+    if motores:
+        motor_max = max(motores, key=lambda x: float(x.get("P_kW") or 0.0))
+        p_motor_max = float(motor_max.get("P_kW") or 0.0)
+        factor_por_tipo = {
+            "directo": 6.0,
+            "estrella_triangulo": 2.0,
+            "variador": 1.2,
+            "arranque_suave": 2.5,
+        }
+        factor_arr = factor_por_tipo.get(
+            str(motor_max.get("tipo_arranque", "directo")).lower(),
+            6.0,
+        )
+    else:
+        p_motor_max = 0.0
+        factor_arr = 1.0
+
+    circuitos_prot = []
+    if protecciones:
+        for c in circuitos:
+            p = protecciones.get(c.get("nombre"))
+            if not p:
+                continue
+            circuitos_prot.append({
+                "nombre": c.get("nombre"),
+                "proteccion_A": p.get("In_A"),
+                "curva": p.get("curva"),
+            })
+
+    resultado = calcular_generador(
+        nombre=datos_generador["GE_nombre"],
+        modelo_ge=datos_generador["GE_modelo"],
+        P_ge_kVA_prime=datos_generador["GE_kVA_prime"],
+        P_ge_kVA_emergencia=datos_generador["GE_kVA_emergencia"],
+        cos_phi_ge=datos_generador.get("GE_cos_phi", 0.8),
+        V_nominal=380.0,
+        regimen_uso=datos_generador.get("GE_regimen_uso", "prime"),
+        P_demanda_kW=p_demanda_kw,
+        P_motor_max_kW=p_motor_max,
+        factor_arranque_motor=factor_arr,
+        altitud_msnm=datos_generador.get("GE_altitud_msnm", 0.0),
+        Xd_pct=datos_generador.get("GE_Xd_pct", 25.0),
+        consumo_100_galhr=datos_generador.get("GE_consumo_100_galhr"),
+        consumo_75_galhr=datos_generador.get("GE_consumo_75_galhr"),
+        capacidad_tanque_gal=datos_generador.get("GE_tanque_gal"),
+        circuitos=circuitos_prot,
+    )
+
+    verif = resultado["verificacion_ge"]
+    req = resultado["potencia_requerida"]
+    icc = resultado["icc_ge"]
+    dv = resultado["dv_arranque_ge"]
+    autonomia = resultado.get("autonomia")
+
+    margen_pct = (verif["margen_kVA"] / max(req["P_minimo_kVA"], 1e-9)) * 100.0
+    ok_str = "OK" if verif["ok"] else "INSUFICIENTE"
+    derrateo_pct = (1.0 - verif["factor_derrateo"]) * 100.0
+
+    lineas.append("")
+    lineas.append("=" * 60)
+    lineas.append("  GENERADOR ELECTRICO - VERIFICACION Y CALCULOS")
+    lineas.append("  Normativa: IEC 60034 / IEC 60909 / RIC")
+    lineas.append("=" * 60)
+    lineas.append(f"  GE            : {resultado['nombre']} ({resultado['modelo_ge']})")
+    lineas.append(f"  Regimen uso   : {resultado['regimen_uso']}")
+    lineas.append(
+        f"  Altitud       : {round(resultado['altitud_msnm'], 1)} msnm -> derrateo: {round(derrateo_pct, 1)}% -> factor: {verif['factor_derrateo']:.3f}"
+    )
+    lineas.append("")
+    lineas.append(
+        f"  P disponible  : {round(resultado['P_ge_kVA_seleccionado'], 1)} kVA / {round(verif['P_ge_efectiva_kW'], 1)} kW ({resultado['regimen_uso']})"
+    )
+    lineas.append(
+        f"  P requerida   : {round(req['P_minimo_kVA'], 0):.0f} kVA / {round(req['P_minimo_kW'], 0):.0f} kW"
+    )
+    lineas.append(f"  Margen        : {round(margen_pct, 1)}% -> {ok_str}")
+    lineas.append("")
+    lineas.append(f"  I_nominal GE  : {round(resultado['I_ge_nominal_A'], 1)} A (cos_phi={resultado['cos_phi_ge']})")
+    lineas.append(f"  X'd asumido   : {round(icc['Xd_pct'], 1)}%")
+    lineas.append(f"  Icc_GE nominal: {icc['Icc_nominal_kA']:.2f} kA")
+    lineas.append(f"  Icc_GE max    : {icc['Icc_max_kA']:.2f} kA | min: {icc['Icc_min_kA']:.2f} kA")
+    lineas.append("")
+    lineas.append(
+        f"  dV arranque motor mayor ({round(resultado['P_motor_max_kW'], 2)} kW DOL x {resultado['factor_arranque_motor']}):"
+    )
+    lineas.append(f"    dV = {round(dv['dv_pct'], 1)}% -> {dv['estado']}")
+
+    if autonomia:
+        lineas.append("")
+        lineas.append("  Autonomia estimada:")
+        lineas.append(
+            f"    Uso: {round(autonomia['uso_pct'], 1)}% -> consumo ~{round(autonomia['consumo_estimado_galhr'], 1)} gal/hr"
+        )
+        lineas.append(
+            f"    Tanque {round(float(datos_generador.get('GE_tanque_gal') or 0), 1)} gal -> autonomia estimada: {round(autonomia['autonomia_hr'], 1)} hr -> {'OK' if autonomia['autonomia_ok'] else 'REVISAR'}"
+        )
+
+    lineas.append("")
+    lineas.append("  Verificacion protecciones modo GE:")
+    if resultado["protecciones_modo_ge"]:
+        for p in resultado["protecciones_modo_ge"]:
+            lineas.append(
+                f"    {p['nombre']}: {p['proteccion']} | Im={round(p['Im'], 1)}A vs Icc_GE={round(p['Icc_ge_A'], 1)}A -> {p['observacion']}"
+            )
+    else:
+        lineas.append("    Sin datos de protecciones para verificar.")
+    lineas.append("=" * 60)
+    return lineas
+
+
 def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
                         datos_trafo=None, protecciones=None,
                         balance_datos=None, tableros_datos=None,
                         params_demanda=None,
-                        cadena_datos=None, perfil=None):
+                        cadena_datos=None, perfil=None,
+                        datos_generador=None):
     perfil = perfil or {}
     lineas      = []
     total_ok    = 0
@@ -305,6 +432,14 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
     # --- MOTORES --- M8
     lineas += generar_seccion_motores(circuitos, perfil=perfil)
 
+    # --- GENERADOR --- M9
+    lineas += generar_seccion_generador(
+        circuitos,
+        datos_generador,
+        protecciones=protecciones,
+        resultado_demanda=resultado_demanda,
+    )
+
     # --- RESUMEN FINAL ---
     lineas.append("")
     lineas.append("=" * 60)
@@ -350,6 +485,7 @@ balance_datos      = {}
 tableros_datos     = {}
 params_demanda     = None
 cadena_datos       = []
+datos_generador    = None
 perfil             = obtener_perfil("industrial").copy()
 
 try:
@@ -385,12 +521,18 @@ try:
         print(f"  Demanda M6    : {params_demanda['tipo_instalacion']} / "
               f"{params_demanda['tipo_alimentador']}")
     cadena_datos = leer_cadena_excel(_libro)
+    datos_generador = leer_generador_excel(_libro)
+    if datos_generador:
+        print(
+            f"  Generador M9  : {datos_generador['GE_nombre']} ({datos_generador['GE_modelo']})"
+        )
     if cadena_datos:
         print(f"  Coordinación  : {len(cadena_datos)} dispositivos en cadena")
 except Exception as e:
     print(f"  AVISO lectura hojas opcionales: {e}")
     params_demanda = None
     cadena_datos   = []
+    datos_generador = None
 
 # --- LEER CIRCUITOS ---
 try:
@@ -427,7 +569,7 @@ lineas, total_ok, total_falla = generar_reporte_txt(
     datos_trafo, protecciones_excel,
     balance_datos, tableros_datos,
     params_demanda, cadena_datos,
-    perfil=perfil
+    perfil=perfil, datos_generador=datos_generador
 )
 
 print()

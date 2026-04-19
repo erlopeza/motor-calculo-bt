@@ -671,3 +671,85 @@ def leer_cadena_excel(libro_openpyxl):
         })
 
     return dispositivos
+
+
+def leer_generador_excel(libro_openpyxl):
+    """
+    Lee datos de generador desde hoja 'generador' (campo/valor) o
+    desde columnas prefijadas GE_ en la hoja 'circuitos'.
+    Retorna dict o None si no hay datos.
+    """
+    def _norm_key(texto):
+        key = str(texto).strip().lower()
+        for orig, repl in [("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ñ", "n")]:
+            key = key.replace(orig, repl)
+        return key
+
+    def _to_float(v, default=None):
+        if v is None or str(v).strip() == "":
+            return default
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return default
+
+    def _to_str(v, default=""):
+        if v is None:
+            return default
+        return str(v).strip()
+
+    datos = {}
+    hoja_generador = next((n for n in libro_openpyxl.sheetnames if n.lower() == "generador"), None)
+    if hoja_generador:
+        hoja = libro_openpyxl[hoja_generador]
+        for fila in hoja.iter_rows(min_row=2, values_only=True):
+            if not fila or fila[0] is None:
+                continue
+            campo = _norm_key(fila[0])
+            datos[campo] = fila[1]
+    else:
+        hoja_circuitos = next((n for n in libro_openpyxl.sheetnames if n.lower() == "circuitos"), None)
+        if not hoja_circuitos:
+            return None
+
+        hoja = libro_openpyxl[hoja_circuitos]
+        headers = [c.value for c in hoja[1]]
+        idx_ge = {}
+        for i, h in enumerate(headers):
+            if h is None:
+                continue
+            txt = str(h).strip()
+            if txt.upper().startswith("GE_"):
+                idx_ge[txt.lower()] = i
+
+        if not idx_ge:
+            return None
+
+        fila2 = [c.value for c in hoja[2]]
+        for key, idx in idx_ge.items():
+            val = fila2[idx] if idx < len(fila2) else None
+            if val is not None and str(val).strip() != "":
+                datos[_norm_key(key)] = val
+
+    if not datos:
+        return None
+
+    resultado = {
+        "GE_nombre": _to_str(datos.get("ge_nombre"), ""),
+        "GE_modelo": _to_str(datos.get("ge_modelo"), ""),
+        "GE_kVA_prime": _to_float(datos.get("ge_kva_prime"), None),
+        "GE_kVA_emergencia": _to_float(datos.get("ge_kva_emergencia"), None),
+        "GE_cos_phi": _to_float(datos.get("ge_cos_phi"), 0.8),
+        "GE_regimen_uso": _to_str(datos.get("ge_regimen_uso"), "prime").lower() or "prime",
+        "GE_altitud_msnm": _to_float(datos.get("ge_altitud_msnm"), 0.0),
+        "GE_Xd_pct": _to_float(datos.get("ge_xd_pct"), 25.0),
+        "GE_consumo_100_galhr": _to_float(datos.get("ge_consumo_100_galhr"), None),
+        "GE_consumo_75_galhr": _to_float(datos.get("ge_consumo_75_galhr"), None),
+        "GE_consumo_50_galhr": _to_float(datos.get("ge_consumo_50_galhr"), None),
+        "GE_tanque_gal": _to_float(datos.get("ge_tanque_gal"), None),
+    }
+
+    faltantes = ["GE_nombre", "GE_modelo", "GE_kVA_prime", "GE_kVA_emergencia"]
+    if any(resultado.get(k) in (None, "") for k in faltantes):
+        return None
+    return resultado
