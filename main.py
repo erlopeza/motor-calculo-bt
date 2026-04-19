@@ -377,6 +377,24 @@ try:
     max_dv_pct = 0.0
     max_icc_ka = 0.0
     circuitos_persistencia = []
+    icc_por_circuito = {}
+    try:
+        if datos_trafo:
+            if datos_trafo.get("modo") == "A":
+                _, zt_ohm, _ = calcular_icc_transformador(
+                    datos_trafo["kVA"], datos_trafo["Vn_BT"], datos_trafo["Ucc_pct"]
+                )
+            else:
+                _, ucc_pct_ref, _ = icc_desde_tabla(datos_trafo["kVA"])
+                zt_ohm = (ucc_pct_ref / 100.0) * (
+                    (datos_trafo["Vn_BT"] ** 2) / (datos_trafo["kVA"] * 1000.0)
+                )
+            circuitos_icc = calcular_icc_todos_circuitos(zt_ohm, circuitos)
+            for c_icc in circuitos_icc:
+                icc_por_circuito[c_icc.get("nombre")] = c_icc.get("Icc_kA")
+    except Exception:
+        icc_por_circuito = {}
+
     for c in circuitos:
         dV_V, dV_pct = calcular_caida_tension(
             c["L_m"], c["S_mm2"], c["I_diseno"], c["paralelos"], c["sistema"]
@@ -385,6 +403,23 @@ try:
         estado_dV = clasificar_caida(dV_pct)
         estado_I = "OK" if c["I_diseno"] <= I_cap else "SUPERA"
         estado = "OK" if (estado_dV != "FALLA" and estado_I == "OK") else "CON_FALLAS"
+        icc_ka = c.get("icc_ka")
+        if icc_ka is None:
+            icc_ka = c.get("Icc_kA")
+        if icc_ka is None:
+            icc_ka = icc_por_circuito.get(c.get("nombre"))
+
+        observaciones = c.get("nivel_icc")
+        if estado_dV == "FALLA" or estado_I == "SUPERA":
+            cond, mm2, dv = sugerir_conductor(
+                c["L_m"], c["I_diseno"], c["paralelos"],
+                c["sistema"], c["temp_amb"],
+                norma=perfil.get("norma", "AWG")
+            )
+            if cond:
+                observaciones = f"redimensionar a {cond} ({mm2}mm2), dV={dv}%"
+            else:
+                observaciones = "redimensionar conductor (sin alternativa en tabla)"
 
         circuitos_persistencia.append(
             {
@@ -400,19 +435,72 @@ try:
                 "sistema": c.get("sistema"),
                 "dv_v": round(dV_V, 3),
                 "dv_pct": round(dV_pct, 3),
-                "icc_ka": c.get("Icc_kA"),
+                "icc_ka": icc_ka,
                 "estado": estado,
-                "observaciones": c.get("nivel_icc"),
+                "observaciones": observaciones,
             }
         )
         if dV_pct > max_dv_pct:
             max_dv_pct = dV_pct
-        if c.get("Icc_kA", 0.0) > max_icc_ka:
-            max_icc_ka = c.get("Icc_kA", 0.0)
+        if (icc_ka or 0.0) > max_icc_ka:
+            max_icc_ka = icc_ka or 0.0
+
+    datos_transformador = None
+    try:
+        if datos_trafo:
+            kVA = float(datos_trafo["kVA"])
+            vn_bt = float(datos_trafo["Vn_BT"])
+            if datos_trafo.get("modo") == "A":
+                icc_nom_kA, _, _ = calcular_icc_transformador(
+                    datos_trafo["kVA"], datos_trafo["Vn_BT"], datos_trafo["Ucc_pct"]
+                )
+                ucc_pct = float(datos_trafo["Ucc_pct"])
+            else:
+                icc_nom_kA, ucc_pct, _ = icc_desde_tabla(datos_trafo["kVA"])
+
+            z_min = ((ucc_pct * 0.925) / 100.0) * (vn_bt ** 2 / (kVA * 1000.0))
+            z_max = ((ucc_pct * 1.075) / 100.0) * (vn_bt ** 2 / (kVA * 1000.0))
+            icc_max_kA = round((1.1 * vn_bt / (1.732 * z_min)) / 1000.0, 2) if z_min > 0 else None
+            icc_min_kA = round((0.95 * vn_bt / (1.732 * z_max)) / 1000.0, 2) if z_max > 0 else None
+
+            datos_transformador = {
+                "kVA": round(kVA, 2),
+                "Vn_BT": round(vn_bt, 2),
+                "Ucc_pct": round(ucc_pct, 2),
+                "Icc_nom_kA": round(icc_nom_kA, 2),
+                "Icc_max_kA": icc_max_kA,
+                "Icc_min_kA": icc_min_kA,
+            }
+    except Exception:
+        datos_transformador = None
+
+    datos_balance_demanda = {}
+    try:
+        if balance_datos and tableros_datos:
+            kVA_trafo = datos_trafo["kVA"] if datos_trafo else 1000
+            r_balance = calcular_balance_tableros(
+                circuitos, balance_datos, tableros_datos, kVA_trafo
+            )
+            datos_balance_demanda["balance"] = {
+                "S_total_kva": r_balance.get("S_total_kva"),
+                "uso_trafo_pct": r_balance.get("uso_trafo_pct"),
+                "kVA_trafo": r_balance.get("kVA_trafo"),
+            }
+        if params_demanda and balance_datos:
+            r_dem = calcular_demanda(circuitos, balance_datos, params_demanda)
+            datos_balance_demanda["demanda"] = {
+                "P_total_kw": r_dem.get("P_total_kw"),
+                "S_total_kva": r_dem.get("S_total_kva"),
+                "factor_crecimiento": r_dem.get("factor_crecimiento"),
+                "S_futuro_kva": r_dem.get("S_futuro_kva"),
+            }
+    except Exception:
+        pass
 
     datos_run = {
         "project_id": nombre_proyecto,
         "revision": "CLI",
+        "timestamp": datetime.now().astimezone().isoformat(),
         "perfil": perfil.get("label", "industrial"),
         "norma": perfil.get("norma", "AWG"),
         "n_circuitos": len(circuitos),
@@ -425,6 +513,8 @@ try:
         "ruta_reporte_txt": nombre_txt,
         "ruta_reporte_xlsx": nombre_xlsx,
         "circuitos": circuitos_persistencia,
+        "transformador": datos_transformador,
+        "balance_demanda": datos_balance_demanda,
     }
 
     # Reporteria SEC adicional (sin interrumpir flujo principal).
