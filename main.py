@@ -370,6 +370,39 @@ nombre_xlsx = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.xlsx"
 guardar_txt(lineas, nombre_txt)
 exportar_excel(nombre_proyecto, circuitos, fecha, nombre_xlsx, perfil=perfil)
 
+try:
+    from persistencia import registrar_ejecucion
+
+    max_dv_pct = 0.0
+    max_icc_ka = 0.0
+    for c in circuitos:
+        _, dV_pct = calcular_caida_tension(
+            c["L_m"], c["S_mm2"], c["I_diseno"], c["paralelos"], c["sistema"]
+        )
+        if dV_pct > max_dv_pct:
+            max_dv_pct = dV_pct
+        if c.get("Icc_kA", 0.0) > max_icc_ka:
+            max_icc_ka = c.get("Icc_kA", 0.0)
+
+    datos_run = {
+        "project_id": nombre_proyecto,
+        "revision": "CLI",
+        "perfil": perfil.get("label", "industrial"),
+        "norma": perfil.get("norma", "AWG"),
+        "n_circuitos": len(circuitos),
+        "n_ok": total_ok,
+        "n_advertencias": max(len(circuitos) - total_ok - total_falla, 0),
+        "n_fallas": total_falla,
+        "max_dv_pct": round(max_dv_pct, 3),
+        "max_icc_ka": round(max_icc_ka, 3),
+        "status": "OK" if total_falla == 0 else "CON_FALLAS",
+        "ruta_reporte_txt": nombre_txt,
+        "ruta_reporte_xlsx": nombre_xlsx,
+    }
+    registrar_ejecucion(datos_run)
+except Exception as e:
+    print(f"  Aviso persistencia: {e}")
+
 print(f"\n  Proyecto  : {nombre_proyecto}")
 print(f"  OK        : {total_ok}")
 print(f"  FALLA     : {total_falla}")

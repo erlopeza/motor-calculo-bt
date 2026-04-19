@@ -1,0 +1,14 @@
+[
+  {
+    "run_id": "43e42652-89e4-46b5-807e-88029a620b14",
+    "project_id": "LEO-ARICA",
+    "revision": "CLI",
+    "timestamp": "2026-04-18T20:49:17.185671+00:00",
+    "event_type": "REPORTE",
+    "estado": "EN_REVISION",
+    "disciplina": "ELC",
+    "WBS_ID": null,
+    "ITEM_ID": null,
+    "observaciones": "1 circuito(s) en falla"
+  }
+]

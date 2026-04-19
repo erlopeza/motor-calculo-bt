@@ -1,0 +1,14 @@
+[
+  {
+    "run_id": "0d4220bf-1523-408a-8b72-9d705fb3ca53",
+    "project_id": "LEO-ARICA",
+    "revision": "Rev12",
+    "timestamp": "2026-04-18T23:14:27.029458+00:00",
+    "event_type": "REPORTE",
+    "estado": "COMPLETADO",
+    "disciplina": "ELC",
+    "WBS_ID": null,
+    "ITEM_ID": null,
+    "observaciones": "sin observaciones"
+  }
+]

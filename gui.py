@@ -837,6 +837,51 @@ class MotorCalculoBT:
                             dispositivos_ord, Icc_A, sistema="3F_380"
                         )
 
+            try:
+                from persistencia import registrar_ejecucion
+
+                total_ok = 0
+                total_falla = 0
+                max_dv_pct = 0.0
+                max_icc_ka = 0.0
+
+                for c in self.circuitos:
+                    I_cap = capacidad_corregida(c["I_max"], c["paralelos"], c["temp_amb"])
+                    _, dV_pct = calcular_caida_tension(
+                        c["L_m"], c["S_mm2"], c["I_diseno"], c["paralelos"], c["sistema"]
+                    )
+                    estado_dV = clasificar_caida(dV_pct)
+                    estado_I = "OK" if c["I_diseno"] <= I_cap else "SUPERA"
+
+                    if estado_dV == "FALLA" or estado_I == "SUPERA":
+                        total_falla += 1
+                    else:
+                        total_ok += 1
+
+                    if dV_pct > max_dv_pct:
+                        max_dv_pct = dV_pct
+                    if c.get("Icc_kA", 0.0) > max_icc_ka:
+                        max_icc_ka = c.get("Icc_kA", 0.0)
+
+                datos_run = {
+                    "project_id": self.nombre_proyecto.get() or "PROYECTO",
+                    "revision": "GUI",
+                    "perfil": self.perfil_activo.get("label", self.var_perfil.get()),
+                    "norma": self.perfil_activo.get("norma", "AWG"),
+                    "n_circuitos": len(self.circuitos),
+                    "n_ok": total_ok,
+                    "n_advertencias": max(len(self.circuitos) - total_ok - total_falla, 0),
+                    "n_fallas": total_falla,
+                    "max_dv_pct": round(max_dv_pct, 3),
+                    "max_icc_ka": round(max_icc_ka, 3),
+                    "status": "OK" if total_falla == 0 else "CON_FALLAS",
+                    "ruta_reporte_txt": None,
+                    "ruta_reporte_xlsx": None,
+                }
+                registrar_ejecucion(datos_run)
+            except Exception as e:
+                print(f"[persistencia][gui] {e}")
+
             # Actualizar GUI desde el hilo principal
             self.root.after(0, self._actualizar_gui)
 

@@ -1,0 +1,2 @@
+run_id,project_id,revision,timestamp,event_type,estado,disciplina,WBS_ID,ITEM_ID,observaciones
+dbe4ad0d-3220-44ad-a75a-9b5aa3098aff,LEO-ARICA,Rev12,2026-04-18T23:14:26.122830+00:00,REPORTE,COMPLETADO,ELC,,,sin observaciones
