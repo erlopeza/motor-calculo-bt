@@ -19,7 +19,7 @@ from excel import (
     leer_balance_excel, leer_tableros_excel,
     guardar_txt, exportar_excel, leer_perfil_excel,
     enriquecer_circuitos, leer_generador_excel, leer_sts_excel,
-    leer_trafo_iso_excel, leer_ups_excel
+    leer_trafo_iso_excel, leer_ups_excel, leer_ats_excel
 )
 from perfiles import obtener_perfil
 from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
@@ -37,6 +37,7 @@ from generador import calcular_generador
 from sts import calcular_sts
 from trafo_iso import calcular_trafo_iso
 from ups import calcular_ups
+from ats import calcular_ats
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
@@ -203,7 +204,11 @@ def generar_seccion_generador(circuitos, datos_generador, protecciones=None, res
         P_motor_max_kW=p_motor_max,
         factor_arranque_motor=factor_arr,
         altitud_msnm=datos_generador.get("GE_altitud_msnm", 0.0),
-        Xd_pct=datos_generador.get("GE_Xd_pct", 25.0),
+        Xd_pp_pct=datos_generador.get("GE_Xd_pp_pct", 20.0),
+        Xd_p_pct=datos_generador.get("GE_Xd_p_pct", 28.0),
+        Xd_pct=datos_generador.get("GE_Xd_pct", 120.0),
+        R1_pct=datos_generador.get("GE_R1_pct", 2.0),
+        X0_pct=datos_generador.get("GE_X0_pct", 5.0),
         consumo_100_galhr=datos_generador.get("GE_consumo_100_galhr"),
         consumo_75_galhr=datos_generador.get("GE_consumo_75_galhr"),
         capacidad_tanque_gal=datos_generador.get("GE_tanque_gal"),
@@ -240,9 +245,17 @@ def generar_seccion_generador(circuitos, datos_generador, protecciones=None, res
     lineas.append(f"  Margen        : {round(margen_pct, 1)}% -> {ok_str}")
     lineas.append("")
     lineas.append(f"  I_nominal GE  : {round(resultado['I_ge_nominal_A'], 1)} A (cos_phi={resultado['cos_phi_ge']})")
-    lineas.append(f"  X'd asumido   : {round(icc['Xd_pct'], 1)}%")
-    lineas.append(f"  Icc_GE nominal: {icc['Icc_nominal_kA']:.2f} kA")
-    lineas.append(f"  Icc_GE max    : {icc['Icc_max_kA']:.2f} kA | min: {icc['Icc_min_kA']:.2f} kA")
+    lineas.append("  Icc GE (IEC 60909)")
+    lineas.append(
+        f"    Xd'' / Xd' / Xd  : {icc['Xd_pp_pct']}% / {icc['Xd_p_pct']}% / {icc['Xd_pct']}%"
+    )
+    lineas.append(f"    Ik'' (subtrans)   : {icc['Ik3_pp_kA']} kA")
+    lineas.append(f"    Ik'  (trans)      : {icc['Ik3_p_kA']} kA")
+    lineas.append(f"    Ik   (permanente) : {icc['Ik3_kA']} kA")
+    lineas.append(f"    Ik1'' (monofasico): {icc['Ik1_pp_kA']} kA")
+    lineas.append(f"    Ik3_min (c_min)   : {icc['Ik3_min_kA']} kA")
+    if icc.get("usa_defaults"):
+        lineas.append("    ! Parametros por defecto - verificar con fabricante")
     lineas.append("")
     lineas.append(
         f"  dV arranque motor mayor ({round(resultado['P_motor_max_kW'], 2)} kW DOL x {resultado['factor_arranque_motor']}):"
@@ -456,13 +469,110 @@ def generar_seccion_ups(datos_ups):
     return lineas
 
 
+def generar_seccion_ats(datos_ats, protecciones=None, circuitos=None):
+    if not datos_ats:
+        return []
+
+    lista_circuitos = []
+    if protecciones:
+        for nombre, p in protecciones.items():
+            lista_circuitos.append({
+                "nombre": nombre,
+                "In_A": p.get("In_A"),
+                "curva": p.get("curva"),
+                "poder_corte_kA": p.get("poder_corte_kA"),
+            })
+
+    r = calcular_ats(
+        nombre=datos_ats["ATS_nombre"],
+        modelo_ats=datos_ats["ATS_modelo"],
+        I_nominal_A=datos_ats["ATS_I_nominal_A"],
+        V_nominal_V=datos_ats["ATS_V_nominal_V"],
+        modo_transferencia=datos_ats["ATS_modo"],
+        I_carga_A=datos_ats["ATS_I_carga_A"],
+        Sn_ge_kVA=datos_ats["ATS_Sn_ge_kVA"],
+        Xd_pp_pct=datos_ats.get("ATS_Xd_pp_pct", 20.0),
+        Xd_p_pct=datos_ats.get("ATS_Xd_p_pct", 28.0),
+        Xd_pct=datos_ats.get("ATS_Xd_pct", 120.0),
+        R1_pct=datos_ats.get("ATS_R1_pct", 2.0),
+        X0_pct=datos_ats.get("ATS_X0_pct", 5.0),
+        t_deteccion_ms=datos_ats.get("ATS_t_deteccion_ms", 3000.0),
+        t_arranque_ge_ms=datos_ats.get("ATS_t_arranque_ms", 10000.0),
+        t_estabilizacion_ge_ms=datos_ats.get("ATS_t_estabilizacion_ms", 5000.0),
+        t_paralelo_ms=datos_ats.get("ATS_t_paralelo_ms", 150.0),
+        V_red_V=datos_ats.get("ATS_V_red_V"),
+        V_ge_V=datos_ats.get("ATS_V_ge_V"),
+        f_red_Hz=datos_ats.get("ATS_f_red_Hz"),
+        f_ge_Hz=datos_ats.get("ATS_f_ge_Hz"),
+        circuitos=lista_circuitos,
+    )
+
+    c = r["corriente"]
+    t = r["tiempos"]
+    icc = r["icc_ge"]
+    lineas = []
+    lineas.append("")
+    lineas.append("=" * 60)
+    lineas.append("  ATS - TRANSFERENCIA AUTOMATICA")
+    lineas.append("  Normativa: IEC 60947-6-1 / IEC 60909 / IEC 60364-5-55")
+    lineas.append("=" * 60)
+    lineas.append(f"  ATS           : {r['nombre']} ({r['modelo_ats']})")
+    lineas.append(f"  Modo          : {r['modo_transferencia']} - {r['descripcion_modo']}")
+    lineas.append(
+        f"  Corriente     : {r['I_nominal_A']}A | Carga: {r['I_carga_A']}A ({c['uso_pct']}%) -> {'OK' if c['ok'] else 'REVISAR'}"
+    )
+    lineas.append("")
+    lineas.append("  TIEMPOS DE TRANSFERENCIA")
+    lineas.append(f"  t_deteccion   : {datos_ats.get('ATS_t_deteccion_ms', 3000.0)}ms")
+    lineas.append(f"  t_arranque GE : {datos_ats.get('ATS_t_arranque_ms', 10000.0)}ms")
+    lineas.append(f"  t_estab. GE   : {datos_ats.get('ATS_t_estabilizacion_ms', 5000.0)}ms")
+    if r["modo_transferencia"] == "closed":
+        lineas.append(f"  t_paralelo    : {datos_ats.get('ATS_t_paralelo_ms', 150.0)}ms")
+    lineas.append(f"  t_total       : {t['t_total_ms']}ms")
+    lineas.append(f"  t_interrupcion: {t['t_interrupcion_ms']}ms")
+
+    if r["modo_transferencia"] == "closed":
+        lineas.append("")
+        lineas.append("  SINCRONIZACION")
+        if r.get("sincronizacion"):
+            s = r["sincronizacion"]
+            lineas.append(f"  dV            : {s['delta_V_pct']}% (max {s['limite_dV']}%) -> {'OK' if s['delta_V_pct'] <= s['limite_dV'] else 'REVISAR'}")
+            lineas.append(f"  df            : {s['delta_f_Hz']}Hz (max {s['limite_df']}Hz) -> {'OK' if s['delta_f_Hz'] <= s['limite_df'] else 'REVISAR'}")
+            lineas.append(f"  dFase         : {s['delta_fase_deg']}° (max {s['limite_fase']}°) -> {'OK' if s['delta_fase_deg'] <= s['limite_fase'] else 'REVISAR'}")
+        else:
+            lineas.append(f"  {r.get('sincronizacion_warning')}")
+
+    lineas.append("")
+    lineas.append("  Icc GE (IEC 60909)")
+    lineas.append(f"  Ik'' subtrans : {icc['Ik3_pp_kA']}kA")
+    lineas.append(f"  Ik'  trans    : {icc['Ik3_p_kA']}kA")
+    lineas.append(f"  Ik   perm     : {icc['Ik3_kA']}kA")
+    lineas.append(f"  Ik1''         : {icc['Ik1_pp_kA']}kA")
+    if icc.get("usa_defaults"):
+        lineas.append("  ! usar ficha tecnica para mayor precision")
+
+    if r["protecciones_modo_ge"]:
+        lineas.append("")
+        lineas.append("  VERIFICACION PROTECCIONES MODO GE")
+        for p in r["protecciones_modo_ge"]:
+            lineas.append(
+                f"  {p['nombre']}: Icu={p['Icu_kA']}kA Im={p['Im_A']}A vs Ik''={p['Ikpp_A']}A -> {p['observacion']}"
+            )
+
+    if r.get("deriva_sts_m11"):
+        lineas.append("  Nota: modo STS deriva a modulo M11.")
+    lineas.append("=" * 60)
+    return lineas
+
+
 def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
                         datos_trafo=None, protecciones=None,
                         balance_datos=None, tableros_datos=None,
                         params_demanda=None,
                         cadena_datos=None, perfil=None,
                         datos_generador=None, datos_sts=None,
-                        datos_trafo_iso=None, datos_ups=None):
+                        datos_trafo_iso=None, datos_ups=None,
+                        datos_ats=None):
     perfil = perfil or {}
     lineas      = []
     total_ok    = 0
@@ -638,6 +748,9 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
     # --- UPS --- M12B
     lineas += generar_seccion_ups(datos_ups)
 
+    # --- ATS --- M13
+    lineas += generar_seccion_ats(datos_ats, protecciones=protecciones, circuitos=circuitos)
+
     # --- RESUMEN FINAL ---
     lineas.append("")
     lineas.append("=" * 60)
@@ -687,6 +800,7 @@ datos_generador    = None
 datos_sts          = None
 datos_trafo_iso    = None
 datos_ups          = None
+datos_ats          = None
 perfil             = obtener_perfil("industrial").copy()
 
 try:
@@ -726,6 +840,7 @@ try:
     datos_sts = leer_sts_excel(_libro)
     datos_trafo_iso = leer_trafo_iso_excel(_libro)
     datos_ups = leer_ups_excel(_libro)
+    datos_ats = leer_ats_excel(_libro)
     if datos_generador:
         print(
             f"  Generador M9  : {datos_generador['GE_nombre']} ({datos_generador['GE_modelo']})"
@@ -742,6 +857,10 @@ try:
         print(
             f"  UPS M12       : {datos_ups['UPS_nombre']} ({datos_ups['UPS_modelo']})"
         )
+    if datos_ats:
+        print(
+            f"  ATS M13       : {datos_ats['ATS_nombre']} ({datos_ats['ATS_modelo']})"
+        )
     if cadena_datos:
         print(f"  Coordinación  : {len(cadena_datos)} dispositivos en cadena")
 except Exception as e:
@@ -752,6 +871,7 @@ except Exception as e:
     datos_sts = None
     datos_trafo_iso = None
     datos_ups = None
+    datos_ats = None
 
 # --- LEER CIRCUITOS ---
 try:
@@ -789,7 +909,7 @@ lineas, total_ok, total_falla = generar_reporte_txt(
     balance_datos, tableros_datos,
     params_demanda, cadena_datos,
     perfil=perfil, datos_generador=datos_generador, datos_sts=datos_sts,
-    datos_trafo_iso=datos_trafo_iso, datos_ups=datos_ups
+    datos_trafo_iso=datos_trafo_iso, datos_ups=datos_ups, datos_ats=datos_ats
 )
 
 print()

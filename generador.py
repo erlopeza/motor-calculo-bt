@@ -9,11 +9,25 @@ POTENCIAS_ESTANDAR_IEC_KVA = [
     1250, 1500, 1750, 2000, 2500, 3000
 ]
 
+XD_PP_DEFAULT = 20.0
+XD_P_DEFAULT = 28.0
+XD_DEFAULT = 120.0
+R1_DEFAULT = 2.0
+X0_DEFAULT = 5.0
+C_MAX_BT = 1.05
+C_MIN_BT = 0.95
+
 XD_DEFAULT_PCT = 25.0
 MARGEN_GE_DEFAULT = 1.25
 COS_PHI_GE_DEFAULT = 0.8
 DV_ARRANQUE_LIMITE_NORMAL = 15.0
 DV_ARRANQUE_LIMITE_CRITICO = 10.0
+
+STAMFORD_HCI544D_W14 = {
+    380: {"Xd_pp": 0.12, "Xd_p": 0.17, "Xd": 3.51, "X2": 0.23, "X0": 0.11, "Rs_ohm": 0.0041, "Sn_base_kVA": 625},
+    400: {"Xd_pp": 0.11, "Xd_p": 0.15, "Xd": 3.17, "X2": 0.20, "X0": 0.10, "Rs_ohm": 0.0041, "Sn_base_kVA": 625},
+    416: {"Xd_pp": 0.10, "Xd_p": 0.14, "Xd": 2.93, "X2": 0.19, "X0": 0.09, "Rs_ohm": 0.0041, "Sn_base_kVA": 625},
+}
 
 
 def _curve_multiplier(curva: str) -> float:
@@ -34,6 +48,71 @@ def _as_float(value, default=0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return float(default)
+
+
+def _norm_to_pu(x: float) -> float:
+    v = float(x)
+    if v > 10.0:
+        return v / 100.0
+    return v
+
+
+def _norm_r_to_pu(x: float) -> float:
+    v = float(x)
+    if v > 1.0:
+        return v / 100.0
+    return v
+
+
+def get_parametros_alternador(
+    modelo: str,
+    Vn_V: float,
+    Sn_kVA: float
+) -> dict:
+    mod = str(modelo or "custom").strip().upper()
+    if mod != "HCI544D_W14":
+        return None
+
+    vn = float(Vn_V)
+    sn = max(float(Sn_kVA), 1e-9)
+    voltajes = sorted(STAMFORD_HCI544D_W14.keys())
+
+    if vn <= voltajes[0]:
+        base = STAMFORD_HCI544D_W14[voltajes[0]].copy()
+    elif vn >= voltajes[-1]:
+        base = STAMFORD_HCI544D_W14[voltajes[-1]].copy()
+    else:
+        v0, v1 = voltajes[0], voltajes[-1]
+        for i in range(len(voltajes) - 1):
+            if voltajes[i] <= vn <= voltajes[i + 1]:
+                v0, v1 = voltajes[i], voltajes[i + 1]
+                break
+        d0 = STAMFORD_HCI544D_W14[v0]
+        d1 = STAMFORD_HCI544D_W14[v1]
+        frac = (vn - v0) / (v1 - v0)
+        base = {
+            "Xd_pp": d0["Xd_pp"] + (d1["Xd_pp"] - d0["Xd_pp"]) * frac,
+            "Xd_p": d0["Xd_p"] + (d1["Xd_p"] - d0["Xd_p"]) * frac,
+            "Xd": d0["Xd"] + (d1["Xd"] - d0["Xd"]) * frac,
+            "X2": d0["X2"] + (d1["X2"] - d0["X2"]) * frac,
+            "X0": d0["X0"] + (d1["X0"] - d0["X0"]) * frac,
+            "Rs_ohm": d0["Rs_ohm"] + (d1["Rs_ohm"] - d0["Rs_ohm"]) * frac,
+            "Sn_base_kVA": d0["Sn_base_kVA"],
+        }
+
+    sn_base = float(base.get("Sn_base_kVA", sn))
+    escala = sn_base / sn
+    return {
+        "Xd_pp": round(base["Xd_pp"], 6),
+        "Xd_p": round(base["Xd_p"], 6),
+        "Xd": round(base["Xd"], 6),
+        "X2": round(base["X2"], 6),
+        "X0": round(base["X0"], 6),
+        "Rs_ohm": round(base["Rs_ohm"], 6),
+        "Sn_base_kVA": sn_base,
+        "factor_escala": round(escala, 6),
+        "modelo": "HCI544D_W14",
+    }
 
 
 def calcular_derrateo_altitud(altitud_msnm: float) -> float:
@@ -140,21 +219,75 @@ def verificar_ge_seleccionado(
 def calcular_icc_ge(
     P_kVA: float,
     V_nominal: float,
-    Xd_pct: float = XD_DEFAULT_PCT
+    Xd_pp_pct: float = XD_PP_DEFAULT,
+    Xd_p_pct: float = XD_P_DEFAULT,
+    Xd_pct: float = XD_DEFAULT,
+    R1_pct: float = R1_DEFAULT,
+    Rs_ohm: float = None,
+    X0_pct: float = X0_DEFAULT,
+    c_max: float = C_MAX_BT,
+    c_min: float = C_MIN_BT
 ) -> dict:
     p_kva = max(float(P_kVA), 1e-9)
     v = max(float(V_nominal), 1e-9)
-    xd = max(float(Xd_pct), 1e-9)
+    xd_pp = max(_norm_to_pu(Xd_pp_pct), 1e-12)
+    xd_p = max(_norm_to_pu(Xd_p_pct), 1e-12)
+    xd = max(_norm_to_pu(Xd_pct), 1e-12)
+    x0 = max(_norm_to_pu(X0_pct), 1e-12)
 
-    z_ge = (xd / 100.0) * ((v ** 2) / (p_kva * 1000.0))
-    icc_nom = v / (math.sqrt(3.0) * max(z_ge, 1e-12))
+    zbase = (v ** 2) / (p_kva * 1000.0)
+    if Rs_ohm is not None:
+        r_ohm = max(float(Rs_ohm), 0.0)
+        r_pu = r_ohm / max(zbase, 1e-12)
+    else:
+        r_pu = max(_norm_r_to_pu(R1_pct), 0.0)
+        r_ohm = r_pu * zbase
+
+    z1_pp = complex(r_pu, xd_pp) * zbase
+    z1_p = complex(r_pu, xd_p) * zbase
+    z1 = complex(r_pu, xd) * zbase
+    z0 = complex(0.0, x0) * zbase
+
+    z1_pp_abs = abs(z1_pp)
+    z1_p_abs = abs(z1_p)
+    z1_abs = abs(z1)
+    z0_abs = abs(z0)
+
+    ik3_pp = float(c_max) * v / (math.sqrt(3.0) * max(z1_pp_abs, 1e-12))
+    ik3_p = float(c_max) * v / (math.sqrt(3.0) * max(z1_p_abs, 1e-12))
+    ik3 = float(c_max) * v / (math.sqrt(3.0) * max(z1_abs, 1e-12))
+    ik1_pp = float(c_max) * math.sqrt(3.0) * v / max((2.0 * z1_pp_abs + z0_abs), 1e-12)
+    ik3_min = float(c_min) * v / (math.sqrt(3.0) * max(z1_pp_abs, 1e-12))
+
+    usa_defaults = any([
+        abs(xd_pp - _norm_to_pu(XD_PP_DEFAULT)) < 1e-9,
+        abs(xd_p - _norm_to_pu(XD_P_DEFAULT)) < 1e-9,
+        abs(xd - _norm_to_pu(XD_DEFAULT)) < 1e-9,
+        Rs_ohm is None and abs(r_pu - _norm_r_to_pu(R1_DEFAULT)) < 1e-9,
+        abs(x0 - _norm_to_pu(X0_DEFAULT)) < 1e-9,
+    ])
 
     return {
-        "Icc_nominal_kA": round(icc_nom / 1000.0, 3),
-        "Icc_max_kA": round((icc_nom * 1.05) / 1000.0, 3),
-        "Icc_min_kA": round((icc_nom * 0.95) / 1000.0, 3),
-        "Z_ge_ohm": round(z_ge, 6),
-        "Xd_pct": round(xd, 3),
+        "Ik3_pp_kA": round(ik3_pp / 1000.0, 3),
+        "Ik3_p_kA": round(ik3_p / 1000.0, 3),
+        "Ik3_kA": round(ik3 / 1000.0, 3),
+        "Ik1_pp_kA": round(ik1_pp / 1000.0, 3),
+        "Ik3_min_kA": round(ik3_min / 1000.0, 3),
+        "Zbase_ohm": round(zbase, 6),
+        "Z1_pp_ohm": round(z1_pp_abs, 6),
+        "Z0_ohm": round(z0_abs, 6),
+        "Xd_pp_pct": round(xd_pp * 100.0, 3),
+        "Xd_p_pct": round(xd_p * 100.0, 3),
+        "Xd_pct": round(xd * 100.0, 3),
+        "R1_pct": round(r_pu * 100.0, 3),
+        "Rs_ohm": round(r_ohm, 6),
+        "X0_pct": round(x0 * 100.0, 3),
+        "usa_defaults": usa_defaults,
+        # Compatibilidad legado
+        "Icc_nominal_kA": round(ik3_pp / 1000.0, 3),
+        "Icc_max_kA": round((ik3_pp * 1.05) / 1000.0, 3),
+        "Icc_min_kA": round((ik3_pp * 0.95) / 1000.0, 3),
+        "Z_ge_ohm": round(z1_pp_abs, 6),
     }
 
 
@@ -279,7 +412,12 @@ def calcular_generador(
     P_motor_max_kW: float,
     factor_arranque_motor: float,
     altitud_msnm: float,
-    Xd_pct: float = XD_DEFAULT_PCT,
+    Xd_pp_pct: float = XD_PP_DEFAULT,
+    Xd_p_pct: float = XD_P_DEFAULT,
+    Xd_pct: float = XD_DEFAULT,
+    R1_pct: float = R1_DEFAULT,
+    Rs_ohm: float = None,
+    X0_pct: float = X0_DEFAULT,
     consumo_100_galhr: float = None,
     consumo_75_galhr: float = None,
     capacidad_tanque_gal: float = None,
@@ -306,7 +444,18 @@ def calcular_generador(
 
     reg = str(regimen_uso or "prime").strip().lower()
     p_kva_sel = float(P_ge_kVA_emergencia if reg == "emergencia" else P_ge_kVA_prime)
-    icc = calcular_icc_ge(P_kVA=p_kva_sel, V_nominal=V_nominal, Xd_pct=Xd_pct)
+    icc = calcular_icc_ge(
+        P_kVA=p_kva_sel,
+        V_nominal=V_nominal,
+        Xd_pp_pct=Xd_pp_pct,
+        Xd_p_pct=Xd_p_pct,
+        Xd_pct=Xd_pct,
+        R1_pct=R1_pct,
+        Rs_ohm=Rs_ohm,
+        X0_pct=X0_pct,
+        c_max=C_MAX_BT,
+        c_min=C_MIN_BT,
+    )
     dv = calcular_dv_arranque_ge(
         P_motor_kW=P_motor_max_kW,
         factor_arranque=factor_arranque_motor,

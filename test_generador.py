@@ -185,3 +185,53 @@ def test_calcular_generador_completo():
     ]:
         assert key in r
     assert isinstance(r["protecciones_modo_ge"], list)
+
+
+def test_icc_ge_3_niveles():
+    r = calcular_icc_ge(P_kVA=650, V_nominal=400, Xd_pp_pct=14, Xd_p_pct=20, Xd_pct=120)
+    assert r["Ik3_pp_kA"] > r["Ik3_p_kA"] > r["Ik3_kA"]
+
+
+def test_icc_ge_monofasico_mayor():
+    r = calcular_icc_ge(P_kVA=650, V_nominal=400, Xd_pp_pct=14, X0_pct=1.0)
+    assert r["Ik1_pp_kA"] > 0
+
+
+def test_icc_ge_con_datos_reales():
+    r = calcular_icc_ge(
+        P_kVA=650,
+        V_nominal=400,
+        Xd_pp_pct=14,
+        Xd_p_pct=18,
+        Xd_pct=90,
+        R1_pct=1.2,
+        X0_pct=3.5,
+    )
+    assert r["Ik3_pp_kA"] > 0
+    assert r["usa_defaults"] is False
+
+
+def test_stamford_hci544d_380v():
+    r = calcular_icc_ge(
+        P_kVA=404,
+        V_nominal=380,
+        Xd_pp_pct=0.12,
+        Xd_p_pct=0.17,
+        Xd_pct=3.51,
+        Rs_ohm=0.0041,
+        X0_pct=0.11,
+    )
+    assert 5.2 <= r["Ik3_pp_kA"] <= 5.5
+
+
+def test_curva_decremento_sostenida():
+    r = calcular_icc_ge(
+        P_kVA=404,
+        V_nominal=380,
+        Xd_pp_pct=0.12,
+        Xd_p_pct=0.17,
+        Xd_pct=0.25,
+        Rs_ohm=0.0041,
+        X0_pct=0.11,
+    )
+    assert 2.3 <= r["Ik3_kA"] <= 2.8

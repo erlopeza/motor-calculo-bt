@@ -742,7 +742,11 @@ def leer_generador_excel(libro_openpyxl):
         "GE_cos_phi": _to_float(datos.get("ge_cos_phi"), 0.8),
         "GE_regimen_uso": _to_str(datos.get("ge_regimen_uso"), "prime").lower() or "prime",
         "GE_altitud_msnm": _to_float(datos.get("ge_altitud_msnm"), 0.0),
-        "GE_Xd_pct": _to_float(datos.get("ge_xd_pct"), 25.0),
+        "GE_Xd_pp_pct": _to_float(datos.get("ge_xd_pp_pct"), 20.0),
+        "GE_Xd_p_pct": _to_float(datos.get("ge_xd_p_pct"), 28.0),
+        "GE_Xd_pct": _to_float(datos.get("ge_xd_pct"), 120.0),
+        "GE_R1_pct": _to_float(datos.get("ge_r1_pct"), 2.0),
+        "GE_X0_pct": _to_float(datos.get("ge_x0_pct"), 5.0),
         "GE_consumo_100_galhr": _to_float(datos.get("ge_consumo_100_galhr"), None),
         "GE_consumo_75_galhr": _to_float(datos.get("ge_consumo_75_galhr"), None),
         "GE_consumo_50_galhr": _to_float(datos.get("ge_consumo_50_galhr"), None),
@@ -968,6 +972,63 @@ def leer_ups_excel(libro_openpyxl):
         "UPS_nombre", "UPS_modelo", "UPS_P_kVA", "UPS_P_carga_kW",
         "UPS_n_baterias_serie", "UPS_V_bat", "UPS_Ah_bat", "UPS_n_strings"
     ]
+    if any(r.get(k) in (None, "") for k in faltantes):
+        return None
+    return r
+
+
+def leer_ats_excel(libro_openpyxl):
+    """
+    Lee datos ATS desde hoja 'ats' (campo/valor).
+    Retorna dict o None.
+    """
+    hoja = next((n for n in libro_openpyxl.sheetnames if n.lower() == "ats"), None)
+    if not hoja:
+        return None
+    ws = libro_openpyxl[hoja]
+    datos = {}
+    for fila in ws.iter_rows(min_row=2, values_only=True):
+        if not fila or fila[0] is None:
+            continue
+        key = str(fila[0]).strip().lower()
+        datos[key] = fila[1]
+
+    def _to_float(v, default=None):
+        if v is None or str(v).strip() == "":
+            return default
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return default
+
+    def _to_str(v, default=""):
+        if v is None:
+            return default
+        return str(v).strip()
+
+    r = {
+        "ATS_nombre": _to_str(datos.get("ats_nombre"), ""),
+        "ATS_modelo": _to_str(datos.get("ats_modelo"), ""),
+        "ATS_I_nominal_A": _to_float(datos.get("ats_i_nominal_a"), None),
+        "ATS_V_nominal_V": _to_float(datos.get("ats_v_nominal_v"), 400.0),
+        "ATS_modo": _to_str(datos.get("ats_modo"), "open").lower(),
+        "ATS_I_carga_A": _to_float(datos.get("ats_i_carga_a"), None),
+        "ATS_Sn_ge_kVA": _to_float(datos.get("ats_sn_ge_kva"), None),
+        "ATS_Xd_pp_pct": _to_float(datos.get("ats_xd_pp_pct"), 20.0),
+        "ATS_Xd_p_pct": _to_float(datos.get("ats_xd_p_pct"), 28.0),
+        "ATS_Xd_pct": _to_float(datos.get("ats_xd_pct"), 120.0),
+        "ATS_R1_pct": _to_float(datos.get("ats_r1_pct"), 2.0),
+        "ATS_X0_pct": _to_float(datos.get("ats_x0_pct"), 5.0),
+        "ATS_t_deteccion_ms": _to_float(datos.get("ats_t_deteccion_ms"), 3000.0),
+        "ATS_t_arranque_ms": _to_float(datos.get("ats_t_arranque_ms"), 10000.0),
+        "ATS_t_estabilizacion_ms": _to_float(datos.get("ats_t_estabilizacion_ms"), 5000.0),
+        "ATS_t_paralelo_ms": _to_float(datos.get("ats_t_paralelo_ms"), 150.0),
+        "ATS_V_red_V": _to_float(datos.get("ats_v_red_v"), None),
+        "ATS_V_ge_V": _to_float(datos.get("ats_v_ge_v"), None),
+        "ATS_f_red_Hz": _to_float(datos.get("ats_f_red_hz"), None),
+        "ATS_f_ge_Hz": _to_float(datos.get("ats_f_ge_hz"), None),
+    }
+    faltantes = ["ATS_nombre", "ATS_modelo", "ATS_I_nominal_A", "ATS_I_carga_A", "ATS_Sn_ge_kVA"]
     if any(r.get(k) in (None, "") for k in faltantes):
         return None
     return r
