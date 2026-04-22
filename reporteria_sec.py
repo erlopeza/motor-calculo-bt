@@ -98,6 +98,18 @@ def _circuitos_en_falla(circuitos: list) -> list:
     return en_falla
 
 
+def _criterio_normativo(modulo: str, parametro: str) -> str:
+    try:
+        from rag_normativa import consultar_criterio_calculo
+
+        criterio = consultar_criterio_calculo(modulo, parametro)
+        if criterio.get("ok"):
+            return str(criterio.get("cita") or "")
+    except Exception:
+        return ""
+    return ""
+
+
 def generar_memoria_docx(
     datos_run: dict,
     circuitos: list,
@@ -124,6 +136,9 @@ def generar_memoria_docx(
     doc.add_heading("Antecedentes", level=1)
     doc.add_paragraph("Sistema de referencia: 380V / 3F / 50Hz")
     doc.add_paragraph(f"Norma aplicada: {_norma_display(datos_run)}")
+    cita_dv = _criterio_normativo("calculos", "limite_dv")
+    if cita_dv:
+        doc.add_paragraph(f"Criterio aplicado: {cita_dv}")
 
     transformador = datos_run.get("transformador") or {}
     if transformador:
