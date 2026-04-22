@@ -25,3 +25,9 @@ streamlit_*.log
 
 # Excel de entrada - cada proyecto tiene el suyo
 # circuitos.xlsx   <- comentado: lo dejamos como plantilla de ejemplo
+
+# Artefactos no versionables (soporte/reporteria local)
+*.jpg
+*.jpeg
+~$*
+rag_normativa/db/
