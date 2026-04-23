@@ -8,7 +8,9 @@ from persistencia import registrar_ejecucion
 from reporteria_sec import (
     generar_desde_run_id,
     generar_memoria_docx,
+    generar_memoria_sec,
     generar_reporte_pdf,
+    verificar_completitud_parametros,
 )
 
 
@@ -118,3 +120,53 @@ def test_fallo_silencioso():
     except Exception as e:
         raise AssertionError(f"No debia lanzar excepcion: {e}")
     assert rutas == ("", "")
+
+
+def test_gate_emision_bloquea_con_defaults():
+    gate = verificar_completitud_parametros(
+        {
+            "ats": {"t_arranque_ge_ms": 10000.0},
+            "motor": {"factor_arranque": 6.0},
+        }
+    )
+    assert gate["apto_emision"] is False
+    assert gate["nivel"] == "INCOMPLETO"
+    assert len(gate["parametros_default"]) >= 1
+
+
+def test_gate_emision_aprueba_sin_defaults():
+    gate = verificar_completitud_parametros(
+        {
+            "ats": {"t_arranque_ge_ms": 9000.0},
+            "motor": {"factor_arranque": 5.5},
+        }
+    )
+    assert gate["apto_emision"] is True
+    assert gate["nivel"] == "FINAL"
+
+
+def test_memoria_borrador_incluye_lista_defaults():
+    datos = {
+        **_datos_run_base(),
+        "ats": {"t_arranque_ge_ms": 10000.0},
+    }
+    ruta = generar_memoria_sec(datos, _circuitos_base(), str(_tmp_dir()), modo_emision="auto")
+    from docx import Document
+
+    doc = Document(ruta)
+    txt = "\n".join(p.text for p in doc.paragraphs)
+    assert "DOCUMENTO BORRADOR" in txt
+    assert "t_arranque_ge_ms" in txt
+
+
+def test_memoria_final_no_incluye_advertencia():
+    datos = {
+        **_datos_run_base(),
+        "ats": {"t_arranque_ge_ms": 9000.0},
+    }
+    ruta = generar_memoria_sec(datos, _circuitos_base(), str(_tmp_dir()), modo_emision="auto")
+    from docx import Document
+
+    doc = Document(ruta)
+    txt = "\n".join(p.text for p in doc.paragraphs)
+    assert "DOCUMENTO BORRADOR" not in txt

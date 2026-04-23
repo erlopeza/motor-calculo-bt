@@ -10,11 +10,50 @@ from pathlib import Path
 from typing import Tuple
 
 from docx import Document
+from docx.shared import Inches
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
 
 from persistencia import inicializar_db, obtener_circuitos, obtener_ejecuciones
+
+PARAMETROS_DEFAULT_TIPO_A = [
+    {
+        "modulo": "ats",
+        "variable": "t_arranque_ge_ms",
+        "valor_default": 10000.0,
+        "advertencia": "DEFAULT - verificar con ficha tecnica GE",
+        "rutas": [("ats", "t_arranque_ge_ms"), ("t_arranque_ge_ms",)],
+    },
+    {
+        "modulo": "ats",
+        "variable": "t_estabilizacion_ms",
+        "valor_default": 5000.0,
+        "advertencia": "DEFAULT - verificar con ficha tecnica GE",
+        "rutas": [("ats", "t_estabilizacion_ms"), ("t_estabilizacion_ms",)],
+    },
+    {
+        "modulo": "ats",
+        "variable": "t_deteccion_ms",
+        "valor_default": 3000.0,
+        "advertencia": "DEFAULT - configurable en AMF25",
+        "rutas": [("ats", "t_deteccion_ms"), ("t_deteccion_ms",)],
+    },
+    {
+        "modulo": "motores",
+        "variable": "factor_arranque",
+        "valor_default": 6.0,
+        "advertencia": "DEFAULT - DOL tipico, verificar con motor real",
+        "rutas": [("motor", "factor_arranque"), ("factor_arranque",)],
+    },
+    {
+        "modulo": "ups",
+        "variable": "prof_descarga_pct",
+        "valor_default": 80.0,
+        "advertencia": "DEFAULT - AGM, verificar con banco real",
+        "rutas": [("ups", "prof_descarga_pct"), ("prof_descarga_pct",)],
+    },
+]
 
 
 def _sanitize(value) -> str:
@@ -110,6 +149,79 @@ def _criterio_normativo(modulo: str, parametro: str) -> str:
     return ""
 
 
+def _valor_por_ruta(base: dict, ruta: tuple) -> object:
+    cur = base
+    for key in ruta:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(key)
+    return cur
+
+
+def verificar_completitud_parametros(resultados: dict) -> dict:
+    """
+    Verifica que parametros TIPO A no queden en DEFAULT sin confirmacion.
+    """
+    confirmados = set(resultados.get("defaults_confirmados") or [])
+    parametros_default = []
+    for spec in PARAMETROS_DEFAULT_TIPO_A:
+        val = None
+        for ruta in spec["rutas"]:
+            got = _valor_por_ruta(resultados, ruta)
+            if got is not None:
+                val = got
+                break
+        if val is None:
+            continue
+        try:
+            if abs(float(val) - float(spec["valor_default"])) < 1e-9:
+                parametros_default.append(
+                    {
+                        "modulo": spec["modulo"],
+                        "variable": spec["variable"],
+                        "valor": val,
+                        "advertencia": spec["advertencia"],
+                        "confirmado": spec["variable"] in confirmados,
+                    }
+                )
+        except Exception:
+            continue
+
+    if not parametros_default:
+        return {"apto_emision": True, "parametros_default": [], "nivel": "FINAL"}
+
+    todos_confirmados = all(p["confirmado"] for p in parametros_default)
+    if todos_confirmados:
+        return {"apto_emision": True, "parametros_default": parametros_default, "nivel": "BORRADOR"}
+    return {"apto_emision": False, "parametros_default": parametros_default, "nivel": "INCOMPLETO"}
+
+
+def _resultados_para_graficos(datos_run: dict, circuitos: list) -> dict:
+    return {
+        "circuitos": [
+            {"id": c.get("nombre") or f"C-{idx + 1:02d}", "dv_pct": float(c.get("dv_pct") or 0.0)}
+            for idx, c in enumerate(circuitos)
+        ],
+        "generador": (datos_run.get("generador") or None),
+        "protecciones": (datos_run.get("protecciones") or None),
+        "Icc_punto_kA": float(datos_run.get("max_icc_ka") or 10.0),
+        "balance": (datos_run.get("balance") or None),
+        "ups": (datos_run.get("ups") or None),
+        "ats": (datos_run.get("ats") or None),
+        "simulaciones": (datos_run.get("simulaciones") or None),
+        "commissioning": (datos_run.get("commissioning") or None),
+    }
+
+
+def _insertar_grafico_docx(doc: Document, titulo: str, ruta_imagen: str) -> None:
+    if not ruta_imagen:
+        return
+    if not Path(ruta_imagen).exists():
+        return
+    doc.add_paragraph(titulo)
+    doc.add_picture(ruta_imagen, width=Inches(6.5))
+
+
 def generar_memoria_docx(
     datos_run: dict,
     circuitos: list,
@@ -117,6 +229,18 @@ def generar_memoria_docx(
 ) -> str:
     ruta_docx = _ruta_memoria(datos_run, ruta_salida)
     fecha = _fecha_formateada(datos_run)
+    graficos_paths = {}
+    try:
+        from graficos import generar_todos as _gen_graficos
+
+        ruta_curvas = str(_asegurar_carpeta(os.path.join(ruta_salida, "07_CONTROL", "curvas")))
+        graficos_paths = _gen_graficos(
+            _resultados_para_graficos(datos_run, circuitos),
+            ruta_curvas,
+            prefijo=f"{_sanitize(datos_run.get('project_id'))}_",
+        )
+    except Exception:
+        graficos_paths = {}
 
     doc = Document()
     titulo = (
@@ -132,6 +256,17 @@ def generar_memoria_docx(
     doc.add_paragraph(f"Fecha: {fecha}")
     doc.add_paragraph(f"Norma: {datos_run.get('norma')}")
     doc.add_paragraph(f"Perfil: {datos_run.get('perfil')}")
+    parametros_default_sec = datos_run.get("_parametros_default_sec") or []
+    nivel_emision = str(datos_run.get("_nivel_emision_sec") or "").upper()
+    if parametros_default_sec and nivel_emision in {"BORRADOR", "INCOMPLETO"}:
+        doc.add_paragraph("⚠ DOCUMENTO BORRADOR")
+        doc.add_paragraph("Los siguientes parámetros usan valores por defecto")
+        doc.add_paragraph("pendientes de verificación con ficha técnica:")
+        for p in parametros_default_sec:
+            doc.add_paragraph(
+                f"  · {p.get('variable')} = {p.get('valor')} ({p.get('advertencia')})"
+            )
+        doc.add_paragraph("Confirme estos valores antes de emitir versión final.")
 
     doc.add_heading("Antecedentes", level=1)
     doc.add_paragraph("Sistema de referencia: 380V / 3F / 50Hz")
@@ -221,6 +356,17 @@ def generar_memoria_docx(
                 f"Demanda futura={demanda.get('S_futuro_kva')} kVA"
             )
 
+    if graficos_paths:
+        doc.add_heading("Graficos tecnicos", level=1)
+        _insertar_grafico_docx(doc, "Perfil DeltaV por circuito", graficos_paths.get("dv_circuitos"))
+        _insertar_grafico_docx(doc, "Curva de decremento Icc GE", graficos_paths.get("decremento_ge"))
+        _insertar_grafico_docx(doc, "Curvas TCC", graficos_paths.get("tcc"))
+        _insertar_grafico_docx(doc, "Balance de carga por fase", graficos_paths.get("balance_fases"))
+        _insertar_grafico_docx(doc, "Autonomia UPS", graficos_paths.get("autonomia_ups"))
+        _insertar_grafico_docx(doc, "Secuencia ATS", graficos_paths.get("transferencia_ats"))
+        _insertar_grafico_docx(doc, "Divergencias vs SIMARIS", graficos_paths.get("divergencias_simaris"))
+        _insertar_grafico_docx(doc, "Estado commissioning", graficos_paths.get("commissioning"))
+
     doc.add_heading("Conclusion", level=1)
     icc_str = (
         f"{datos_run['max_icc_ka']} kA"
@@ -247,6 +393,28 @@ def generar_memoria_docx(
 
     doc.save(str(ruta_docx))
     return str(ruta_docx)
+
+
+def generar_memoria_sec(
+    datos_run: dict,
+    circuitos: list,
+    ruta_salida: str,
+    modo_emision: str = "auto",
+) -> str:
+    """
+    Genera memoria SEC con gate de completitud de parametros.
+    """
+    modo = str(modo_emision or "auto").lower()
+    gate = verificar_completitud_parametros(datos_run)
+    if modo == "final":
+        gate = {"apto_emision": True, "parametros_default": [], "nivel": "FINAL"}
+    elif modo == "borrador":
+        gate = {"apto_emision": True, "parametros_default": gate["parametros_default"], "nivel": "BORRADOR"}
+
+    datos_memoria = dict(datos_run)
+    datos_memoria["_parametros_default_sec"] = gate.get("parametros_default") or []
+    datos_memoria["_nivel_emision_sec"] = gate.get("nivel")
+    return generar_memoria_docx(datos_memoria, circuitos, ruta_salida)
 
 
 def generar_reporte_pdf(

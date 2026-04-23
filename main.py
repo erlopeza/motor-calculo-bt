@@ -7,6 +7,7 @@
 import sys
 import math
 import os
+import argparse  # agregado graficos
 import openpyxl
 from datetime import datetime
 from conductores import LIMITE_DV, TENSION_SISTEMA
@@ -779,12 +780,31 @@ print("  ΔV | Icc | Protecciones | Balance de carga")
 print("  Normativa: SEC RIC N10 / NEC / IEC 60364")
 print("=" * 60)
 
+parser = argparse.ArgumentParser(add_help=True)
+parser.add_argument("--proyecto", help="Nombre del proyecto")  # agregado graficos
+parser.add_argument("--excel", help="Archivo Excel de entrada (.xlsx)")  # agregado graficos
+parser.add_argument(
+    "--graficos",
+    action="store_true",
+    help="Genera graficos tecnicos PNG en 07_CONTROL/curvas/<proyecto>/",
+ )  # agregado graficos
+parser.add_argument(
+    "--no-pause",
+    action="store_true",
+    help="No espera Enter al finalizar (modo automatizado).",
+ )  # agregado graficos
+args = parser.parse_args()
+
 ahora         = datetime.now()
 fecha         = ahora.strftime("%d/%m/%Y %H:%M")
 fecha_archivo = ahora.strftime("%Y%m%d_%H%M")
 
-nombre_proyecto = input("\n  Nombre del proyecto : ").strip()
-archivo_excel   = input("  Archivo Excel       : ").strip()
+nombre_proyecto = (args.proyecto or "").strip()
+archivo_excel = (args.excel or "").strip()
+if not nombre_proyecto:
+    nombre_proyecto = input("\n  Nombre del proyecto : ").strip()
+if not archivo_excel:
+    archivo_excel = input("  Archivo Excel       : ").strip()
 
 if not archivo_excel.endswith(".xlsx"):
     archivo_excel += ".xlsx"
@@ -881,25 +901,30 @@ try:
     )
 except FileNotFoundError as e:
     print(f"\n  ERROR: {e}")
-    input("\n  Presiona Enter para cerrar...")
+    if not args.no_pause:
+        input("\n  Presiona Enter para cerrar...")
     sys.exit()
 except ValueError as e:
     print(f"\n  ERROR: {e}")
-    input("\n  Presiona Enter para cerrar...")
+    if not args.no_pause:
+        input("\n  Presiona Enter para cerrar...")
     sys.exit()
 except PermissionError as e:
     print(f"\n  ERROR: {e}")
-    input("\n  Presiona Enter para cerrar...")
+    if not args.no_pause:
+        input("\n  Presiona Enter para cerrar...")
     sys.exit()
 except Exception as e:
     print(f"\n  ERROR inesperado: {e}")
     print("  Contacta al desarrollador con este mensaje.")
-    input("\n  Presiona Enter para cerrar...")
+    if not args.no_pause:
+        input("\n  Presiona Enter para cerrar...")
     sys.exit()
 
 if len(circuitos) == 0:
     print("\n  ERROR: no se procesó ningún circuito válido.")
-    input("\n  Presiona Enter para cerrar...")
+    if not args.no_pause:
+        input("\n  Presiona Enter para cerrar...")
     sys.exit()
 
 # --- GENERAR Y MOSTRAR REPORTE ---
@@ -1065,6 +1090,27 @@ try:
         "balance_demanda": datos_balance_demanda,
     }
 
+    if args.graficos:
+        try:
+            from parser_reporte import parsear_reporte
+            from graficos import generar_todos
+
+            ruta_txt = os.path.join(os.getcwd(), nombre_txt)
+            reporte = parsear_reporte(ruta_txt)
+            ruta_curvas = os.path.join(
+                os.getcwd(),
+                "07_CONTROL",
+                "curvas",
+                nombre_proyecto,
+            )
+            graficos = generar_todos(reporte, ruta_curvas, prefijo=nombre_proyecto + "_")
+            datos_run["graficos"] = graficos
+            if reporte.get("errores"):
+                print(f"  Parser reporte: {len(reporte['errores'])} advertencia(s)")
+            print(f"  Graficos generados: {len(graficos)}")
+        except Exception as e:
+            print(f"  Advertencia graficos: {e}")
+
     # Reporteria SEC adicional (sin interrumpir flujo principal).
     try:
         from reporteria_sec import generar_memoria_docx, generar_reporte_pdf
@@ -1087,4 +1133,5 @@ print(f"\n  Proyecto  : {nombre_proyecto}")
 print(f"  OK        : {total_ok}")
 print(f"  FALLA     : {total_falla}")
 print("\n  Listo.")
-input("\n  Presiona Enter para cerrar...")
+if not args.no_pause:
+    input("\n  Presiona Enter para cerrar...")

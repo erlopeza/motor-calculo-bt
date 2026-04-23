@@ -1,5 +1,11 @@
 import math
 
+# ============================================================
+# CONSTANTES - clasificacion por origen
+# TIPO A: parametro de proyecto - DEBE ser ingresado por usuario
+# TIPO B: constante normada - no modificar sin cambiar norma
+# TIPO C: criterio de diseno - cambiar solo con justificacion
+# ============================================================
 
 MODOS_TRANSFERENCIA = {
     "open": "Open Transition - interrupcion breve (100-500ms)",
@@ -8,15 +14,15 @@ MODOS_TRANSFERENCIA = {
     "soft": "Soft Load - via UPS/variador, transparente",
 }
 
-SYNC_DV_MAX_PCT = 5.0
-SYNC_DF_MAX_HZ = 0.2
-SYNC_DFASE_MAX_DEG = 5.0
-T_PARALELO_MAX_MS = 200.0
+SYNC_DV_MAX_PCT = 5.0  # TIPO B - IEC 60947-6-1 8.3 sincronismo de tension
+SYNC_DF_MAX_HZ = 0.2  # TIPO B - IEC 60947-6-1 8.3 sincronismo de frecuencia
+SYNC_DFASE_MAX_DEG = 5.0  # TIPO B - IEC 60947-6-1 8.3 sincronismo de fase
+T_PARALELO_MAX_MS = 200.0  # TIPO B - IEC 60947-6-1 closed transition
 
-T_DETECCION_DEFAULT_MS = 3000.0
-T_ARRANQUE_GE_DEFAULT_MS = 10000.0
-T_ESTABILIZACION_DEFAULT_MS = 5000.0
-T_CIERRE_CONTACTOR_MS = 200.0
+T_DETECCION_DEFAULT_MS = 3000.0  # TIPO A - DEFAULT: configurable por logica AMF
+T_ARRANQUE_GE_DEFAULT_MS = 10000.0  # TIPO A - DEFAULT: verificar con ficha GE
+T_ESTABILIZACION_DEFAULT_MS = 5000.0  # TIPO A - DEFAULT: verificar con regulador AVR
+T_CIERRE_CONTACTOR_MS = 200.0  # TIPO C - tiempo tipico de maniobra
 
 STAMFORD_HCI544D_W14 = {
     380: {"Xd_pp": 0.12, "Xd_p": 0.17, "Xd": 3.51, "X2": 0.23, "X0": 0.11, "Rs_ohm": 0.0041, "Sn_base_kVA": 625},
@@ -112,8 +118,8 @@ def calcular_icc_ge_ats(
     R1_pct: float = 2.0,
     Rs_ohm: float = None,
     X0_pct: float = 5.0,
-    c_max: float = 1.05,
-    c_min: float = 0.95
+    c_max: float = 1.05,  # IEC 60909-0: factor de tensión c_max en BT
+    c_min: float = 0.95  # IEC 60909-0: factor de tensión c_min en BT
 ) -> dict:
     sn = max(float(Sn_kVA), 1e-9)
     vn = max(float(Vn_V), 1e-9)

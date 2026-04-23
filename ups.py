@@ -1,14 +1,21 @@
+# ============================================================
+# CONSTANTES - clasificacion por origen
+# TIPO A: parametro de proyecto - DEBE ser ingresado por usuario
+# TIPO B: constante normada - no modificar sin cambiar norma
+# TIPO C: criterio de diseno - cambiar solo con justificacion
+# ============================================================
+
 AUTONOMIA_MINIMA_MIN = {
-    "tier1": 10,
-    "tier2": 10,
-    "tier3": 15,
-    "tier4": 15,
-    "critico": 15,
-    "general": 10,
+    "tier1": 10,  # TIPO B - TIA-942 referencia minima por criticidad
+    "tier2": 10,  # TIPO B - TIA-942 referencia minima por criticidad
+    "tier3": 15,  # TIPO B - TIA-942 referencia minima por criticidad
+    "tier4": 15,  # TIPO B - TIA-942 referencia minima por criticidad
+    "critico": 15,  # TIPO B - ANSI/BICSI 002 criterio para infraestructura critica
+    "general": 10,  # TIPO B - IEC 62040-4 referencia para aplicaciones generales
 }
 
-AUTONOMIA_ALERTA_MIN = 10
-AUTONOMIA_WARNING_MIN = 15
+AUTONOMIA_ALERTA_MIN = 10  # TIPO C - umbral interno de alerta operativa
+AUTONOMIA_WARNING_MIN = 15  # TIPO C - umbral interno de warning
 
 TIPO_UPS = {
     "VFI": "Doble conversion - tension y frecuencia independientes",
@@ -16,9 +23,9 @@ TIPO_UPS = {
     "VFD": "Standby - solo actua en falla",
 }
 
-ETA_UPS_DEFAULT = 0.94
-ETA_BAT_DEFAULT = 0.85
-FACTOR_USO_MAX_UPS = 0.80
+ETA_UPS_DEFAULT = 0.94  # TIPO C - valor tipico de eficiencia UPS online
+ETA_BAT_DEFAULT = 0.85  # TIPO C - valor tipico de eficiencia del banco
+FACTOR_USO_MAX_UPS = 0.80  # TIPO C - criterio conservador de operacion continua
 
 FACTOR_TEMP_BAT = {
     20: 1.03,

@@ -3,12 +3,19 @@
 from calculos import calcular_caida_tension
 from conductores import FACTORES_TEMP, get_tabla_conductores
 
+# ============================================================
+# CONSTANTES - clasificacion por origen
+# TIPO A: parametro de proyecto - DEBE ser ingresado por usuario
+# TIPO B: constante normada - no modificar sin cambiar norma
+# TIPO C: criterio de diseno - cambiar solo con justificacion
+# ============================================================
+
 
 FACTORES_ARRANQUE_DEFAULT = {
-    "directo": 6.0,
-    "estrella_triangulo": 2.0,
-    "variador": 1.2,
-    "arranque_suave": 2.5,
+    "directo": 6.0,  # TIPO A - DEFAULT: DOL tipico, verificar placa del motor
+    "estrella_triangulo": 2.0,  # TIPO A - DEFAULT: verificar configuracion real
+    "variador": 1.2,  # TIPO A - DEFAULT: verificar rampa del VFD
+    "arranque_suave": 2.5,  # TIPO A - DEFAULT: verificar ajuste del softstarter
 }
 
 FACTORES_ARRANQUE_RANGO = {
@@ -19,14 +26,15 @@ FACTORES_ARRANQUE_RANGO = {
 }
 
 FACTORES_NCH_1228 = {
+    # NCh Elec 12/2003 (uso de motores): factores por régimen y duración de servicio.
     "breve": {5: 1.1, 15: 1.2, 30: 1.5, 60: 1.5, 999: 1.5},
     "intermitente": {5: 0.85, 15: 0.85, 30: 0.9, 60: 0.9, 999: 1.4},
     "periodico": {5: 0.85, 15: 0.9, 30: 0.95, 60: 0.95, 999: 1.4},
     "permanente": 1.25,
 }
 
-DV_ARRANQUE_LIMITE_NORMAL = 15.0
-DV_ARRANQUE_LIMITE_CRITICO = 10.0
+DV_ARRANQUE_LIMITE_NORMAL = 15.0  # TIPO B - NCh 4-2003 12.28.8 referencia de aceptacion
+DV_ARRANQUE_LIMITE_CRITICO = 10.0  # TIPO C - umbral interno para cargas sensibles
 
 
 def _normalizar_arranque(tipo_arranque: str) -> str:

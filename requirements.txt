@@ -11,4 +11,5 @@ llama-index-vector-stores-chroma==0.6.3
 chromadb==1.0.20
 sentence-transformers==5.1.0
 pdfplumber==0.11.7
+matplotlib>=3.8
 

@@ -74,7 +74,7 @@ def clasificar_caida(dV_pct):
         return "ÓPTIMO"
     elif dV_pct <= LIMITE_DV:
         return "ACEPTABLE"
-    elif dV_pct <= 5.0:
+    elif dV_pct <= 5.0:  # RIC N°10: límite global de caída de tensión en BT
         return "PRECAUCIÓN"
     else:
         return "FALLA"

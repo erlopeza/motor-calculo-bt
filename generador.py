@@ -2,6 +2,12 @@ import math
 
 from motores import calcular_corriente_arranque
 
+# ============================================================
+# CONSTANTES - clasificacion por origen
+# TIPO A: parametro de proyecto - DEBE ser ingresado por usuario
+# TIPO B: constante normada - no modificar sin cambiar norma
+# TIPO C: criterio de diseno - cambiar solo con justificacion
+# ============================================================
 
 POTENCIAS_ESTANDAR_IEC_KVA = [
     20, 30, 45, 60, 75, 100, 125, 150, 175, 200,
@@ -9,19 +15,19 @@ POTENCIAS_ESTANDAR_IEC_KVA = [
     1250, 1500, 1750, 2000, 2500, 3000
 ]
 
-XD_PP_DEFAULT = 20.0
-XD_P_DEFAULT = 28.0
-XD_DEFAULT = 120.0
-R1_DEFAULT = 2.0
-X0_DEFAULT = 5.0
-C_MAX_BT = 1.05
-C_MIN_BT = 0.95
+XD_PP_DEFAULT = 20.0  # TIPO A - DEFAULT: verificar con ficha tecnica GE
+XD_P_DEFAULT = 28.0  # TIPO A - DEFAULT: verificar con ficha tecnica GE
+XD_DEFAULT = 120.0  # TIPO A - DEFAULT: verificar con ficha tecnica GE
+R1_DEFAULT = 2.0  # TIPO A - DEFAULT: verificar con ficha tecnica GE
+X0_DEFAULT = 5.0  # TIPO A - DEFAULT: verificar con ficha tecnica GE
+C_MAX_BT = 1.05  # TIPO B - IEC 60909-0: factor de tension c_max para BT
+C_MIN_BT = 0.95  # TIPO B - IEC 60909-0: factor de tension c_min para BT
 
-XD_DEFAULT_PCT = 25.0
-MARGEN_GE_DEFAULT = 1.25
-COS_PHI_GE_DEFAULT = 0.8
-DV_ARRANQUE_LIMITE_NORMAL = 15.0
-DV_ARRANQUE_LIMITE_CRITICO = 10.0
+XD_DEFAULT_PCT = 25.0  # TIPO A - DEFAULT: reactancia usada en evaluacion rapida
+MARGEN_GE_DEFAULT = 1.25  # TIPO C - criterio conservador de diseno (+25%)
+COS_PHI_GE_DEFAULT = 0.8  # TIPO C - valor tipico de alternador en generacion BT
+DV_ARRANQUE_LIMITE_NORMAL = 15.0  # TIPO B - NCh 4-2003 12.28.8 referencia operativa
+DV_ARRANQUE_LIMITE_CRITICO = 10.0  # TIPO C - umbral interno para cargas criticas
 
 STAMFORD_HCI544D_W14 = {
     380: {"Xd_pp": 0.12, "Xd_p": 0.17, "Xd": 3.51, "X2": 0.23, "X0": 0.11, "Rs_ohm": 0.0041, "Sn_base_kVA": 625},
