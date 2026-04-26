@@ -38,6 +38,7 @@ from perfiles import (PERFILES, PERFIL_DEFAULT, obtener_perfil, lista_perfiles,
 from datetime import datetime
 from gui.arranque_window import ArranqueWindow
 from gui.emergencia_window import EmergenciaWindow
+from gui.reporte_window import ReporteWindow
 
 # ============================================================
 # COLORES Y ESTILOS â€” TEMA INDUSTRIAL
@@ -332,6 +333,10 @@ class MotorCalculoBT:
                     panel, "M9  EMERGENCIA RIC-N08", self._abrir_emergencia,
                     color=COLORES["encabezado"])
         self.btn_emergencia.pack(fill="x", padx=14, pady=2)
+        self.btn_reporte = self._boton(
+                    panel, "G3  MEMORIA EXPLICATIVA", self._abrir_reporte,
+                    color=COLORES["encabezado"])
+        self.btn_reporte.pack(fill="x", padx=14, pady=2)
 
         tk.Frame(panel, bg=COLORES["borde"], height=1).pack(fill="x", padx=10, pady=8)
 
@@ -450,6 +455,39 @@ class MotorCalculoBT:
     def _abrir_emergencia(self):
         """Abre la ventana de sistemas de emergencia RIC-N08."""
         EmergenciaWindow(self.root)
+
+    def _abrir_reporte(self):
+        """Abre la ventana para generar memoria explicativa SEC."""
+        ReporteWindow(self.root, self._datos_calculo_reporte())
+
+    def _datos_calculo_reporte(self):
+        """Construye resumen minimo de datos calculados para la memoria."""
+        circuitos = []
+        for circuito in self.circuitos or []:
+            circuitos.append(
+                {
+                    "nombre": circuito.get("nombre", ""),
+                    "potencia_w": circuito.get("P_W", circuito.get("potencia_w", 0)),
+                    "corriente_a": circuito.get("I_diseno", circuito.get("corriente_a", 0)),
+                    "seccion_mm2": circuito.get("S_mm2", circuito.get("seccion_mm2", 0)),
+                    "ducto_mm": circuito.get("ducto_mm", 0),
+                    "proteccion_a": circuito.get("proteccion_a", circuito.get("In_A", 0)),
+                    "curva": circuito.get("curva", "C"),
+                    "long_m": circuito.get("L_m", circuito.get("long_m", 0)),
+                    "caida_v": circuito.get("dV_V", circuito.get("caida_v", 0)),
+                    "caida_pct": circuito.get("dV_pct", circuito.get("caida_pct", 0)),
+                }
+            )
+        return {
+            "tension_v": 380.0,
+            "potencia_total_kw": sum(float(c.get("potencia_w", 0) or 0) for c in circuitos) / 1000.0,
+            "corriente_total_a": sum(float(c.get("corriente_a", 0) or 0) for c in circuitos),
+            "factor_potencia": 0.85,
+            "circuitos": circuitos,
+            "alimentador": {"seccion_mm2": 0, "long_m": 0, "caida_v": 0, "caida_pct": 0, "tipo_cable": "Cu"},
+            "emergencia": None,
+            "arranque": None,
+        }
 
     def _limpiar_tab(self, tab_frame):
         for widget in tab_frame.winfo_children():
