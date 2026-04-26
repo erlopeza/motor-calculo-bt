@@ -36,6 +36,7 @@ from coordinacion import verificar_cadena, reporte_coordinacion
 from perfiles import (PERFILES, PERFIL_DEFAULT, obtener_perfil, lista_perfiles,
     validar_perfil_vs_datos, hay_bloqueo, NIVEL_OK, NIVEL_ADVERTENCIA, NIVEL_BLOQUEO)
 from datetime import datetime
+from gui.arranque_window import ArranqueWindow
 
 # ============================================================
 # COLORES Y ESTILOS â€” TEMA INDUSTRIAL
@@ -322,6 +323,10 @@ class MotorCalculoBT:
                     color=COLORES["encabezado"])
         self.btn_coord.pack(fill="x", padx=14, pady=2)
         self.btn_coord.config(state="disabled")     # habilitado tras calcular
+        self.btn_arranque = self._boton(
+                    panel, "M8  ARRANQUE MOTORES", self._abrir_arranque,
+                    color=COLORES["encabezado"])
+        self.btn_arranque.pack(fill="x", padx=14, pady=2)
 
         tk.Frame(panel, bg=COLORES["borde"], height=1).pack(fill="x", padx=10, pady=8)
 
@@ -432,6 +437,10 @@ class MotorCalculoBT:
         tk.Label(f, textvariable=variable, bg=COLORES["panel"],
                  fg=color, font=FUENTES["subtitulo"],
                  anchor="e").pack(side="right")
+
+    def _abrir_arranque(self):
+        """Abre la ventana de arranque de motores."""
+        ArranqueWindow(self.root)
 
     def _limpiar_tab(self, tab_frame):
         for widget in tab_frame.winfo_children():
