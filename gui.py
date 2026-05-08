@@ -38,6 +38,7 @@ from perfiles import (PERFILES, PERFIL_DEFAULT, obtener_perfil, lista_perfiles,
 from datetime import datetime
 from gui.arranque_window import ArranqueWindow
 from gui.emergencia_window import EmergenciaWindow
+from gui.guiada_window import GuiadaWindow
 from gui.reporte_window import ReporteWindow
 
 # ============================================================
@@ -329,6 +330,10 @@ class MotorCalculoBT:
                     panel, "M8  ARRANQUE MOTORES", self._abrir_arranque,
                     color=COLORES["encabezado"])
         self.btn_arranque.pack(fill="x", padx=14, pady=2)
+        self.btn_guiada = self._boton(
+                    panel, "GUI GUIADA V1", self._abrir_guiada,
+                    color=COLORES["encabezado"])
+        self.btn_guiada.pack(fill="x", padx=14, pady=2)
         self.btn_emergencia = self._boton(
                     panel, "M9  EMERGENCIA RIC-N08", self._abrir_emergencia,
                     color=COLORES["encabezado"])
@@ -451,6 +456,10 @@ class MotorCalculoBT:
     def _abrir_arranque(self):
         """Abre la ventana de arranque de motores."""
         ArranqueWindow(self.root)
+
+    def _abrir_guiada(self):
+        """Abre la ventana guiada v1 basada en sugerencias."""
+        GuiadaWindow(self.root)
 
     def _abrir_emergencia(self):
         """Abre la ventana de sistemas de emergencia RIC-N08."""

@@ -3,25 +3,11 @@ Modulo M8 - Arranque de motores electricos trifasicos BT.
 Calculo de corriente nominal, corriente de arranque,
 metodo de arranque y seleccion de guardamotor.
 """
-import math
-
-
-RANGOS_GUARDAMOTOR = [
-    (0.1, 0.16),
-    (0.16, 0.25),
-    (0.25, 0.4),
-    (0.4, 0.63),
-    (0.63, 1.0),
-    (1.0, 1.6),
-    (1.6, 2.5),
-    (2.5, 4.0),
-    (4.0, 6.3),
-    (6.3, 10.0),
-    (10.0, 16.0),
-    (16.0, 25.0),
-    (25.0, 40.0),
-    (40.0, 63.0),
-]
+from motores import (
+    calcular_corriente_arranque as _calcular_corriente_arranque_motor,
+    calcular_corriente_motor as _calcular_corriente_motor,
+    seleccionar_guardamotor as _seleccionar_guardamotor_motor,
+)
 
 
 def corriente_nominal(potencia_kw: float, tension_v: float, fp: float, rendimiento: float) -> float:
@@ -39,22 +25,23 @@ def corriente_nominal(potencia_kw: float, tension_v: float, fp: float, rendimien
     if not 0 < rendimiento <= 1:
         raise ValueError("El rendimiento debe estar en rango (0, 1]")
 
-    potencia_w = potencia_kw * 1000.0
-    in_a = potencia_w / (math.sqrt(3.0) * tension_v * fp * rendimiento)
-    return round(in_a, 2)
+    return _calcular_corriente_motor(potencia_kw, tension_v, fp, rendimiento, sistema="3F")
 
 
 def corriente_arranque(in_a: float, factor_ia: float = 6.0) -> float:
     """
     Corriente de arranque directo (DOL).
     Ia = In x factor_ia (factor tipico 5-7, default 6).
+    Retorna solo I_arranque_A extraido del dict canonico de motores.py;
+    esta simplificacion es intencional en la fachada M8 GUI.
     Raise ValueError si in_a <= 0 o factor_ia <= 0.
     """
     if in_a <= 0:
         raise ValueError("La corriente nominal debe ser mayor que cero")
     if factor_ia <= 0:
         raise ValueError("El factor de arranque debe ser mayor que cero")
-    return round(in_a * factor_ia, 2)
+    resultado = _calcular_corriente_arranque_motor(in_a, "directo", factor_arranque=factor_ia)
+    return resultado["I_arranque"]
 
 
 def metodo_arranque(potencia_kw: float, tension_v: float = 380) -> dict:
@@ -99,15 +86,14 @@ def seleccionar_guardamotor(in_a: float) -> dict:
     if in_a <= 0:
         raise ValueError("La corriente nominal debe ser mayor que cero")
 
-    for rango_min, rango_max in RANGOS_GUARDAMOTOR:
-        if rango_min <= in_a <= rango_max:
-            return {
-                "rango_min": rango_min,
-                "rango_max": rango_max,
-                "ajuste_recomendado": round(in_a, 2),
-            }
-
-    raise ValueError("Corriente fuera de tabla de guardamotores")
+    resultado = _seleccionar_guardamotor_motor(in_a)
+    if not resultado["rango_min"] <= in_a <= resultado["rango_max"]:
+        raise ValueError("Corriente fuera de tabla de guardamotores")
+    return {
+        "rango_min": resultado["rango_min"],
+        "rango_max": resultado["rango_max"],
+        "ajuste_recomendado": resultado["ajuste"],
+    }
 
 
 def calcular_arranque_completo(

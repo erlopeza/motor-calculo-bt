@@ -66,10 +66,105 @@ CARGAS_TIPICAS_RESIDENCIAL = {
     "Iluminacion_LED_punto": {"P_W": 10, "cos_phi": 0.90, "fuente": "IEC 62612"},
 }
 
+PARAMETROS_PERFIL = {
+    "INDUSTRIAL": {
+        "gi": 1.25,
+        "cos_phi_base": 0.85,
+        "Vn_V": 380,
+        "sistema": "3F",
+        "fuente": "RIC N04 / NCh 4-2003 - criterio industrial BT",
+    },
+    "DATACENTER": {
+        "gi": 1.25,
+        "cos_phi_base": 0.90,
+        "Vn_V": 380,
+        "sistema": "3F",
+        "fuente": "TIA-942 / IEC 60364 - cargas criticas TI",
+    },
+    "COMERCIAL": {
+        "gi": 1.15,
+        "cos_phi_base": 0.90,
+        "Vn_V": 220,
+        "sistema": "1F",
+        "fuente": "RIC N04 / criterio comercial BT",
+    },
+}
+
+CARGAS_TIPICAS_POR_PERFIL = {
+    "RESIDENCIAL": CARGAS_TIPICAS_RESIDENCIAL,
+    "INDUSTRIAL": {
+        "Motor_industrial": {"P_W": 15000, "cos_phi": 0.85, "fuente": "IEC 60034-1"},
+        "Bomba_industrial": {"P_W": 7500, "cos_phi": 0.85, "fuente": "NCh 4-2003 motor BT"},
+        "Ventilador_industrial": {"P_W": 5500, "cos_phi": 0.82, "fuente": "IEC 60034-1"},
+        "Tablero_control": {"P_W": 1000, "cos_phi": 0.90, "fuente": "criterio mercado industrial"},
+        "Iluminacion_industrial": {"P_W": 150, "cos_phi": 0.92, "fuente": "IEC 62612"},
+    },
+    "DATACENTER": {
+        "UPS": {"P_W": 220000, "cos_phi": 0.90, "fuente": "IEC 62040 / TIA-942"},
+        "STS": {"P_W": 180000, "cos_phi": 0.90, "fuente": "IEC 62310 / TIA-942"},
+        "CRAC": {"P_W": 35000, "cos_phi": 0.85, "fuente": "ASHRAE / TIA-942"},
+        "Rack_servidores": {"P_W": 8000, "cos_phi": 0.95, "fuente": "TIA-942 carga TI"},
+        "Iluminacion_tecnica": {"P_W": 500, "cos_phi": 0.90, "fuente": "IEC 62612"},
+    },
+    "COMERCIAL": {
+        "Iluminacion_comercial": {"P_W": 800, "cos_phi": 0.90, "fuente": "IEC 62612"},
+        "Tomacorrientes": {"P_W": 1500, "cos_phi": 0.90, "fuente": "RIC N04 criterio comercial"},
+        "HVAC_comercial": {"P_W": 12000, "cos_phi": 0.85, "fuente": "ASHRAE"},
+        "Ascensor": {"P_W": 11000, "cos_phi": 0.82, "fuente": "IEC 60034-1"},
+        "Escalera_mecanica": {"P_W": 7500, "cos_phi": 0.82, "fuente": "IEC 60034-1"},
+    },
+}
+
+ALIAS_CARGAS = {
+    "television": "TV",
+    "televisor": "TV",
+    "tv": "TV",
+    "notebook": "PC_notebook",
+    "laptop": "PC_notebook",
+    "pc": "PC_escritorio",
+    "aire": "Aire_acondicionado_1ton",
+    "bomba": "Bomba_industrial",
+    "motor": "Motor_industrial",
+    "ventilador": "Ventilador_industrial",
+    "ups": "UPS",
+    "sts": "STS",
+    "crac": "CRAC",
+    "rack": "Rack_servidores",
+    "servidor": "Rack_servidores",
+    "iluminacion": "Iluminacion_comercial",
+    "tomacorriente": "Tomacorrientes",
+    "hvac": "HVAC_comercial",
+    "ascensor": "Ascensor",
+}
+
 
 def _normalize(text: str) -> str:
     txt = unicodedata.normalize("NFKD", str(text or "")).encode("ascii", "ignore").decode("ascii")
     return txt.lower().replace(" ", "_")
+
+
+def _normalizar_perfil(perfil: str = None) -> str | None:
+    if perfil is None:
+        return None
+    perfil_norm = _normalize(perfil).upper()
+    if perfil_norm in CARGAS_TIPICAS_POR_PERFIL:
+        return perfil_norm
+    return None
+
+
+def listar_perfiles() -> list[str]:
+    """Retorna perfiles disponibles para el flujo guiado."""
+    return sorted(PARAMETROS_PERFIL.keys())
+
+
+def sugerir_parametros_por_perfil(perfil: str) -> dict:
+    """
+    Retorna parametros electricos base para un perfil guiado.
+    """
+    perfil_norm = _normalizar_perfil(perfil)
+    if perfil_norm not in PARAMETROS_PERFIL:
+        raise ValueError(f"Perfil no reconocido: {perfil}")
+    return dict(PARAMETROS_PERFIL[perfil_norm])
 
 
 def sugerir_parametros_ge(
@@ -144,7 +239,7 @@ def sugerir_parametros_motor(
     }
 
 
-def sugerir_carga_por_nombre(nombre: str) -> dict:
+def sugerir_carga_por_nombre(nombre: str, perfil: str = None) -> dict:
     """
     Dado nombre de artefacto en lenguaje natural, retorna P_W, cos_phi y fuente.
     """
@@ -152,30 +247,32 @@ def sugerir_carga_por_nombre(nombre: str) -> dict:
         return {}
 
     norm = _normalize(nombre)
-    alias = {
-        "television": "TV",
-        "televisor": "TV",
-        "tv": "TV",
-        "notebook": "PC_notebook",
-        "laptop": "PC_notebook",
-        "pc": "PC_escritorio",
-        "aire": "Aire_acondicionado_1ton",
-    }
-    if norm in alias:
-        key = alias[norm]
-        return {"nombre": key, **CARGAS_TIPICAS_RESIDENCIAL[key]}
+    perfil_norm = _normalizar_perfil(perfil)
+    perfiles_busqueda = [perfil_norm] if perfil_norm else []
+    perfiles_busqueda.extend(p for p in ["RESIDENCIAL", "INDUSTRIAL", "DATACENTER", "COMERCIAL"] if p not in perfiles_busqueda)
 
-    keys = list(CARGAS_TIPICAS_RESIDENCIAL.keys())
-    norm_keys = {_normalize(k): k for k in keys}
+    if norm in ALIAS_CARGAS:
+        key = ALIAS_CARGAS[norm]
+        for perfil_actual in perfiles_busqueda:
+            tabla_actual = CARGAS_TIPICAS_POR_PERFIL[perfil_actual]
+            if key in tabla_actual:
+                return {"nombre": key, "perfil": perfil_actual, **tabla_actual[key]}
+
+    cargas = {}
+    for perfil_actual in perfiles_busqueda:
+        for key, value in CARGAS_TIPICAS_POR_PERFIL[perfil_actual].items():
+            cargas[key] = {"perfil": perfil_actual, **value}
+
+    norm_keys = {_normalize(k): k for k in cargas.keys()}
 
     if norm in norm_keys:
         k = norm_keys[norm]
-        return {"nombre": k, **CARGAS_TIPICAS_RESIDENCIAL[k]}
+        return {"nombre": k, **cargas[k]}
 
     match = difflib.get_close_matches(norm, list(norm_keys.keys()), n=1, cutoff=0.5)
     if match:
         k = norm_keys[match[0]]
-        return {"nombre": k, **CARGAS_TIPICAS_RESIDENCIAL[k]}
+        return {"nombre": k, **cargas[k]}
 
     return {}
 

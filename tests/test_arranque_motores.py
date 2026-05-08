@@ -7,6 +7,10 @@ from src.arranque_motores import (
     metodo_arranque,
     seleccionar_guardamotor,
 )
+from motores import (
+    calcular_corriente_arranque as calcular_corriente_arranque_canonica,
+    calcular_corriente_motor,
+)
 
 
 def test_corriente_nominal_motor_5kw_380v():
@@ -82,3 +86,13 @@ def test_arranque_completo_motor_11kw():
     assert resultado["ia_arranque_a"] == round(resultado["in_a"] * 6.0, 2)
     assert resultado["metodo"]["metodo"] == "Estrella-Triangulo"
     assert resultado["guardamotor"]["rango_min"] <= resultado["in_a"] <= resultado["guardamotor"]["rango_max"]
+
+
+def test_corriente_nominal_fachada_coincide_con_motores_canonico():
+    esperado = calcular_corriente_motor(22.0, 380.0, 0.86, 0.93, sistema="3F")
+    assert corriente_nominal(22.0, 380.0, 0.86, 0.93) == pytest.approx(esperado, abs=0.0)
+
+
+def test_corriente_arranque_fachada_coincide_con_motores_canonico():
+    esperado = calcular_corriente_arranque_canonica(41.79, "directo", factor_arranque=6.0)
+    assert corriente_arranque(41.79, 6.0) == pytest.approx(esperado["I_arranque"], abs=0.0)
