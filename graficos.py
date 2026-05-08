@@ -76,6 +76,8 @@ def grafico_dv_circuitos(circuitos, titulo="Perfil ΔV por circuito", ruta_salid
 
 
 def grafico_decremento_ge(resultado_ge, titulo="Curva de decremento Icc GE", ruta_salida=None):
+    if not resultado_ge:
+        return None
     ikpp = resultado_ge["Ik3_pp_kA"]
     ikp = resultado_ge["Ik3_p_kA"]
     ik = resultado_ge["Ik3_kA"]
@@ -109,7 +111,9 @@ def grafico_decremento_ge(resultado_ge, titulo="Curva de decremento Icc GE", rut
 def grafico_tcc(protecciones, icc_punto_ka, titulo="Curvas TCC", ruta_salida=None):
     if not protecciones:
         return None
-    i_vals = np.logspace(0, 4, 500)
+    in_max = max(float(p.get("In_A") or 0.0) for p in protecciones)
+    i_limit = max(10000.0, float(icc_punto_ka) * 1000.0 * 1.5, in_max * 20.0)
+    i_vals = np.logspace(0, np.log10(i_limit), 500)
     fig, ax = plt.subplots(figsize=(8, 5))
     colores = [STYLE["info"], STYLE["accent"], STYLE["warning"], STYLE["danger"]]
     for idx, prot in enumerate(protecciones):
@@ -151,7 +155,9 @@ def grafico_tcc(protecciones, icc_punto_ka, titulo="Curvas TCC", ruta_salida=Non
 def grafico_balance_fases(resultado_balance, titulo="Balance de carga por fase", ruta_salida=None):
     fases = ["L1", "L2", "L3"]
     kw = [resultado_balance[f"L{i + 1}_kW"] for i in range(3)]
-    amp = [resultado_balance[f"L{i + 1}_A"] for i in range(3)]
+    amp = None
+    if all(resultado_balance.get(f"L{i + 1}_A") is not None for i in range(3)):
+        amp = [resultado_balance[f"L{i + 1}_A"] for i in range(3)]
     deseq = resultado_balance.get("desequilibrio_pct", 0)
     if deseq > 25:
         col_deseq = STYLE["danger"]
@@ -159,8 +165,13 @@ def grafico_balance_fases(resultado_balance, titulo="Balance de carga por fase",
         col_deseq = STYLE["warning"]
     else:
         col_deseq = STYLE["accent"]
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 4))
-    for ax, vals, lbl in [(ax1, kw, "kW"), (ax2, amp, "A")]:
+    if amp is None:
+        fig, ax1 = plt.subplots(figsize=(6, 4))
+        ejes = [(ax1, kw, "kW")]
+    else:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 4))
+        ejes = [(ax1, kw, "kW"), (ax2, amp, "A")]
+    for ax, vals, lbl in ejes:
         bars = ax.bar(fases, vals, color=STYLE["info"], width=0.5)
         max_val = max(vals) if vals else 0
         for bar, v in zip(bars, vals):
@@ -309,6 +320,12 @@ def generar_todos(reporte, ruta_salida, prefijo=""):
     """
     generados = {}
     tcc = reporte.get("tcc")
+    if not tcc and reporte.get("protecciones"):
+        icc_punto_ka = reporte.get("Icc_punto_kA")
+        tcc = {
+            "icc_falla_A": None if icc_punto_ka is None else float(icc_punto_ka) * 1000.0,
+            "dispositivos": reporte.get("protecciones"),
+        }
     tcc_dispositivos = None
     if isinstance(tcc, dict):
         dispositivos = []
@@ -321,6 +338,8 @@ def generar_todos(reporte, ruta_salida, prefijo=""):
             tcc_dispositivos = dispositivos
     sts = reporte.get("sts") or {}
     transferencia = None
+    if isinstance(reporte.get("ats"), dict) and reporte.get("ats"):
+        transferencia = reporte.get("ats")
     if isinstance(sts, dict) and sts:
         t_transfer = sts.get("t_transfer_ms")
         if t_transfer is not None:
@@ -333,6 +352,7 @@ def generar_todos(reporte, ruta_salida, prefijo=""):
             }
     mapa = {
         "dv_circuitos": (grafico_dv_circuitos, reporte.get("circuitos")),
+        "decremento_ge": (grafico_decremento_ge, reporte.get("generador")),
         "balance_fases": (grafico_balance_fases, reporte.get("balance")),
         "autonomia_ups": (grafico_autonomia_ups, reporte.get("ups")),
         "transferencia_ats": (grafico_transferencia_ats, transferencia),
@@ -344,7 +364,7 @@ def generar_todos(reporte, ruta_salida, prefijo=""):
         try:
             ruta = _ruta_salida(f"{prefijo}{nombre}" if prefijo else nombre, ruta_salida)
             if nombre == "tcc":
-                icc_falla_a = (reporte.get("tcc") or {}).get("icc_falla_A")
+                icc_falla_a = (tcc or {}).get("icc_falla_A")
                 icc = None if icc_falla_a is None else float(icc_falla_a) / 1000.0
                 if icc is None:
                     generados["tcc_advertencia"] = "Icc_punto_kA no disponible — gráfico TCC omitido"

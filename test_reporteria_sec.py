@@ -1,4 +1,5 @@
 ﻿import os
+import json
 import re
 import sqlite3
 import uuid
@@ -6,6 +7,7 @@ from pathlib import Path
 
 from persistencia import registrar_ejecucion
 from reporteria_sec import (
+    exportar_json_epc,
     generar_desde_run_id,
     generar_memoria_docx,
     generar_memoria_sec,
@@ -170,3 +172,28 @@ def test_memoria_final_no_incluye_advertencia():
     doc = Document(ruta)
     txt = "\n".join(p.text for p in doc.paragraphs)
     assert "DOCUMENTO BORRADOR" not in txt
+
+
+def test_exportar_json_epc_incluye_nivel_incompleto_con_defaults():
+    datos = {
+        **_datos_run_base(),
+        "ats": {"t_arranque_ge_ms": 10000.0},
+    }
+    ruta = exportar_json_epc(datos, str(_tmp_dir()))
+    with open(ruta, "r", encoding="utf-8") as fh:
+        payload = json.load(fh)
+    assert payload["nivel_emision"] == "INCOMPLETO"
+    assert payload["apto_emision"] is False
+    assert payload["parametros_default"]
+
+
+def test_exportar_json_epc_incluye_nivel_final_sin_defaults():
+    datos = {
+        **_datos_run_base(),
+        "ats": {"t_arranque_ge_ms": 9000.0},
+    }
+    ruta = exportar_json_epc(datos, str(_tmp_dir()))
+    with open(ruta, "r", encoding="utf-8") as fh:
+        payload = json.load(fh)
+    assert payload["nivel_emision"] == "FINAL"
+    assert payload["apto_emision"] is True

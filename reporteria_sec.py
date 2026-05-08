@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import json
 import sqlite3
 import uuid
 from datetime import datetime
@@ -197,6 +198,7 @@ def verificar_completitud_parametros(resultados: dict) -> dict:
 
 
 def _resultados_para_graficos(datos_run: dict, circuitos: list) -> dict:
+    max_icc = datos_run.get("max_icc_ka")
     return {
         "circuitos": [
             {"id": c.get("nombre") or f"C-{idx + 1:02d}", "dv_pct": float(c.get("dv_pct") or 0.0)}
@@ -204,7 +206,7 @@ def _resultados_para_graficos(datos_run: dict, circuitos: list) -> dict:
         ],
         "generador": (datos_run.get("generador") or None),
         "protecciones": (datos_run.get("protecciones") or None),
-        "Icc_punto_kA": float(datos_run.get("max_icc_ka") or 10.0),
+        "Icc_punto_kA": None if max_icc is None else float(max_icc),
         "balance": (datos_run.get("balance") or None),
         "ups": (datos_run.get("ups") or None),
         "ats": (datos_run.get("ats") or None),
@@ -415,6 +417,41 @@ def generar_memoria_sec(
     datos_memoria["_parametros_default_sec"] = gate.get("parametros_default") or []
     datos_memoria["_nivel_emision_sec"] = gate.get("nivel")
     return generar_memoria_docx(datos_memoria, circuitos, ruta_salida)
+
+
+def exportar_json_epc(
+    datos_run: dict,
+    ruta_salida: str,
+    modo_emision: str = "auto",
+) -> str:
+    """
+    Exporta un JSON minimo para consumo EPC con nivel de emision SEC.
+    """
+    modo = str(modo_emision or "auto").lower()
+    gate = verificar_completitud_parametros(datos_run)
+    if modo == "final":
+        gate = {"apto_emision": True, "parametros_default": [], "nivel": "FINAL"}
+    elif modo == "borrador":
+        gate = {"apto_emision": True, "parametros_default": gate["parametros_default"], "nivel": "BORRADOR"}
+
+    carpeta = _asegurar_carpeta(ruta_salida)
+    nombre = (
+        f"EPC_{_sanitize(datos_run.get('project_id'))}_"
+        f"{_sanitize(datos_run.get('revision'))}_{_marca_archivo()}.json"
+    )
+    ruta_json = carpeta / nombre
+    payload = {
+        "project_id": datos_run.get("project_id"),
+        "revision": datos_run.get("revision"),
+        "timestamp": datos_run.get("timestamp"),
+        "nivel_emision": gate.get("nivel"),
+        "apto_emision": gate.get("apto_emision"),
+        "parametros_default": gate.get("parametros_default") or [],
+        "resultados": datos_run,
+    }
+    with open(ruta_json, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=False, indent=2, default=str)
+    return str(ruta_json)
 
 
 def generar_reporte_pdf(

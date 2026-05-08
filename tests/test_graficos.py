@@ -147,6 +147,25 @@ def test_generar_todos_retorna_dict():
     assert isinstance(d, dict) and len(d) > 0
 
 
+def test_generar_todos_genera_g2_decremento_ge():
+    tmp_dir = _tmp_dir()
+    d = generar_todos({"generador": GE}, str(tmp_dir))
+    assert "decremento_ge" in d
+    assert os.path.exists(d["decremento_ge"])
+
+
+def test_grafico_balance_acepta_parser_sin_corrientes():
+    tmp_dir = _tmp_dir()
+    balance_parser = {
+        "L1_kW": 10.0,
+        "L2_kW": 11.0,
+        "L3_kW": 9.5,
+        "desequilibrio_pct": 5.0,
+    }
+    r = grafico_balance_fases(balance_parser, ruta_salida=str(tmp_dir / "balance_parser.png"))
+    assert r and os.path.exists(r)
+
+
 def test_generar_todos_omite_tcc_si_no_hay_icc():
     tmp_dir = _tmp_dir()
     res = {
