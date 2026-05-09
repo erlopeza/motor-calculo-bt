@@ -1,3 +1,4 @@
+import importlib
 import math
 
 from motores import calcular_corriente_arranque
@@ -28,13 +29,6 @@ MARGEN_GE_DEFAULT = 1.25  # TIPO C - criterio conservador de diseno (+25%)
 COS_PHI_GE_DEFAULT = 0.8  # TIPO C - valor tipico de alternador en generacion BT
 DV_ARRANQUE_LIMITE_NORMAL = 15.0  # TIPO B - NCh 4-2003 12.28.8 referencia operativa
 DV_ARRANQUE_LIMITE_CRITICO = 10.0  # TIPO C - umbral interno para cargas criticas
-
-STAMFORD_HCI544D_W14 = {
-    380: {"Xd_pp": 0.12, "Xd_p": 0.17, "Xd": 3.51, "X2": 0.23, "X0": 0.11, "Rs_ohm": 0.0041, "Sn_base_kVA": 625},
-    400: {"Xd_pp": 0.11, "Xd_p": 0.15, "Xd": 3.17, "X2": 0.20, "X0": 0.10, "Rs_ohm": 0.0041, "Sn_base_kVA": 625},
-    416: {"Xd_pp": 0.10, "Xd_p": 0.14, "Xd": 2.93, "X2": 0.19, "X0": 0.09, "Rs_ohm": 0.0041, "Sn_base_kVA": 625},
-}
-
 
 def _curve_multiplier(curva: str) -> float:
     c = str(curva or "").strip().upper()
@@ -73,52 +67,48 @@ def _norm_r_to_pu(x: float) -> float:
 def get_parametros_alternador(
     modelo: str,
     Vn_V: float,
-    Sn_kVA: float
+    Sn_kVA: float = None
 ) -> dict:
-    mod = str(modelo or "custom").strip().upper()
-    if mod != "HCI544D_W14":
-        return None
-
-    vn = float(Vn_V)
-    sn = max(float(Sn_kVA), 1e-9)
-    voltajes = sorted(STAMFORD_HCI544D_W14.keys())
-
-    if vn <= voltajes[0]:
-        base = STAMFORD_HCI544D_W14[voltajes[0]].copy()
-    elif vn >= voltajes[-1]:
-        base = STAMFORD_HCI544D_W14[voltajes[-1]].copy()
-    else:
-        v0, v1 = voltajes[0], voltajes[-1]
-        for i in range(len(voltajes) - 1):
-            if voltajes[i] <= vn <= voltajes[i + 1]:
-                v0, v1 = voltajes[i], voltajes[i + 1]
-                break
-        d0 = STAMFORD_HCI544D_W14[v0]
-        d1 = STAMFORD_HCI544D_W14[v1]
-        frac = (vn - v0) / (v1 - v0)
-        base = {
-            "Xd_pp": d0["Xd_pp"] + (d1["Xd_pp"] - d0["Xd_pp"]) * frac,
-            "Xd_p": d0["Xd_p"] + (d1["Xd_p"] - d0["Xd_p"]) * frac,
-            "Xd": d0["Xd"] + (d1["Xd"] - d0["Xd"]) * frac,
-            "X2": d0["X2"] + (d1["X2"] - d0["X2"]) * frac,
-            "X0": d0["X0"] + (d1["X0"] - d0["X0"]) * frac,
-            "Rs_ohm": d0["Rs_ohm"] + (d1["Rs_ohm"] - d0["Rs_ohm"]) * frac,
-            "Sn_base_kVA": d0["Sn_base_kVA"],
+    mod = str(modelo or "").strip().lower().replace("-", "_").replace(" ", "_")
+    try:
+        preset = importlib.import_module(f"presets.alternadores.{mod}")
+        return preset.get_parametros(Vn_V=Vn_V, Sn_kVA=Sn_kVA)
+    except (ImportError, AttributeError):
+        return {
+            "Xd_pp_pct": XD_PP_DEFAULT,
+            "Xd_p_pct": XD_P_DEFAULT,
+            "Xd_pct": XD_DEFAULT,
+            "R1_pct": R1_DEFAULT,
+            "X0_pct": X0_DEFAULT,
+            "Rs_ohm": None,
+            "Sn_base_kVA": None if Sn_kVA is None else float(Sn_kVA),
+            "modelo": mod or "custom",
+            "usa_defaults": True,
+            "defaults_aplicados": ["Xd_pp_pct", "Xd_p_pct", "Xd_pct", "R1_pct", "X0_pct"],
+            "modelo_no_encontrado": modelo,
         }
 
-    sn_base = float(base.get("Sn_base_kVA", sn))
-    escala = sn_base / sn
-    return {
-        "Xd_pp": round(base["Xd_pp"], 6),
-        "Xd_p": round(base["Xd_p"], 6),
-        "Xd": round(base["Xd"], 6),
-        "X2": round(base["X2"], 6),
-        "X0": round(base["X0"], 6),
-        "Rs_ohm": round(base["Rs_ohm"], 6),
-        "Sn_base_kVA": sn_base,
-        "factor_escala": round(escala, 6),
-        "modelo": "HCI544D_W14",
-    }
+
+def _defaults_icc_ge_aplicados(
+    Xd_pp_pct: float,
+    Xd_p_pct: float,
+    Xd_pct: float,
+    R1_pct: float,
+    Rs_ohm: float,
+    X0_pct: float
+) -> list:
+    defaults = []
+    if abs(_norm_to_pu(Xd_pp_pct) - _norm_to_pu(XD_PP_DEFAULT)) < 1e-9:
+        defaults.append("Xd_pp_pct")
+    if abs(_norm_to_pu(Xd_p_pct) - _norm_to_pu(XD_P_DEFAULT)) < 1e-9:
+        defaults.append("Xd_p_pct")
+    if abs(_norm_to_pu(Xd_pct) - _norm_to_pu(XD_DEFAULT)) < 1e-9:
+        defaults.append("Xd_pct")
+    if Rs_ohm is None and abs(_norm_r_to_pu(R1_pct) - _norm_r_to_pu(R1_DEFAULT)) < 1e-9:
+        defaults.append("R1_pct")
+    if abs(_norm_to_pu(X0_pct) - _norm_to_pu(X0_DEFAULT)) < 1e-9:
+        defaults.append("X0_pct")
+    return defaults
 
 
 def calcular_derrateo_altitud(altitud_msnm: float) -> float:
@@ -265,13 +255,15 @@ def calcular_icc_ge(
     ik1_pp = float(c_max) * math.sqrt(3.0) * v / max((2.0 * z1_pp_abs + z0_abs), 1e-12)
     ik3_min = float(c_min) * v / (math.sqrt(3.0) * max(z1_pp_abs, 1e-12))
 
-    usa_defaults = any([
-        abs(xd_pp - _norm_to_pu(XD_PP_DEFAULT)) < 1e-9,
-        abs(xd_p - _norm_to_pu(XD_P_DEFAULT)) < 1e-9,
-        abs(xd - _norm_to_pu(XD_DEFAULT)) < 1e-9,
-        Rs_ohm is None and abs(r_pu - _norm_r_to_pu(R1_DEFAULT)) < 1e-9,
-        abs(x0 - _norm_to_pu(X0_DEFAULT)) < 1e-9,
-    ])
+    defaults_aplicados = _defaults_icc_ge_aplicados(
+        Xd_pp_pct=Xd_pp_pct,
+        Xd_p_pct=Xd_p_pct,
+        Xd_pct=Xd_pct,
+        R1_pct=R1_pct,
+        Rs_ohm=Rs_ohm,
+        X0_pct=X0_pct,
+    )
+    usa_defaults = bool(defaults_aplicados)
 
     return {
         "Ik3_pp_kA": round(ik3_pp / 1000.0, 3),
@@ -289,6 +281,7 @@ def calcular_icc_ge(
         "Rs_ohm": round(r_ohm, 6),
         "X0_pct": round(x0 * 100.0, 3),
         "usa_defaults": usa_defaults,
+        "defaults_aplicados": defaults_aplicados,
         # Compatibilidad legado
         "Icc_nominal_kA": round(ik3_pp / 1000.0, 3),
         "Icc_max_kA": round((ik3_pp * 1.05) / 1000.0, 3),
@@ -491,6 +484,7 @@ def calcular_generador(
     )
 
     i_nom_ge = (p_kva_sel * 1000.0) / (math.sqrt(3.0) * max(float(V_nominal), 1e-9))
+    defaults_aplicados = list(icc.get("defaults_aplicados", []))
 
     return {
         "nombre": nombre,
@@ -512,4 +506,6 @@ def calcular_generador(
         "dv_arranque_ge": dv,
         "autonomia": autonomia,
         "protecciones_modo_ge": protecciones,
+        "usa_defaults": bool(defaults_aplicados),
+        "defaults_aplicados": defaults_aplicados,
     }
