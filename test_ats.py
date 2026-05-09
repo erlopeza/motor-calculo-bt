@@ -1,6 +1,6 @@
 from ats import (
     calcular_ats,
-    calcular_icc_ge_ats,
+    calcular_icc_ge,
     calcular_tiempos_transferencia,
     verificar_corriente_ats,
     verificar_protecciones_modo_ge,
@@ -9,33 +9,33 @@ from ats import (
 
 
 def test_icc_ge_subtransitorio():
-    r = calcular_icc_ge_ats(Sn_kVA=650, Vn_V=400, Xd_pp_pct=14.0, Xd_p_pct=20.0, Xd_pct=120.0, R1_pct=2.0, X0_pct=5.0)
+    r = calcular_icc_ge(P_kVA=650, V_nominal=400, Xd_pp_pct=14.0, Xd_p_pct=20.0, Xd_pct=120.0, R1_pct=2.0, X0_pct=5.0)
     assert r["Ik3_pp_kA"] > 2.0
 
 
 def test_icc_ge_transitorio():
-    r = calcular_icc_ge_ats(Sn_kVA=650, Vn_V=400, Xd_pp_pct=14.0, Xd_p_pct=20.0, Xd_pct=120.0)
+    r = calcular_icc_ge(P_kVA=650, V_nominal=400, Xd_pp_pct=14.0, Xd_p_pct=20.0, Xd_pct=120.0)
     assert r["Ik3_p_kA"] < r["Ik3_pp_kA"]
 
 
 def test_icc_ge_permanente():
-    r = calcular_icc_ge_ats(Sn_kVA=650, Vn_V=400, Xd_pp_pct=14.0, Xd_p_pct=20.0, Xd_pct=120.0)
+    r = calcular_icc_ge(P_kVA=650, V_nominal=400, Xd_pp_pct=14.0, Xd_p_pct=20.0, Xd_pct=120.0)
     assert r["Ik3_kA"] < r["Ik3_p_kA"]
 
 
 def test_icc_ge_monofasico():
-    r = calcular_icc_ge_ats(Sn_kVA=650, Vn_V=400, Xd_pp_pct=14.0, X0_pct=5.0)
+    r = calcular_icc_ge(P_kVA=650, V_nominal=400, Xd_pp_pct=14.0, X0_pct=5.0)
     assert r["Ik1_pp_kA"] > 0
 
 
 def test_icc_ge_defaults():
-    r = calcular_icc_ge_ats(Sn_kVA=500, Vn_V=400)
+    r = calcular_icc_ge(P_kVA=500, V_nominal=400)
     assert r["usa_defaults"] is True
 
 
 def test_icc_ge_parametros_reales():
-    r = calcular_icc_ge_ats(
-        Sn_kVA=650, Vn_V=400,
+    r = calcular_icc_ge(
+        P_kVA=650, V_nominal=400,
         Xd_pp_pct=14.0, Xd_p_pct=18.0, Xd_pct=90.0, R1_pct=1.2, X0_pct=3.5
     )
     assert r["usa_defaults"] is False
