@@ -52,6 +52,18 @@ FACTORES_DEMANDA = {
 }
 
 # Fallback cuando no se encuentra la combinación exacta
+# RIC N°03 Tabla N°3 - Factor de demanda para alumbrado
+# Fuente: RIC N°03 §3, Tabla N°3
+# Formato: lista de (limite_superior_kW, Fd)
+FD_ALUMBRADO_RIC_N03 = [
+    (2.0, 1.00),
+    (5.0, 0.90),
+    (10.0, 0.85),
+    (20.0, 0.80),
+    (30.0, 0.75),
+    (float("inf"), 0.70),
+]
+
 FD_DEFAULT = 1.00   # criterio conservador
 
 # Potencias nominales estándar de transformadores IEC 60076 (kVA)
@@ -95,6 +107,66 @@ def obtener_fd(tipo_instalacion, tipo_carga):
     ti = str(tipo_instalacion).strip().lower()
     tc = str(tipo_carga).strip().lower()
     return FACTORES_DEMANDA.get((ti, tc), FD_DEFAULT)
+
+
+def calcular_fd_alumbrado_ric(P_alumbrado_kW: float) -> dict:
+    """
+    Calcula factor de demanda para alumbrado segun RIC N°03 Tabla N°3.
+    """
+    p_alum = float(P_alumbrado_kW)
+    tramos = [
+        (2.0, "≤ 2 kW"),
+        (5.0, "2 a 5 kW"),
+        (10.0, "5 a 10 kW"),
+        (20.0, "10 a 20 kW"),
+        (30.0, "20 a 30 kW"),
+        (float("inf"), "> 30 kW"),
+    ]
+
+    for (limite, fd), (_, tramo) in zip(FD_ALUMBRADO_RIC_N03, tramos):
+        if p_alum <= limite:
+            return {
+                "P_alumbrado_kW": p_alum,
+                "fd": fd,
+                "P_demanda_kW": round(p_alum * fd, 3),
+                "tramo": tramo,
+                "norma": "RIC N°03 Tabla N°3",
+                "es_normativo": True,
+            }
+
+
+def calcular_demanda_mixta(
+    P_alumbrado_kW: float,
+    P_fuerza_kW: float = 0.0,
+    P_climatizacion_kW: float = 0.0
+) -> dict:
+    """
+    Calcula demanda maxima con criterio normativo correcto.
+    """
+    alumbrado = calcular_fd_alumbrado_ric(P_alumbrado_kW)
+    p_fuerza = float(P_fuerza_kW)
+    p_climat = float(P_climatizacion_kW)
+    advertencia = None
+    if p_fuerza > 0 or p_climat > 0:
+        advertencia = (
+            "Fd=1.0 aplicado a fuerza/climatización según criterio normativo "
+            "conservador RIC N°03"
+        )
+
+    return {
+        "P_alumbrado_kW": alumbrado["P_alumbrado_kW"],
+        "P_fuerza_kW": p_fuerza,
+        "P_climatizacion_kW": p_climat,
+        "fd_alumbrado": alumbrado["fd"],
+        "fd_fuerza": 1.0,
+        "fd_climatizacion": 1.0,
+        "P_demanda_alumbrado": alumbrado["P_demanda_kW"],
+        "P_demanda_fuerza": round(p_fuerza, 3),
+        "P_demanda_climat": round(p_climat, 3),
+        "P_demanda_total_kW": round(alumbrado["P_demanda_kW"] + p_fuerza + p_climat, 3),
+        "norma": "RIC N°03 Tabla N°3 + criterio normativo",
+        "advertencia": advertencia,
+    }
 
 
 def calcular_potencia_circuito(I_diseno, cos_phi, sistema, Vn):
