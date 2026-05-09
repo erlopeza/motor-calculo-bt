@@ -53,6 +53,15 @@ def _factor_temp_bat(temperatura: float) -> float:
     return FACTOR_TEMP_BAT[25]
 
 
+def _merge_defaults(*resultados: dict) -> list:
+    defaults = []
+    for resultado in resultados:
+        for nombre in resultado.get("defaults_aplicados", []):
+            if nombre not in defaults:
+                defaults.append(nombre)
+    return defaults
+
+
 def verificar_capacidad_ups(
     P_carga_kVA: float,
     P_ups_kVA: float,
@@ -64,11 +73,16 @@ def verificar_capacidad_ups(
     limite_pct = float(factor_uso_max) * 100.0
     ok = uso_pct <= limite_pct
     margen = (p_ups * float(factor_uso_max)) - p_carga
+    defaults_aplicados = []
+    if factor_uso_max == FACTOR_USO_MAX_UPS:
+        defaults_aplicados.append("factor_uso_max")
     return {
         "uso_pct": round(uso_pct, 3),
         "margen_kVA": round(margen, 3),
         "ok": ok,
         "observacion": "OK" if ok else "Capacidad UPS excedida sobre limite operativo",
+        "usa_defaults": bool(defaults_aplicados),
+        "defaults_aplicados": defaults_aplicados,
     }
 
 
@@ -91,6 +105,11 @@ def calcular_banco_baterias(
     f_temp = _factor_temp_bat(temperatura)
     ah_ef = ah_total * f_temp * eta
     e_kwh = (v_string * ah_ef) / 1000.0
+    defaults_aplicados = []
+    if temperatura == 25.0:
+        defaults_aplicados.append("temperatura")
+    if eta_bat == ETA_BAT_DEFAULT:
+        defaults_aplicados.append("eta_bat")
 
     return {
         "V_string": round(v_string, 3),
@@ -98,6 +117,8 @@ def calcular_banco_baterias(
         "Ah_efectivo": round(ah_ef, 3),
         "E_kWh": round(e_kwh, 3),
         "factor_temp": round(f_temp, 4),
+        "usa_defaults": bool(defaults_aplicados),
+        "defaults_aplicados": defaults_aplicados,
     }
 
 
@@ -130,6 +151,11 @@ def calcular_autonomia(
         estado = "WARNING"
     else:
         estado = "INSUFICIENTE"
+    defaults_aplicados = []
+    if eta_ups == ETA_UPS_DEFAULT:
+        defaults_aplicados.append("eta_ups")
+    if nivel_infraestructura == "critico":
+        defaults_aplicados.append("nivel_infraestructura")
 
     return {
         "P_baterias_kW": round(p_bat, 3),
@@ -137,6 +163,8 @@ def calcular_autonomia(
         "t_minimo_normado": int(t_minimo),
         "estado": estado,
         "norma_aplicada": norma,
+        "usa_defaults": bool(defaults_aplicados),
+        "defaults_aplicados": defaults_aplicados,
     }
 
 
@@ -154,11 +182,16 @@ def calcular_tiempo_recarga(
     i_carga = (p_ups * 1000.0 * eta) / v_string
     t_rec = (ah_ef * 10.0) / max(i_carga, 1e-9)
     ok = t_rec <= 12.0
+    defaults_aplicados = []
+    if eta_ups == ETA_UPS_DEFAULT:
+        defaults_aplicados.append("eta_ups")
     return {
         "I_carga_A": round(i_carga, 3),
         "t_recarga_hr": round(t_rec, 3),
         "ok": ok,
         "norma": "IEC 62040-4",
+        "usa_defaults": bool(defaults_aplicados),
+        "defaults_aplicados": defaults_aplicados,
     }
 
 
@@ -224,6 +257,7 @@ def calcular_ups(
         eta_ups=eta_ups,
     )
     tipo = verificar_tipo_ups(tipo=tipo_ups, tipo_carga=tipo_carga)
+    defaults_aplicados = _merge_defaults(banco, autonomia, recarga)
 
     return {
         "nombre": str(nombre),
@@ -248,4 +282,6 @@ def calcular_ups(
         "autonomia": autonomia,
         "recarga": recarga,
         "tipo_validacion": tipo,
+        "usa_defaults": bool(defaults_aplicados),
+        "defaults_aplicados": defaults_aplicados,
     }

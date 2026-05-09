@@ -72,6 +72,18 @@ def _buscar_por_mm2(tabla: dict, s_mm2: float):
     return candidatos[-1]
 
 
+def _merge_defaults(*resultados: dict, extras: list = None) -> list:
+    defaults = []
+    for nombre in extras or []:
+        if nombre not in defaults:
+            defaults.append(nombre)
+    for resultado in resultados:
+        for nombre in resultado.get("defaults_aplicados", []):
+            if nombre not in defaults:
+                defaults.append(nombre)
+    return defaults
+
+
 def calcular_corriente_motor(
     P_kW: float,
     V_nominal: float,
@@ -101,8 +113,10 @@ def calcular_corriente_arranque(
 
     if factor_arranque is None:
         factor = FACTORES_ARRANQUE_DEFAULT[tipo]
+        defaults_aplicados = ["factor_arranque"]
     else:
         factor = float(factor_arranque)
+        defaults_aplicados = []
 
     en_rango = rango[0] <= factor <= rango[1]
     i_arr = round(float(I_n) * factor, 2)
@@ -110,9 +124,12 @@ def calcular_corriente_arranque(
     return {
         "I_arranque": i_arr,
         "factor_usado": round(factor, 3),
+        "factor_arranque_efectivo": round(factor, 3),
         "en_rango_tipico": en_rango,
         "rango_tipico": rango,
         "tipo_arranque": tipo,
+        "usa_defaults": bool(defaults_aplicados),
+        "defaults_aplicados": defaults_aplicados,
     }
 
 
@@ -166,6 +183,11 @@ def dimensionar_conductor_motor(
 
     factor_temp = _factor_temperatura(temperatura)
     i_diseno = round(float(I_n) * factor_regimen * factor_temp, 2)
+    defaults_aplicados = []
+    if temperatura == 30.0:
+        defaults_aplicados.append("temperatura")
+    if str(norma).upper() == "AWG":
+        defaults_aplicados.append("norma")
 
     tabla = get_tabla_conductores(str(norma).upper())
     candidatos = sorted(tabla.items(), key=lambda item: item[1]["mm2"])
@@ -183,6 +205,8 @@ def dimensionar_conductor_motor(
         "I_diseño": i_diseno,
         "factor_regimen": round(factor_regimen, 3),
         "factor_temperatura": round(factor_temp, 3),
+        "usa_defaults": bool(defaults_aplicados),
+        "defaults_aplicados": defaults_aplicados,
     }
 
 
@@ -266,6 +290,12 @@ def calcular_motor(
     Icc_punto: float = None,
     norma: str = "AWG"
 ) -> dict:
+    defaults_base = []
+    if sistema == "3F":
+        defaults_base.append("sistema")
+    if curva == "MA":
+        defaults_base.append("curva")
+
     i_n = calcular_corriente_motor(P_kW, V_nominal, cos_phi, rendimiento, sistema)
     arranque = calcular_corriente_arranque(i_n, tipo_arranque, factor_arranque)
 
@@ -297,6 +327,7 @@ def calcular_motor(
     proteccion = verificar_proteccion_arranque(
         arranque["I_arranque"], proteccion_nominal, curva, Icc_punto=Icc_punto
     )
+    defaults_aplicados = _merge_defaults(arranque, cond_dimensionado, extras=defaults_base)
 
     return {
         "nombre": nombre,
@@ -321,4 +352,7 @@ def calcular_motor(
         },
         "Icc_punto": Icc_punto,
         "norma": str(norma).upper(),
+        "usa_defaults": bool(defaults_aplicados),
+        "defaults_aplicados": defaults_aplicados,
+        "factor_arranque_efectivo": arranque["factor_arranque_efectivo"],
     }
