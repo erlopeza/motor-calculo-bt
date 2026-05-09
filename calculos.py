@@ -4,6 +4,8 @@
 # Razón para cambiar: actualizar fórmulas o límites normativos
 # ============================================================
 # calculos.py — import actualizado
+import math
+
 from conductores import (
     get_tabla_conductores, FACTOR_SISTEMA, TENSION_SISTEMA,
     LIMITE_DV, FACTORES_TEMP
@@ -12,6 +14,11 @@ from conductores import (
 # RESISTIVIDAD DEL COBRE
 # ============================================================
 RHO_CU = 0.0175   # Ω·mm²/m — cobre a 20°C (IEC 60228)
+
+# RIC N°10 / NCh Elec. 4/2003: limite total de caida desde origen de instalacion.
+DV_MAX_TOTAL_RIC_PCT = 5.0
+# RIC N°10: recomendacion de diseno para reservar margen al circuito terminal.
+DV_MAX_ALIMENTADOR_RIC_PCT = 3.0
 
 
 def calcular_potencia(I_diseno, cos_phi, sistema):
@@ -78,6 +85,89 @@ def clasificar_caida(dV_pct):
         return "PRECAUCIÓN"
     else:
         return "FALLA"
+
+
+def _normalizar_clasificacion(clasificacion: str) -> str:
+    etiquetas = {
+        "Ã“PTIMO": "óptimo",
+        "ÓPTIMO": "óptimo",
+        "ACEPTABLE": "aceptable",
+        "PRECAUCIÃ“N": "precaución",
+        "PRECAUCIÓN": "precaución",
+        "FALLA": "falla",
+    }
+    return etiquetas.get(str(clasificacion), str(clasificacion).lower())
+
+
+def calcular_caida_acumulada(
+    dv_alimentador_pct: float,
+    dv_circuito_pct: float
+) -> dict:
+    """
+    Calcula caida de tension acumulada segun RIC N°10 / NCh Elec. 4/2003.
+
+    dv_alimentador_pct: caida en el alimentador (%)
+    dv_circuito_pct: caida en el circuito terminal (%)
+    """
+    dv_alim = float(dv_alimentador_pct)
+    dv_circ = float(dv_circuito_pct)
+    dv_total = round(dv_alim + dv_circ, 3)
+    clasificacion = _normalizar_clasificacion(clasificar_caida(dv_total))
+
+    return {
+        "dv_alimentador_pct": round(dv_alim, 3),
+        "dv_circuito_pct": round(dv_circ, 3),
+        "dv_total_pct": dv_total,
+        "clasificacion": clasificacion,
+        "cumple_ric": dv_total <= DV_MAX_TOTAL_RIC_PCT,
+        "norma": "RIC N°10 / NCh Elec. 4/2003",
+    }
+
+
+def calcular_caida_alimentador(
+    P_W: float,
+    L_m: float,
+    S_mm2: float,
+    Vn_V: float,
+    sistema: str = "3F",
+    cos_phi: float = 0.9,  # DEFAULT_TIPICO: factor de potencia de diseno sin dato real.
+    norma: str = "MM2"
+) -> dict:
+    """
+    Calcula caida de tension en el alimentador reutilizando calcular_caida_tension().
+    """
+    sist = str(sistema).upper()
+    p_w = float(P_W)
+    vn = max(float(Vn_V), 1e-9)
+    fp = max(float(cos_phi), 1e-9)
+
+    if sist == "3F":
+        i_diseno = p_w / (math.sqrt(3.0) * vn * fp)
+    else:
+        i_diseno = p_w / (vn * fp)
+
+    dv_v, dv_pct = calcular_caida_tension(
+        float(L_m),
+        float(S_mm2),
+        i_diseno,
+        1,
+        sist,
+    )
+
+    return {
+        "dV_V": dv_v,
+        "dV_pct": dv_pct,
+        "I_diseno_A": round(i_diseno, 3),
+        "P_W": p_w,
+        "L_m": float(L_m),
+        "S_mm2": float(S_mm2),
+        "Vn_V": float(Vn_V),
+        "sistema": sist,
+        "cos_phi": float(cos_phi),
+        "norma": str(norma).upper(),
+        "es_alimentador": True,
+        "norma_aplicada": "RIC N°10",
+    }
 
 
 def capacidad_corregida(I_max, paralelos, temp_amb):
