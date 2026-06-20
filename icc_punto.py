@@ -159,6 +159,33 @@ def clasificar_icc_punto(Icc_kA):
     else:
         return "EXTREMO"
 
+def calcular_icc_con_aporte_motores(
+    Icc_red_kA: float,
+    aportes_motores_A: list,
+) -> tuple:
+    """Icc total = aporte de la red + aporte de motores (IEC 60909 §3.8).
+
+    La suma es escalar (peor caso — aportes en fase).
+    Aportes negativos se ignoran (no reducen Icc).
+
+    Retorna:
+        Icc_total_kA (float): corriente total en kA
+        desglose (dict): Icc_red_kA, Icc_motores_kA, Icc_total_kA, n_motores
+    """
+    icc_red = float(Icc_red_kA)
+    aportes_validos = [max(float(a), 0.0) for a in aportes_motores_A]
+    icc_motores_kA = sum(aportes_validos) / 1000.0
+    icc_total = icc_red + icc_motores_kA
+    desglose = {
+        "Icc_red_kA": round(icc_red, 4),
+        "Icc_motores_kA": round(icc_motores_kA, 4),
+        "Icc_total_kA": round(icc_total, 4),
+        "n_motores": len(aportes_validos),
+        "norma": "IEC 60909:2016 §3.8",
+    }
+    return round(icc_total, 4), desglose
+
+
 def calcular_icc_todos_circuitos(Zt_trafo_ohm, circuitos):
     """
     Calcula la Icc en cada circuito del sistema.

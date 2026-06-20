@@ -40,6 +40,58 @@ DV_ARRANQUE_LIMITE_CRITICO = 10.0  # TIPO C - umbral interno para cargas sensibl
 LIMITE_DOL_KW = 7.5       # TIPO C - <= 7.5 kW: arranque directo (DOL) admisible
 LIMITE_YD_KW = 30.0       # TIPO C - <= 30 kW: Estrella-Triangulo recomendado
 
+# --- REACTANCIA SUBTRANSITORIA DE MOTORES — DATA-2 ---
+# Fuente: IEC 60909-4:2021 Tabla 1 / IEC TR 60909-4 Tabla B.1
+# X''d expresada en p.u. sobre base del motor.
+# Para calcular I''_motor: I''_motor = I_n / X''d
+_XD_SUBTRANSITORIO: list[tuple[float, float]] = [
+    # (P_kW_limite_superior, X''d_pu)
+    (11.0,  0.20),   # < 11 kW  — motores pequeños
+    (90.0,  0.18),   # 11–90 kW — motores medianos
+    (315.0, 0.16),   # 91–315 kW — motores grandes
+    (float("inf"), 0.15),  # > 315 kW — motores muy grandes
+]
+
+
+def get_xd_subtransitorio(P_kW: float) -> float:
+    """Reactancia subtransitoria X''d (p.u.) de un motor de induccion BT.
+
+    Fuente: IEC 60909-4:2021 Tabla 1. Escalonada por rango de potencia.
+    """
+    for limite, xd in _XD_SUBTRANSITORIO:
+        if float(P_kW) <= limite:
+            return xd
+    return _XD_SUBTRANSITORIO[-1][1]
+
+
+def calcular_aporte_icc_motor(
+    P_kW: float,
+    Vn_V: float,
+    cos_phi: float = 0.85,
+    rendimiento: float = 0.92,
+    sistema: str = "3F",
+) -> dict:
+    """Corriente subtransitoria aportada por un motor al cortocircuito.
+
+    Metodo simplificado IEC 60909 §3.8: I'' = I_n / X''d.
+    El factor de tension c=1.05 no se aplica aqui (conservador por defecto).
+
+    Retorna dict con I_nominal_A, I_aporte_A, I_aporte_kA, Xd_subtransitorio,
+    P_kW, Vn_V y norma.
+    """
+    i_n = calcular_corriente_motor(P_kW, Vn_V, cos_phi, rendimiento, sistema)
+    xd = get_xd_subtransitorio(float(P_kW))
+    i_aporte = i_n / xd
+    return {
+        "P_kW": float(P_kW),
+        "Vn_V": float(Vn_V),
+        "I_nominal_A": round(i_n, 3),
+        "Xd_subtransitorio": xd,
+        "I_aporte_A": round(i_aporte, 3),
+        "I_aporte_kA": round(i_aporte / 1000.0, 6),
+        "norma": "IEC 60909-4:2021 Tabla 1",
+    }
+
 
 def recomendar_metodo_arranque(P_kW: float, V_nominal: float = 380) -> dict:
     """Recomienda metodo de arranque por potencia — criterio BT Chile.
