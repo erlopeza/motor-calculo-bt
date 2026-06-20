@@ -71,3 +71,5 @@ Los problemas son **periféricos pero numerosos y de fácil corrección**: el re
 | [07_dependencias_empaquetado.md](07_dependencias_empaquetado.md) | requirements, PyInstaller, CI, riesgos |
 | [08_documentacion.md](08_documentacion.md) | README, docs, notas |
 | [09_informe_tecnico_funciones.md](09_informe_tecnico_funciones.md) | **Informe técnico de funciones del proyecto** |
+| [10_comparativa_ETAP.md](10_comparativa_ETAP.md) | Comparativa funciones/usabilidad vs. ETAP 22 + factibilidad |
+| [11_ROADMAP_CONSOLIDADO.md](11_ROADMAP_CONSOLIDADO.md) | **Roadmap consolidado** (hallazgos + ETAP + plan por fases) |
