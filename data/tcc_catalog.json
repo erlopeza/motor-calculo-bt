@@ -1,0 +1,109 @@
+{
+  "version": "1.0",
+  "fecha": "2026-06-19",
+  "fuentes": [
+    "IEC 60898-1:2003 Tabla 6 — interruptores automáticos BT uso doméstico",
+    "IEC 60947-2:2016 — interruptores de baja tensión uso industrial",
+    "IEC 60255-151:2009 — funciones de protección de tiempo inverso"
+  ],
+  "curvas": [
+    {
+      "id": "IEC60898_B",
+      "tipo": "IEC60898",
+      "modelo": "B",
+      "fabricante": "generico",
+      "descripcion": "Curva B — IEC 60898-1. Disparo magnético 3–5×In. Uso: cargas resistivas, cables largos.",
+      "formula": "termica_k_cuadrado",
+      "parametros": {
+        "k": 45,
+        "I_mag_min_xIn": 3.0,
+        "I_mag_max_xIn": 5.0,
+        "t_inst_s": 0.02
+      }
+    },
+    {
+      "id": "IEC60898_C",
+      "tipo": "IEC60898",
+      "modelo": "C",
+      "fabricante": "generico",
+      "descripcion": "Curva C — IEC 60898-1. Disparo magnético 5–10×In. Uso: cargas mixtas, motores pequeños.",
+      "formula": "termica_k_cuadrado",
+      "parametros": {
+        "k": 80,
+        "I_mag_min_xIn": 5.0,
+        "I_mag_max_xIn": 10.0,
+        "t_inst_s": 0.02
+      }
+    },
+    {
+      "id": "IEC60898_D",
+      "tipo": "IEC60898",
+      "modelo": "D",
+      "fabricante": "generico",
+      "descripcion": "Curva D — IEC 60898-1. Disparo magnético 10–20×In. Uso: transformadores, motores con alta corriente de arranque.",
+      "formula": "termica_k_cuadrado",
+      "parametros": {
+        "k": 180,
+        "I_mag_min_xIn": 10.0,
+        "I_mag_max_xIn": 20.0,
+        "t_inst_s": 0.02
+      }
+    },
+    {
+      "id": "IEC60255_NI",
+      "tipo": "IEC60255",
+      "modelo": "NI",
+      "fabricante": "generico",
+      "descripcion": "Normal Inverse (tiempo inverso normal) — IEC 60255-151 Tabla 1. Uso: protección general BT/MT.",
+      "formula": "idmt",
+      "parametros": {
+        "alpha": 0.02,
+        "beta": 0.14,
+        "L": 0.0,
+        "tms_default": 1.0
+      }
+    },
+    {
+      "id": "IEC60255_VI",
+      "tipo": "IEC60255",
+      "modelo": "VI",
+      "fabricante": "generico",
+      "descripcion": "Very Inverse (tiempo muy inverso) — IEC 60255-151 Tabla 1. Uso: protección de motores y feeders.",
+      "formula": "idmt",
+      "parametros": {
+        "alpha": 1.0,
+        "beta": 13.5,
+        "L": 0.0,
+        "tms_default": 1.0
+      }
+    },
+    {
+      "id": "IEC60255_EI",
+      "tipo": "IEC60255",
+      "modelo": "EI",
+      "fabricante": "generico",
+      "descripcion": "Extremely Inverse (tiempo extremadamente inverso) — IEC 60255-151 Tabla 1. Uso: fusibles, protección con alta discriminación.",
+      "formula": "idmt",
+      "parametros": {
+        "alpha": 2.0,
+        "beta": 80.0,
+        "L": 0.0,
+        "tms_default": 1.0
+      }
+    },
+    {
+      "id": "IEC60255_LTI",
+      "tipo": "IEC60255",
+      "modelo": "LTI",
+      "fabricante": "generico",
+      "descripcion": "Long Time Inverse (tiempo largo inverso) — IEC 60255-151 Tabla 1. Uso: protección de cables y transformadores.",
+      "formula": "idmt",
+      "parametros": {
+        "alpha": 1.0,
+        "beta": 120.0,
+        "L": 0.0,
+        "tms_default": 1.0
+      }
+    }
+  ]
+}
