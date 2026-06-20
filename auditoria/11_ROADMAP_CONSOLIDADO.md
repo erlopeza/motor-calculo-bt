@@ -23,25 +23,25 @@ Esfuerzo S/M/L/XL · Valor ★–★★★.
 |---|---|---|---|---|---|---|---|---|
 | H-01 | `.gitignore` reescrito (UTF-8) | Auditoría | Higiene | S | ★★ | — | ✅ (sin commit) | F0 |
 | H-02 | Desindexar 64 artefactos generados | Auditoría | Higiene | S | ★★ | H-01 | ✅ (sin commit) | F0 |
-| H-03 | Reescribir README (real + sin escape) | Auditoría | Docs | M | ★★ | — | 🟡 | F0 |
-| H-05 | Unificar layout de tests bajo `tests/` + `conftest.py` | Auditoría | Calidad | M | ★★ | — | 🟡 | F0 |
-| H-06 | `pyproject.toml` + CI (pytest en cada push/PR) | Auditoría | Infra | M | ★★★ | — | 🟡 | F0 |
-| H-04 | Consolidar duplicación `src/`↔raíz (delegar en `motores.py`) | Auditoría | Refactor | M | ★★ | H-06 | 🟡 | F0 |
-| H-07 | Mover datos Stamford HCI544D a `presets/` | Auditoría | Calidad | S | ★ | — | 🟡 | F0 |
-| H-08 | Citar/parametrizar defaults sin fuente (altitud, autonomía) | Auditoría | Normativa | S | ★★ | — | 🟡 | F0 |
-| H-09 | Resolver `*.spec` duplicado e identidad git | Auditoría | Higiene | S | ★ | — | 🟡 | F0 |
-| P0.1 | **Impedancia compleja de cable (R+jX)** en Icc/ΔV | ETAP | Exactitud | S | ★★★ | DATA-1 | 🟡 | F1 |
-| P0.2 | **Aporte de motores al cortocircuito** | ETAP | Exactitud | M | ★★★ | DATA-2 | 🟡 | F1 |
-| P0.3 | Declarar **rango de validez** en la memoria SEC | ETAP | Exactitud | S | ★★ | — | 🟡 | F1 |
-| P1.1 | **Arc Flash IEEE 1584-2018** | ETAP | Diferenciador | M | ★★★ | P0.1, coordinacion.py | 🟡 | F2 |
-| P1.2 | **Librería de curvas TCC** (relés/fabricantes) | ETAP | Diferenciador | M | ★★★ | DATA-3 | 🟡 | F2 |
-| P1.3 | Refuerzo de coordinación (márgenes, back-up, TCC en reporte) | ETAP | Diferenciador | S–M | ★★ | P1.2 | 🟡 | F2 |
+| H-03 | Reescribir README (real + sin escape) | Auditoría | Docs | M | ★★ | — | ✅ sesión | F0 |
+| H-05 | Unificar layout de tests bajo `tests/` + `conftest.py` | Auditoría | Calidad | M | ★★ | — | ✅ sesión | F0 |
+| H-06 | `pyproject.toml` + CI (pytest en cada push/PR) | Auditoría | Infra | M | ★★★ | — | ✅ sesión | F0 |
+| H-04 | Consolidar duplicación `src/`↔raíz (delegar en `motores.py`) | Auditoría | Refactor | M | ★★ | H-06 | ✅ sesión | F0 |
+| H-07 | Mover datos Stamford HCI544D a `presets/` | Auditoría | Calidad | S | ★ | — | ✅ sesión | F0 |
+| H-08 | Citar/parametrizar defaults sin fuente (altitud, autonomía) | Auditoría | Normativa | S | ★★ | — | ✅ sesión | F0 |
+| H-09 | Resolver `*.spec` duplicado e identidad git | Auditoría | Higiene | S | ★ | — | ✅ sesión | F0 |
+| P0.1 | **Impedancia compleja de cable (R+jX)** en Icc/ΔV | ETAP | Exactitud | S | ★★★ | DATA-1 | ✅ sesión | F1 |
+| P0.2 | **Aporte de motores al cortocircuito** | ETAP | Exactitud | M | ★★★ | DATA-2 | ✅ sesión | F1 |
+| P0.3 | Declarar **rango de validez** en la memoria SEC | ETAP | Exactitud | S | ★★ | — | ✅ sesión | F1 |
+| P1.1 | **Arc Flash IEEE 1584-2002** (modelo BT) | ETAP | Diferenciador | M | ★★★ | P0.1, coordinacion.py | ✅ sesión | F2 |
+| P1.2 | **Librería de curvas TCC** (IEC 60898 + IEC 60255 IDMT) | ETAP | Diferenciador | M | ★★★ | DATA-3 | ✅ sesión | F2 |
+| P1.3 | Refuerzo de coordinación (márgenes, back-up) | ETAP | Diferenciador | S–M | ★★ | P1.2 | ✅ sesión | F2 |
 | P2.1 | **Flujo de carga nodal** (bus/rama + Newton-Raphson) | ETAP | Arquitectura | L–XL | ★★★ | F0 completa | 🟡 | F3 |
 | P3.x | Ground Grid (IEEE 80) · DC · ANSI SC · Armónicos | ETAP | Expansión | M–L | ★–★★ | mercado | ⏸️ | F4 |
 | — | Transitorios · OPF · RA · VFD/PV | ETAP | — | XL | ★ | — | ❌ descartado | — |
-| DATA-1 | Tabla de reactancia X por conductor (IEC 60909-2 / NEC Ch.9) | Insumo | Datos | S | — | — | 🟡 | F1 |
-| DATA-2 | Reactancias subtransitorias típicas de motores | Insumo | Datos | S | — | — | 🟡 | F1 |
-| DATA-3 | Catálogo de curvas de protección (JSON/Excel) | Insumo | Datos | M | — | — | 🟡 | F2 |
+| DATA-1 | Tabla de reactancia X por conductor (IEC 60909-2 / NEC Ch.9) | Insumo | Datos | S | — | — | ✅ sesión | F1 |
+| DATA-2 | Reactancias subtransitorias típicas de motores | Insumo | Datos | S | — | — | ✅ sesión | F1 |
+| DATA-3 | Catálogo de curvas de protección (JSON/Excel) | Insumo | Datos | M | — | — | ✅ sesión | F2 |
 
 ---
 
