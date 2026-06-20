@@ -360,6 +360,94 @@ def verificar_cadena(dispositivos, Icc_A, sistema="3F_380"):
 # REPORTE
 # ============================================================
 
+# ============================================================
+# P1.3: MARGEN DE SELECTIVIDAD Y PROTECCIÓN DE RESPALDO
+# ============================================================
+
+# Margen mínimo de tiempo entre dos niveles de protección
+# IEC 60947-2 §7.2.2: ≥ 0.25–0.30s según fabricante
+_MARGEN_MIN_SELECTIVIDAD_S = 0.3
+
+
+def verificar_margen_selectividad(
+    t_inf_s,
+    t_sup_s,
+    margen_min_s: float = _MARGEN_MIN_SELECTIVIDAD_S,
+) -> dict:
+    """Verifica que el margen de tiempo entre dos protecciones sea suficiente.
+
+    Criterio: t_sup − t_inf ≥ margen_min_s (default 0.3s — IEC 60947-2 §7.2.2).
+
+    Parámetros:
+        t_inf_s    : tiempo de disparo del dispositivo inferior (más cercano a falla)
+        t_sup_s    : tiempo de disparo del dispositivo superior (aguas arriba)
+        margen_min_s: margen mínimo exigido en segundos
+
+    Retorna dict con cumple, margen_s, margen_min_s, estado, nota.
+    """
+    if t_inf_s is None or t_sup_s is None:
+        return {
+            "cumple":       None,
+            "margen_s":     None,
+            "margen_min_s": margen_min_s,
+            "estado":       "INDETERMINADO",
+            "nota":         "Tiempo no determinado en algún nivel — verificar curva",
+        }
+
+    t_inf = float(t_inf_s)
+    t_sup = float(t_sup_s)
+    margen = round(t_sup - t_inf, 6)
+    cumple = margen >= margen_min_s
+
+    return {
+        "cumple":       cumple,
+        "margen_s":     margen,
+        "margen_min_s": margen_min_s,
+        "estado":       "OK" if cumple else "INSUFICIENTE",
+        "nota":         (
+            f"Margen {margen:.3f}s ≥ {margen_min_s}s → OK"
+            if cumple else
+            f"Margen {margen:.3f}s < {margen_min_s}s → INSUFICIENTE (IEC 60947-2 §7.2.2)"
+        ),
+    }
+
+
+def verificar_proteccion_backup(
+    resultado_primario: dict,
+    resultado_backup: dict,
+) -> dict:
+    """Verifica que el back-up dispare cuando el primario no actúa.
+
+    Parámetros:
+        resultado_primario : dict salida de calcular_tiempo_disparo()
+        resultado_backup   : dict salida de calcular_tiempo_disparo()
+
+    Retorna dict con primario_dispara, backup_dispara, estado, nota.
+    """
+    prim_dispara = resultado_primario.get("dispara", False)
+    back_dispara = resultado_backup.get("dispara", False)
+
+    if prim_dispara is False and back_dispara is True:
+        estado = "OK"
+        nota = "Primario no dispara — backup actúa correctamente"
+    elif prim_dispara is False and back_dispara is False:
+        estado = "FALLO"
+        nota = "FALLO CRÍTICO: ni primario ni backup disparan ante esta Icc"
+    elif prim_dispara is True:
+        estado = "NORMAL"
+        nota = "Primario dispara normalmente — backup en reserva"
+    else:
+        estado = "INDETERMINADO"
+        nota = "Estado no determinado — verificar curvas"
+
+    return {
+        "primario_dispara": prim_dispara,
+        "backup_dispara":   back_dispara,
+        "estado":           estado,
+        "nota":             nota,
+    }
+
+
 def reporte_coordinacion(resultado_cadena, nombre_cadena="Cadena"):
     """
     Genera líneas de reporte de coordinación TCC.
