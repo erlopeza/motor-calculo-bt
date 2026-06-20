@@ -1,0 +1,39 @@
+[project]
+name = "motor-calculo-bt"
+version = "2.0.0"
+description = "Motor de cálculo eléctrico para instalaciones BT según normativa chilena (SEC/NCh/IEC)"
+requires-python = ">=3.12"
+readme = "README.md"
+
+dependencies = [
+    "openpyxl>=3.1",
+    "python-docx>=1.2",
+    "reportlab>=4.4",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+# Subsistema RAG (embeddings + vector store) — pesado, instalar solo si se usa rag_normativa/
+rag = [
+    "llama-index-core>=0.13",
+    "llama-index-vector-stores-chroma>=0.6",
+    "chromadb>=1.0",
+    "sentence-transformers>=5.1",
+    "pdfplumber>=0.11",
+]
+dev = [
+    "pytest>=9.0",
+    "pytest-cov>=4.0",
+]
+build = [
+    "pyinstaller>=6.0",
+]
+
+[tool.pytest.ini_options]
+# Antes de H-05: tests en raíz y en tests/; post-H-05 cambiar a ["tests"]
+testpaths = ["."]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--tb=short -q"
