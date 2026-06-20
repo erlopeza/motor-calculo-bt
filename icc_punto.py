@@ -6,65 +6,59 @@
 # ============================================================
 
 import math
-from conductores import RHO_CU, CONDUCTORES, TENSION_SISTEMA
+from conductores import RHO_CU, CONDUCTORES, TENSION_SISTEMA, get_reactancia_cable_ohm_km
 
 RHO_CU_OHM_MM2_M = RHO_CU  # resistividad cobre a 20°C (Ω·mm²/m) — IEC 60228
 C_MIN_IEC60909 = 0.95      # factor tension minima BT — IEC 60909 §4.3.1
 
-def calcular_zt_cable(L_m, S_mm2, paralelos=1, rho=RHO_CU):
-    """
-    Calcula la impedancia resistiva del cable en Ohmios.
-    Fórmula: Zt_cable = (rho × L) / (S × paralelos)
 
-    Parámetros:
-        L_m       : longitud del cable en metros
-        S_mm2     : sección del conductor en mm²
-        paralelos : conductores en paralelo (default 1)
-        rho       : resistividad del material (default cobre)
+def calcular_zt_cable(L_m, S_mm2, paralelos=1, rho=RHO_CU) -> float:
+    """Resistencia del cable en Ω (componente real, sin reactancia).
 
-    Retorna:
-        Zt_ohm : impedancia del cable en Ohmios
+    Mantiene firma y retorno originales para retrocompatibilidad con GUI y
+    reportes que solo necesitan R. Para Icc usar calcular_zt_cable_complejo.
     """
-    Zt_ohm = (rho * L_m) / (S_mm2 * paralelos)
-    return round(Zt_ohm, 6)
+    return round((rho * L_m) / (S_mm2 * paralelos), 6)
+
+
+def calcular_zt_cable_complejo(L_m, S_mm2, paralelos=1, rho=RHO_CU) -> complex:
+    """Impedancia compleja del cable Z = R + jX en Ω (IEC 60909-2 §B).
+
+    R: resistencia (rho × L / (S × paralelos)).
+    X: reactancia inductiva interpolada en tabla IEC 60909-2 Tabla B.1.
+
+    Retorna complex para uso en calculos de Icc; usar abs() para magnitud.
+    """
+    r = (rho * L_m) / (S_mm2 * paralelos)
+    x = get_reactancia_cable_ohm_km(S_mm2) * L_m / 1000.0 / paralelos
+    return complex(r, x)
 
 def calcular_icc_punto(Zt_trafo_ohm, L_m, S_mm2, paralelos, sistema="3F"):
-    """
-    Calcula la corriente de cortocircuito en un punto del sistema.
-    Suma la impedancia del transformador + impedancia del cable.
+    """Corriente de cortocircuito en un punto usando impedancia compleja R+jX.
 
-    Parámetros:
-        Zt_trafo_ohm : impedancia del transformador en Ohmios
-        L_m          : longitud del cable hasta el punto en metros
-        S_mm2        : sección del conductor en mm²
-        paralelos    : conductores en paralelo
-        sistema      : "3F", "1F", "2F"
+    Modelo: Z_cable = R + jX (IEC 60909-2 Tabla B.1); Z_trafo = real.
+    Icc = c_max × Vn / (√3 × |Z_total|) para 3F.
+    Para 1F/2F: Icc = Vn / |Z_total + Z_retorno|.
 
     Retorna:
-        Icc_kA   : corriente de cortocircuito en el punto en kA
-        Zt_total : impedancia total en Ohmios
-        dIcc_pct : reducción respecto a la Icc del transformador en %
+        Icc_kA   : float — corriente de cortocircuito en kA
+        Zt_total : float — |Z_total| en Ω (magnitud, retrocompatible)
+        Zt_cable : float — |Z_cable| en Ω (magnitud, retrocompatible)
     """
     V_nom = TENSION_SISTEMA.get(sistema, 380)
 
-    # Impedancia del cable hasta el punto
-    Zt_cable = calcular_zt_cable(L_m, S_mm2, paralelos)
+    Z_cable = calcular_zt_cable_complejo(L_m, S_mm2, paralelos)
+    # trafo modelado como impedancia puramente resistiva (fase posterior: añadir X_trafo)
+    Z_trafo = complex(float(Zt_trafo_ohm), 0.0)
+    Z_total = Z_trafo + Z_cable
 
-    # Impedancia total — transformador + cable
-    Zt_total = Zt_trafo_ohm + Zt_cable
-
-    # Icc en el punto
     if sistema == "3F":
-        Icc_A = V_nom / (math.sqrt(3) * Zt_total)
+        Icc_A = V_nom / (math.sqrt(3) * abs(Z_total))
     else:
-        # Para 1F y 2F — circuito monofásico fase-neutro
-        # Impedancia de retorno por neutro = misma sección
-        Zt_retorno = Zt_cable   # neutro mismo calibre que fase
-        Icc_A = V_nom / (Zt_total + Zt_retorno)
+        Z_retorno = Z_cable  # neutro mismo calibre que fase
+        Icc_A = V_nom / abs(Z_total + Z_retorno)
 
-    Icc_kA = round(Icc_A / 1000, 2)
-
-    return Icc_kA, round(Zt_total, 6), round(Zt_cable, 6)
+    return round(Icc_A / 1000, 2), round(abs(Z_total), 6), round(abs(Z_cable), 6)
 
 def calcular_icc_fase_neutro(
     Vn_V: float,
@@ -74,30 +68,39 @@ def calcular_icc_fase_neutro(
     norma: str = "MM2",
     c_min: float = C_MIN_IEC60909
 ) -> dict:
-    """
-    Calcula Icc minima fase-neutro para verificacion de disparo.
-    Metodo: IEC 60909 con c_min, bucle fase+neutro.
+    """Icc mínima fase-neutro con impedancia compleja del cable (IEC 60364-4-41).
+
+    Modelo: bucle fase + neutro (mismo conductor), Z = R + jX por tramo.
+    Z_fuente tratada como puramente resistiva; mejora futura: añadir X_fuente.
     """
     vn = float(Vn_V)
     u0 = vn / math.sqrt(3.0)
-    z_fuente = float(Zt_fuente_ohm)
-    z_fase = (RHO_CU_OHM_MM2_M * float(L_m)) / max(float(S_mm2), 1e-9)
-    z_neutro = z_fase
-    zs_total = z_fuente + z_fase + z_neutro
-    icc_fn_a = (float(c_min) * u0) / max(zs_total, 1e-9)
+    s = max(float(S_mm2), 1e-9)
+    l = float(L_m)
+
+    Z_fase = calcular_zt_cable_complejo(l, s, paralelos=1)
+    Z_neutro = Z_fase  # mismo calibre
+    x_cable = Z_fase.imag
+    Z_fuente = complex(float(Zt_fuente_ohm), 0.0)
+    Zs_compleja = Z_fuente + Z_fase + Z_neutro
+    zs_mag = abs(Zs_compleja)
+
+    icc_fn_a = (float(c_min) * u0) / max(zs_mag, 1e-9)
+    z_fase_r = Z_fase.real  # componente resistiva (retrocompat)
 
     return {
         "Vn_V": vn,
         "U0_V": round(u0, 3),
-        "Zt_fuente_ohm": round(z_fuente, 6),
-        "Z_cable_fase_ohm": round(z_fase, 6),
-        "Z_cable_neutro_ohm": round(z_neutro, 6),
-        "Zs_total_ohm": round(zs_total, 6),
+        "Zt_fuente_ohm": round(float(Zt_fuente_ohm), 6),
+        "Z_cable_fase_ohm": round(z_fase_r, 6),
+        "Z_cable_neutro_ohm": round(z_fase_r, 6),
+        "X_cable_ohm": round(x_cable, 6),
+        "Zs_total_ohm": round(zs_mag, 6),
         "Icc_fn_A": round(icc_fn_a, 3),
         "Icc_fn_kA": round(icc_fn_a / 1000.0, 6),
         "c_min": float(c_min),
         "norma": str(norma).upper(),
-        "norma_calculo": "IEC 60364-4-41 / IEC 60909",
+        "norma_calculo": "IEC 60364-4-41 / IEC 60909 (modelo R+jX)",
     }
 
 def verificar_disparo_proteccion(

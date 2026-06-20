@@ -19,10 +19,13 @@ def test_icc_fn_u0_es_fase_neutro():
 def test_icc_fn_zs_incluye_fase_y_neutro():
     r = calcular_icc_fase_neutro(Vn_V=380, Zt_fuente_ohm=0.01, L_m=50, S_mm2=6)
     assert r["Z_cable_fase_ohm"] == r["Z_cable_neutro_ohm"]
-    assert r["Zs_total_ohm"] == pytest.approx(
-        r["Zt_fuente_ohm"] + 2 * r["Z_cable_fase_ohm"],
-        abs=2e-6,
-    )
+    # Modelo R+jX: Zs_total es |Z_fuente + 2*(R_cable + jX_cable)|
+    R_total = r["Zt_fuente_ohm"] + 2 * r["Z_cable_fase_ohm"]
+    X_total = 2 * r["X_cable_ohm"]
+    Zs_expected = math.sqrt(R_total**2 + X_total**2)
+    assert r["Zs_total_ohm"] == pytest.approx(Zs_expected, abs=1e-6)
+    # La magnitud compleja es siempre >= suma resistiva
+    assert r["Zs_total_ohm"] >= r["Zt_fuente_ohm"] + 2 * r["Z_cable_fase_ohm"]
 
 
 def test_icc_fn_circuito_largo_reduce_icc():

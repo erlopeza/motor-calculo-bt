@@ -159,3 +159,52 @@ FACTORES_TEMP = {
     45: 0.87,
     50: 0.82,
 }
+
+# --- REACTANCIA INDUCTIVA POR SECCIÓN — DATA-1 ---
+# Fuente: IEC 60909-2:2008 Tabla B.1 / NEC Chapter 9 Table 9 (60 Hz × 5/6)
+# Valores típicos para cables de Cu en instalación BT (conduit/bandeja) a 50 Hz.
+# Unidades: Ω por kilómetro de cable (Ω/km).
+# Para obtener X_ohm: X = REACTANCIA_CABLE_OHM_KM[S_mm2] * L_m / 1000 / paralelos
+_REACTANCIA_CABLE_OHM_KM: dict[float, float] = {
+    1.5:   0.090,
+    2.5:   0.087,
+    4.0:   0.085,
+    6.0:   0.083,
+    10.0:  0.080,
+    16.0:  0.078,
+    25.0:  0.076,
+    35.0:  0.075,
+    50.0:  0.073,
+    70.0:  0.071,
+    95.0:  0.070,
+    120.0: 0.068,
+    150.0: 0.067,
+    185.0: 0.066,
+    240.0: 0.065,
+    300.0: 0.064,
+    400.0: 0.063,
+    500.0: 0.062,
+}
+_REACTANCIA_SECCIONES = sorted(_REACTANCIA_CABLE_OHM_KM.keys())
+
+
+def get_reactancia_cable_ohm_km(S_mm2: float) -> float:
+    """Reactancia inductiva del cable por kilómetro a 50 Hz (Ω/km).
+
+    Interpola linealmente en la tabla IEC 60909-2 Tabla B.1.
+    Para secciones fuera de rango extrapola con el valor extremo más próximo.
+    """
+    s = float(S_mm2)
+    secciones = _REACTANCIA_SECCIONES
+    if s <= secciones[0]:
+        return _REACTANCIA_CABLE_OHM_KM[secciones[0]]
+    if s >= secciones[-1]:
+        return _REACTANCIA_CABLE_OHM_KM[secciones[-1]]
+    for i in range(len(secciones) - 1):
+        s0, s1 = secciones[i], secciones[i + 1]
+        if s0 <= s <= s1:
+            x0 = _REACTANCIA_CABLE_OHM_KM[s0]
+            x1 = _REACTANCIA_CABLE_OHM_KM[s1]
+            frac = (s - s0) / (s1 - s0)
+            return round(x0 + (x1 - x0) * frac, 6)
+    return _REACTANCIA_CABLE_OHM_KM[secciones[-1]]
