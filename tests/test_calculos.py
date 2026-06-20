@@ -685,15 +685,13 @@ import os
 from excel import leer_circuitos_excel, enriquecer_circuitos
 
 def test_leer_circuitos_excel_conductor_mm2():
-    ruta = os.path.join(os.path.dirname(__file__),
-                        "tests", "circuitos_test_mm2.xlsx")
+    ruta = os.path.join(os.path.dirname(__file__), "circuitos_test_mm2.xlsx")
     circuitos = leer_circuitos_excel(ruta)
     assert len(circuitos) == 1
     assert circuitos[0]["conductor"] == "10MM2"
 
 def test_enriquecer_circuitos_mm2():
-    ruta = os.path.join(os.path.dirname(__file__),
-                        "tests", "circuitos_test_mm2.xlsx")
+    ruta = os.path.join(os.path.dirname(__file__), "circuitos_test_mm2.xlsx")
     circuitos = leer_circuitos_excel(ruta)
     circuitos = enriquecer_circuitos(circuitos, norma="MM2")
     assert circuitos[0]["S_mm2"] == 10.0

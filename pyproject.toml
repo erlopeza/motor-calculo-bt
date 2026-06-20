@@ -31,8 +31,8 @@ build = [
 ]
 
 [tool.pytest.ini_options]
-# Antes de H-05: tests en raíz y en tests/; post-H-05 cambiar a ["tests"]
-testpaths = ["."]
+testpaths = ["tests"]
+pythonpath = ["."]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
