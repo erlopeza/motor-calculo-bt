@@ -6,6 +6,7 @@ metodo de arranque y seleccion de guardamotor.
 from motores import (
     calcular_corriente_arranque as _calcular_corriente_arranque_motor,
     calcular_corriente_motor as _calcular_corriente_motor,
+    recomendar_metodo_arranque as _recomendar_metodo_arranque,
     seleccionar_guardamotor as _seleccionar_guardamotor_motor,
 )
 
@@ -45,36 +46,8 @@ def corriente_arranque(in_a: float, factor_ia: float = 6.0) -> float:
 
 
 def metodo_arranque(potencia_kw: float, tension_v: float = 380) -> dict:
-    """
-    Recomienda metodo de arranque segun potencia.
-    Criterios BT Chile:
-        <= 7.5 kW      -> DOL (directo), reduccion_corriente_pct = 0
-        7.5 < P <= 30  -> Estrella-Triangulo, reduccion_corriente_pct = 33
-        > 30 kW        -> Variador de frecuencia, reduccion_corriente_pct = 70
-    Retorna metodo, justificacion y reduccion de corriente.
-    """
-    if potencia_kw <= 0:
-        raise ValueError("La potencia debe ser mayor que cero")
-    if tension_v <= 0:
-        raise ValueError("La tension debe ser mayor que cero")
-
-    if potencia_kw <= 7.5:
-        return {
-            "metodo": "DOL",
-            "justificacion": "Motor pequeno BT; arranque directo admisible segun criterio de potencia",
-            "reduccion_corriente_pct": 0.0,
-        }
-    if potencia_kw <= 30:
-        return {
-            "metodo": "Estrella-Triangulo",
-            "justificacion": "Potencia media BT; se recomienda reducir corriente de partida",
-            "reduccion_corriente_pct": 33.0,
-        }
-    return {
-        "metodo": "Variador de frecuencia",
-        "justificacion": "Potencia alta BT; se recomienda rampa controlada con VFD",
-        "reduccion_corriente_pct": 70.0,
-    }
+    """Fachada GUI: delega en motores.recomendar_metodo_arranque."""
+    return _recomendar_metodo_arranque(potencia_kw, tension_v)
 
 
 def seleccionar_guardamotor(in_a: float) -> dict:

@@ -36,6 +36,38 @@ FACTORES_NCH_1228 = {
 DV_ARRANQUE_LIMITE_NORMAL = 15.0  # TIPO B - NCh 4-2003 12.28.8 referencia de aceptacion
 DV_ARRANQUE_LIMITE_CRITICO = 10.0  # TIPO C - umbral interno para cargas sensibles
 
+# Limites de potencia para recomendacion de metodo de arranque — criterio BT Chile
+LIMITE_DOL_KW = 7.5       # TIPO C - <= 7.5 kW: arranque directo (DOL) admisible
+LIMITE_YD_KW = 30.0       # TIPO C - <= 30 kW: Estrella-Triangulo recomendado
+
+
+def recomendar_metodo_arranque(P_kW: float, V_nominal: float = 380) -> dict:
+    """Recomienda metodo de arranque por potencia — criterio BT Chile.
+
+    Retorna metodo (str), justificacion (str) y reduccion_corriente_pct (float).
+    """
+    if P_kW <= 0:
+        raise ValueError("La potencia debe ser mayor que cero")
+    if V_nominal <= 0:
+        raise ValueError("La tension debe ser mayor que cero")
+    if P_kW <= LIMITE_DOL_KW:
+        return {
+            "metodo": "DOL",
+            "justificacion": "Motor pequeno BT; arranque directo admisible segun criterio de potencia",
+            "reduccion_corriente_pct": 0.0,
+        }
+    if P_kW <= LIMITE_YD_KW:
+        return {
+            "metodo": "Estrella-Triangulo",
+            "justificacion": "Potencia media BT; se recomienda reducir corriente de partida",
+            "reduccion_corriente_pct": 33.0,
+        }
+    return {
+        "metodo": "Variador de frecuencia",
+        "justificacion": "Potencia alta BT; se recomienda rampa controlada con VFD",
+        "reduccion_corriente_pct": 70.0,
+    }
+
 
 def _normalizar_arranque(tipo_arranque: str) -> str:
     tipo = str(tipo_arranque).strip().lower()
