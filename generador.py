@@ -30,6 +30,16 @@ COS_PHI_GE_DEFAULT = 0.8  # TIPO C - valor tipico de alternador en generacion BT
 DV_ARRANQUE_LIMITE_NORMAL = 15.0  # TIPO B - NCh 4-2003 12.28.8 referencia operativa
 DV_ARRANQUE_LIMITE_CRITICO = 10.0  # TIPO C - umbral interno para cargas criticas
 
+# Derrateo por altitud — ISO 8528-1:2018 §13.4 / IEC 60034-1 §3.5:
+#   sin derrateo hasta 1500 msnm; -4% por cada 300 m adicionales
+ALTITUD_BASE_DERRATEO_MSNM = 1500.0
+ALTITUD_MAX_DERRATEO_MSNM = 4000.0
+TASA_DERRATEO_POR_300M = 0.04  # 4 % / 300 m — ISO 8528-1 Tabla 3
+
+# Autonomía mínima de emergencia — RIC N°08 §5.3.1 (SEC Chile):
+#   grupos electrógenos de emergencia ≥ 6 h de autonomía a plena carga
+AUTONOMIA_MINIMA_EMERGENCIA_HR = 6.0
+
 def _curve_multiplier(curva: str) -> float:
     c = str(curva or "").strip().upper()
     if c == "MA":
@@ -113,11 +123,11 @@ def _defaults_icc_ge_aplicados(
 
 def calcular_derrateo_altitud(altitud_msnm: float) -> float:
     alt = float(altitud_msnm)
-    if alt > 4000:
-        raise ValueError("Altitud > 4000 msnm: consultar fabrica")
-    if alt <= 1500:
+    if alt > ALTITUD_MAX_DERRATEO_MSNM:
+        raise ValueError(f"Altitud > {ALTITUD_MAX_DERRATEO_MSNM:.0f} msnm: consultar fabrica")
+    if alt <= ALTITUD_BASE_DERRATEO_MSNM:
         return 1.0
-    factor = 1.0 - (0.04 * ((alt - 1500.0) / 300.0))
+    factor = 1.0 - (TASA_DERRATEO_POR_300M * ((alt - ALTITUD_BASE_DERRATEO_MSNM) / 300.0))
     return round(max(factor, 0.01), 4)
 
 
@@ -361,7 +371,7 @@ def calcular_autonomia(
         "uso_pct": round(uso_pct, 3),
         "consumo_estimado_galhr": round(consumo, 3),
         "autonomia_hr": round(autonomia, 3),
-        "autonomia_ok": autonomia >= 6.0,
+        "autonomia_ok": autonomia >= AUTONOMIA_MINIMA_EMERGENCIA_HR,
     }
 
 
