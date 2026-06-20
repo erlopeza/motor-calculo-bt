@@ -197,3 +197,41 @@ def test_exportar_json_epc_incluye_nivel_final_sin_defaults():
         payload = json.load(fh)
     assert payload["nivel_emision"] == "FINAL"
     assert payload["apto_emision"] is True
+
+
+# --- P0.3: seccion de alcance y supuestos ---
+
+def test_memoria_incluye_seccion_alcance_supuestos():
+    """P0.3: la memoria DOCX debe declarar alcance, supuestos y limitaciones."""
+    from docx import Document as DocxDocument
+
+    ruta = generar_memoria_docx(_datos_run_base(), _circuitos_base(), str(_tmp_dir()))
+    doc = DocxDocument(ruta)
+    textos = [p.text for p in doc.paragraphs]
+    texto_completo = "\n".join(textos)
+
+    assert "Alcance y Supuestos" in texto_completo
+    assert "IEC 60909-2" in texto_completo
+    assert "Limitaciones" in texto_completo
+
+
+def test_memoria_alcance_menciona_impedancia_compleja():
+    """La sección de alcance debe indicar el modelo R+jX."""
+    from docx import Document as DocxDocument
+
+    ruta = generar_memoria_docx(_datos_run_base(), _circuitos_base(), str(_tmp_dir()))
+    doc = DocxDocument(ruta)
+    texto_completo = "\n".join(p.text for p in doc.paragraphs)
+
+    assert "R + jX" in texto_completo or "R+jX" in texto_completo
+
+
+def test_memoria_alcance_menciona_rango_valido():
+    """La sección de alcance debe declarar el rango de validez."""
+    from docx import Document as DocxDocument
+
+    ruta = generar_memoria_docx(_datos_run_base(), _circuitos_base(), str(_tmp_dir()))
+    doc = DocxDocument(ruta)
+    texto_completo = "\n".join(p.text for p in doc.paragraphs)
+
+    assert "1000 V" in texto_completo or "1.5 mm" in texto_completo

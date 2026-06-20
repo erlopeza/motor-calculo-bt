@@ -224,6 +224,50 @@ def _insertar_grafico_docx(doc: Document, titulo: str, ruta_imagen: str) -> None
     doc.add_picture(ruta_imagen, width=Inches(6.5))
 
 
+def _agregar_seccion_alcance_supuestos(doc: Document) -> None:
+    """Sección fija P0.3: alcance, supuestos y limitaciones del modelo de cálculo."""
+    doc.add_heading("Alcance y Supuestos del Modelo de Cálculo", level=1)
+
+    doc.add_heading("Ámbito de aplicación", level=2)
+    doc.add_paragraph(
+        "El presente cálculo aplica a instalaciones de baja tensión (BT) "
+        "hasta 1000 V, 50 Hz, según normativa chilena SEC/NCh e internacional IEC."
+    )
+
+    doc.add_heading("Modelo de impedancia de cable", level=2)
+    doc.add_paragraph(
+        "Impedancia compleja Z = R + jX por tramo de conductor:\n"
+        "  R = ρ × L / (S × n_paralelos)  [IEC 60228, ρ_Cu = 0.0175 Ω·mm²/m]\n"
+        "  X interpolado de tabla IEC 60909-2:2008 Tabla B.1 (50 Hz, Cu, conduit/bandeja)"
+    )
+
+    doc.add_heading("Cortocircuito", level=2)
+    doc.add_paragraph(
+        "Método: IEC 60909 con factores c_max = 1.05 / c_min = 0.95.\n"
+        "Se calculan Icc trifásica (3F) e Icc fase-neutro (IEC 60364-4-41) en cada punto.\n"
+        "Aporte de motores (IEC 60909-4:2021): disponible por llamada explícita a "
+        "calcular_icc_con_aporte_motores(); no incluido por defecto en esta memoria."
+    )
+
+    doc.add_heading("Rango de validez", level=2)
+    doc.add_paragraph(
+        "• Tensión de sistema: 220 V (1F/2F) o 380 V (3F) fase-línea.\n"
+        "• Sección de conductor: 1.5 mm² a 500 mm² (Cu) o equivalente AWG.\n"
+        "• Longitud de tramo: sin límite superior, con X ganando peso relativo > 50 m.\n"
+        "• Temperatura de referencia para R: 20°C (IEC 60228); corrección por temperatura\n"
+        "  disponible en calculos.py (NEC Table 310.15(B)(1))."
+    )
+
+    doc.add_heading("Limitaciones conocidas", level=2)
+    doc.add_paragraph(
+        "• Impedancia de transformador: tratada como puramente resistiva en esta versión\n"
+        "  (X_trafo no incluida; error < 2% en BT típico).\n"
+        "• Sin aporte de motores activado en el cálculo base de esta memoria.\n"
+        "• Sin análisis nodal de flujo de carga acoplado (calculista por circuito).\n"
+        "• Sin Arc Flash IEEE 1584-2018 (previsto en fase F2 del roadmap)."
+    )
+
+
 def generar_memoria_docx(
     datos_run: dict,
     circuitos: list,
@@ -276,6 +320,8 @@ def generar_memoria_docx(
     cita_dv = _criterio_normativo("calculos", "limite_dv")
     if cita_dv:
         doc.add_paragraph(f"Criterio aplicado: {cita_dv}")
+
+    _agregar_seccion_alcance_supuestos(doc)
 
     transformador = datos_run.get("transformador") or {}
     if transformador:
