@@ -89,6 +89,30 @@ class TestEnergiaIncidente:
         res = calcular_energia_incidente(10.0, 0.2, 610.0, V_kV=0.48, G_mm=32.0)
         assert res.get("Cf") == pytest.approx(1.5, abs=0.01)
 
+    def test_exponente_distancia_open_es_2(self):
+        """#2: 'open' usa x=2.0 → E(305)/E(610) = (610/305)^2 = 4.0.
+
+        En la razón, K1/K2/Cf/En se cancelan, aislando el exponente x.
+        """
+        e_cerca = calcular_energia_incidente(10.0, 0.2, 305.0, 0.48, 32.0, config="open")
+        e_lejos = calcular_energia_incidente(10.0, 0.2, 610.0, 0.48, 32.0, config="open")
+        razon = e_cerca["E_cal_cm2"] / e_lejos["E_cal_cm2"]
+        assert razon == pytest.approx(2.0 ** 2.0, rel=1e-3)
+
+    def test_exponente_distancia_box_es_1_473(self):
+        """#2: 'box' (tablero BT) usa x≈1.473 → razón = 2^1.473 ≈ 2.776.
+
+        Antes del fix usaba x=2.0 (inconsistente con K1 de gabinete).
+        """
+        e_cerca = calcular_energia_incidente(10.0, 0.2, 305.0, 0.48, 32.0, config="box")
+        e_lejos = calcular_energia_incidente(10.0, 0.2, 610.0, 0.48, 32.0, config="box")
+        razon = e_cerca["E_cal_cm2"] / e_lejos["E_cal_cm2"]
+        assert razon == pytest.approx(2.0 ** 1.473, rel=1e-3)
+
+    def test_resultado_reporta_exponente_x(self):
+        res = calcular_energia_incidente(10.0, 0.2, 610.0, 0.48, 32.0, config="box")
+        assert res["x_distancia"] == pytest.approx(1.473, abs=1e-3)
+
 
 # ---------------------------------------------------------------------------
 # calcular_frontera_arco

@@ -23,9 +23,21 @@ import math
 _CF_BT = 1.5   # V ≤ 1 kV
 _CF_MT = 1.0   # V > 1 kV
 
-# Distancia de referencia y exponente — IEEE 1584-2002 §4.8
+# Distancia de referencia — IEEE 1584-2002 §4.8
 _D_REF_MM = 610.0
-_X_DISTANCIA = 2.0        # bus abierto o gabinete ≤ 600V
+
+# Exponente de distancia x por configuración — IEEE 1584-2002 Tabla 4 (≤1 kV)
+#   open  : aire abierto / cable        → 2.000
+#   box   : tablero/switchgear cerrado  → 1.473
+# Debe ser coherente con K1 (que también depende de la configuración).
+_X_DISTANCIA = {
+    "open": 2.000,
+    "box":  1.473,
+}
+
+
+def _exponente_x(config: str) -> float:
+    return _X_DISTANCIA.get(config.lower(), _X_DISTANCIA["open"])
 
 # Energía de inicio de quemadura 2° grado — IEEE 1584-2002 §4.10 / NFPA 70E
 _EI_DEFAULT_CAL_CM2 = 1.2
@@ -138,21 +150,23 @@ def calcular_energia_incidente(
     v = float(V_kV)
 
     Cf = _CF_BT if v <= 1.0 else _CF_MT
+    x = _exponente_x(config)
 
     log_en = K1 + K2 + 1.081 * math.log10(ia) + 0.0011 * g
     En = 10 ** log_en  # cal/cm² a t=0.2s, D=610mm
 
-    E = 4.184 * Cf * En * (t / 0.2) * (_D_REF_MM / d) ** _X_DISTANCIA
+    E = 4.184 * Cf * En * (t / 0.2) * (_D_REF_MM / d) ** x
     E = round(E, 4)
 
     return {
-        "E_cal_cm2":  E,
-        "En_cal_cm2": round(En, 6),
-        "Cf":         Cf,
-        "t_s":        t,
-        "D_mm":       d,
-        "Ia_kA":      ia,
-        "norma":      _NORMA_CALCULO,
+        "E_cal_cm2":   E,
+        "En_cal_cm2":  round(En, 6),
+        "Cf":          Cf,
+        "x_distancia": x,
+        "t_s":         t,
+        "D_mm":        d,
+        "Ia_kA":       ia,
+        "norma":       _NORMA_CALCULO,
     }
 
 
@@ -185,6 +199,7 @@ def calcular_frontera_arco(
     K1 = -0.792 if config.lower() == "open" else -0.555
     K2 = -0.113
     Cf = _CF_BT if v <= 1.0 else _CF_MT
+    x = _exponente_x(config)
 
     log_en = K1 + K2 + 1.081 * math.log10(ia) + 0.0011 * g
     En = 10 ** log_en
@@ -193,7 +208,7 @@ def calcular_frontera_arco(
     if argumento <= 0:
         D_afb = 0.0
     else:
-        D_afb = _D_REF_MM * (argumento ** (1.0 / _X_DISTANCIA))
+        D_afb = _D_REF_MM * (argumento ** (1.0 / x))
 
     return {
         "D_afb_mm":    round(D_afb, 1),
