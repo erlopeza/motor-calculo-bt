@@ -12,8 +12,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -30,11 +29,10 @@ class Bus:
     Cargas se ingresan como P_kW < 0, Q_kVAR < 0.
     """
     id: str
-    tipo: str           # "slack" | "PQ" | "PV"
+    tipo: str           # "slack" | "PQ"  (PV no soportado, ver Red.__init__)
     P_kW: float = 0.0   # potencia activa inyectada (kW)
     Q_kVAR: float = 0.0 # potencia reactiva inyectada (kVAR)
-    V_pu: float = 1.0   # tensión inicial (fijada para slack/PV, estimada PQ)
-    V_base_kV: float = 0.38
+    V_pu: float = 1.0   # tensión inicial (fijada para slack, estimada para PQ)
 
 
 @dataclass

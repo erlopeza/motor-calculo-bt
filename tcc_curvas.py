@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import json
-import math
 from pathlib import Path
 from typing import Optional
 
@@ -45,10 +44,13 @@ def listar_disponibles() -> dict[str, list[str]]:
     return resultado
 
 
-def buscar_curva(tipo: str, modelo: str, fabricante: str = "generico") -> Optional[dict]:
+def buscar_curva(tipo: str, modelo: str) -> Optional[dict]:
     """Busca una curva en el catálogo por tipo + modelo (insensible a mayúsculas).
 
     Retorna el dict de la entrada o None si no existe.
+
+    Nota: el catálogo incluye un campo 'fabricante' (hoy solo "generico").
+    El filtrado por fabricante se añadirá cuando existan curvas propietarias.
     """
     tipo_n = tipo.upper()
     modelo_n = modelo.upper()
