@@ -93,6 +93,28 @@ class TestModeloDatos:
                 ramas=[Rama("B0", "B1", 0.05, 0.02)],
             )
 
+    def test_rama_con_bus_inexistente_lanza_valueerror(self):
+        """#6: una rama que referencia un bus inexistente debe fallar claro."""
+        with pytest.raises(ValueError):
+            Red(
+                buses=[
+                    Bus(id="B0", tipo="slack"),
+                    Bus(id="B1", tipo="PQ", P_kW=-10.0),
+                ],
+                ramas=[Rama("B0", "FANTASMA", 0.05, 0.02)],
+            )
+
+    def test_pv_no_soportado_lanza_error(self):
+        """#1: PV no implementado — debe rechazarse explícitamente."""
+        with pytest.raises((ValueError, NotImplementedError)):
+            Red(
+                buses=[
+                    Bus(id="B0", tipo="slack"),
+                    Bus(id="B1", tipo="PV", P_kW=20.0),
+                ],
+                ramas=[Rama("B0", "B1", 0.05, 0.02)],
+            )
+
 
 # ---------------------------------------------------------------------------
 # Y-bus

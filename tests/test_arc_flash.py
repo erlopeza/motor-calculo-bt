@@ -198,3 +198,33 @@ class TestIntegracionArcFlash:
         )
         # Con Icc baja y disparo instantáneo, energía debe ser muy baja
         assert res["E_cal_cm2"] < 10.0
+
+
+# ---------------------------------------------------------------------------
+# Guardas de dominio (#3)
+# ---------------------------------------------------------------------------
+
+class TestGuardasDominio:
+    def test_ibf_cero_lanza_valueerror(self):
+        with pytest.raises(ValueError):
+            calcular_corriente_arco(Ibf_kA=0.0, V_kV=0.48, G_mm=32.0)
+
+    def test_ibf_negativo_lanza_valueerror(self):
+        with pytest.raises(ValueError):
+            calcular_corriente_arco(Ibf_kA=-5.0, V_kV=0.48, G_mm=32.0)
+
+    def test_ia_cero_en_energia_lanza_valueerror(self):
+        with pytest.raises(ValueError):
+            calcular_energia_incidente(Ia_kA=0.0, t_s=0.1, D_mm=610.0, V_kV=0.48, G_mm=32.0)
+
+    def test_distancia_cero_lanza_valueerror(self):
+        with pytest.raises(ValueError):
+            calcular_energia_incidente(Ia_kA=10.0, t_s=0.1, D_mm=0.0, V_kV=0.48, G_mm=32.0)
+
+    def test_tiempo_negativo_lanza_valueerror(self):
+        with pytest.raises(ValueError):
+            calcular_energia_incidente(Ia_kA=10.0, t_s=-0.1, D_mm=610.0, V_kV=0.48, G_mm=32.0)
+
+    def test_ei_cero_en_frontera_lanza_valueerror(self):
+        with pytest.raises(ValueError):
+            calcular_frontera_arco(Ia_kA=10.0, t_s=0.2, V_kV=0.48, G_mm=32.0, Ei_cal_cm2=0.0)

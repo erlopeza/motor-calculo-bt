@@ -63,11 +63,33 @@ class Red:
         if len(slacks) != 1:
             raise ValueError(f"La red debe tener exactamente 1 bus slack, tiene {len(slacks)}")
 
+        # PV no implementado: el solver trata todo bus no-slack como PQ.
+        # Aceptar un PV daría resultados incorrectos en silencio → rechazar.
+        pv = [b.id for b in buses if b.tipo == "PV"]
+        if pv:
+            raise NotImplementedError(
+                f"Buses tipo PV no soportados (solver solo slack/PQ): {pv}"
+            )
+
+        no_validos = [b.id for b in buses if b.tipo not in ("slack", "PQ")]
+        if no_validos:
+            raise ValueError(f"Tipo de bus no válido en {no_validos}: usar 'slack' o 'PQ'")
+
         self.buses = list(buses)
         self.ramas = list(ramas)
         self.S_base_kVA = float(S_base_kVA)
         self.V_base_kV = float(V_base_kV)
         self._idx: dict[str, int] = {b.id: i for i, b in enumerate(buses)}
+
+        # Validar que cada rama referencie buses existentes
+        ids = set(self._idx)
+        for rama in self.ramas:
+            faltantes = {rama.from_bus, rama.to_bus} - ids
+            if faltantes:
+                raise ValueError(
+                    f"Rama {rama.from_bus}->{rama.to_bus} referencia bus(es) "
+                    f"inexistente(s): {sorted(faltantes)}"
+                )
 
     @property
     def Z_base_ohm(self) -> float:

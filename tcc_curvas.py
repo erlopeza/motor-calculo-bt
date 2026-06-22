@@ -85,6 +85,11 @@ def calcular_tiempo_tcc(
         dispara : bool | None
         nota    : str
     """
+    if float(In_A) <= 0:
+        raise ValueError(
+            f"In_A (corriente nominal/pickup) debe ser > 0, se recibió {In_A}"
+        )
+
     entrada = buscar_curva(tipo, modelo)
     if entrada is None:
         return {

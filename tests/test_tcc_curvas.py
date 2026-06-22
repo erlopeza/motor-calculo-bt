@@ -205,3 +205,21 @@ class TestTccIEC60255:
         res = calcular_tiempo_tcc(500, 100, tipo="FICTICIO", modelo="X")
         assert res["t_s"] is None
         assert res["dispara"] is False
+
+
+# ---------------------------------------------------------------------------
+# Guardas de dominio (#3)
+# ---------------------------------------------------------------------------
+
+class TestGuardasDominio:
+    def test_in_cero_iec60898_lanza_valueerror(self):
+        with pytest.raises(ValueError):
+            calcular_tiempo_tcc(500, In_A=0.0, tipo="IEC60898", modelo="C")
+
+    def test_in_negativo_iec60898_lanza_valueerror(self):
+        with pytest.raises(ValueError):
+            calcular_tiempo_tcc(500, In_A=-10.0, tipo="IEC60898", modelo="C")
+
+    def test_is_cero_idmt_lanza_valueerror(self):
+        with pytest.raises(ValueError):
+            calcular_tiempo_tcc(500, In_A=0.0, tipo="IEC60255", modelo="NI", tms=1.0)

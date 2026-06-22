@@ -67,6 +67,9 @@ def calcular_corriente_arco(
 
     Retorna dict con Ia_kA, Ibf_kA, V_kV, G_mm, config, norma.
     """
+    if float(Ibf_kA) <= 0:
+        raise ValueError(f"Ibf_kA debe ser > 0, se recibió {Ibf_kA}")
+
     # K depende de configuración — IEEE 1584-2002 §4.2
     K = -0.153 if config.lower() == "open" else -0.097
 
@@ -116,6 +119,13 @@ def calcular_energia_incidente(
         G_mm   : separación entre conductores en mm
         config : "open" | "box"
     """
+    if float(Ia_kA) <= 0:
+        raise ValueError(f"Ia_kA debe ser > 0, se recibió {Ia_kA}")
+    if float(t_s) < 0:
+        raise ValueError(f"t_s (tiempo de despeje) no puede ser negativo, se recibió {t_s}")
+    if float(D_mm) <= 0:
+        raise ValueError(f"D_mm (distancia de trabajo) debe ser > 0, se recibió {D_mm}")
+
     # K1 — IEEE 1584-2002 §4.5 (en función de configuración)
     K1 = -0.792 if config.lower() == "open" else -0.555
     # K2 — §4.5 (grounding; usamos neutro solidamente puesto a tierra como conservador)
@@ -161,6 +171,11 @@ def calcular_frontera_arco(
 
     D_afb = 610 × (4.184 × Cf × En × (t/0.2) / Ei)^(1/x)
     """
+    if float(Ia_kA) <= 0:
+        raise ValueError(f"Ia_kA debe ser > 0, se recibió {Ia_kA}")
+    if float(Ei_cal_cm2) <= 0:
+        raise ValueError(f"Ei_cal_cm2 (umbral) debe ser > 0, se recibió {Ei_cal_cm2}")
+
     ia = float(Ia_kA)
     t = float(t_s)
     v = float(V_kV)
