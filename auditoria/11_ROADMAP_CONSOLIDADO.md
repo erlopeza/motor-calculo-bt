@@ -36,7 +36,7 @@ Esfuerzo S/M/L/XL · Valor ★–★★★.
 | P1.1 | **Arc Flash IEEE 1584-2002** (modelo BT) | ETAP | Diferenciador | M | ★★★ | P0.1, coordinacion.py | ✅ sesión | F2 |
 | P1.2 | **Librería de curvas TCC** (IEC 60898 + IEC 60255 IDMT) | ETAP | Diferenciador | M | ★★★ | DATA-3 | ✅ sesión | F2 |
 | P1.3 | Refuerzo de coordinación (márgenes, back-up) | ETAP | Diferenciador | S–M | ★★ | P1.2 | ✅ sesión | F2 |
-| P2.1 | **Flujo de carga nodal** (bus/rama + Newton-Raphson) | ETAP | Arquitectura | L–XL | ★★★ | F0 completa | 🟡 | F3 |
+| P2.1 | **Flujo de carga nodal** (bus/rama + Newton-Raphson) | ETAP | Arquitectura | L–XL | ★★★ | F0 completa | ✅ sesión | F3 |
 | P3.x | Ground Grid (IEEE 80) · DC · ANSI SC · Armónicos | ETAP | Expansión | M–L | ★–★★ | mercado | ⏸️ | F4 |
 | — | Transitorios · OPF · RA · VFD/PV | ETAP | — | XL | ★ | — | ❌ descartado | — |
 | DATA-1 | Tabla de reactancia X por conductor (IEC 60909-2 / NEC Ch.9) | Insumo | Datos | S | — | — | ✅ sesión | F1 |
@@ -62,10 +62,10 @@ Esfuerzo S/M/L/XL · Valor ★–★★★.
 - P1.1 Arc Flash IEEE 1584 (usa Icc + tiempo de despeje existentes), P1.2 librería de curvas TCC (+DATA-3), P1.3 refuerzo de coordinación.
 - **Hito 2 "listo cuando":** la memoria incluye energía incidente/frontera de arco y coordinación con curvas reales de fabricante.
 
-### Fase 3 — Análisis de red (P2) · *salto estratégico*
+### Fase 3 — Análisis de red (P2) · *salto estratégico* · ✅ completada
 **Objetivo:** pasar de determinista por circuito a red acoplada.
-- P2.1 refactor del modelo de datos (lista de circuitos → grafo bus/rama) + solucionador Newton-Raphson sobre `numpy`/`scipy.sparse`.
-- **Hito 3 "listo cuando":** flujo de carga nodal validado contra casos de referencia; convive con el modo simplificado actual.
+- P2.1 ✅ `flujo_nodal.py`: modelo bus/rama + Y-bus + solver Newton-Raphson polar sobre `numpy` denso (suficiente para redes BT < 100 buses; `scipy.sparse` queda como mejora futura para redes grandes).
+- **Hito 3 "listo cuando":** ✅ flujo de carga nodal con balance de potencia y pérdidas por rama verificados (33 tests); convive con el modo simplificado actual sin tocarlo.
 
 ### Fase 4 — Expansión opcional (P3) · *según mercado*
 Ground Grid (IEEE 80), sistemas DC (datacenter), ANSI SC, armónicos — solo si la demanda lo justifica.
