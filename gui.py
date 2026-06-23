@@ -941,6 +941,8 @@ class MotorCalculoBT:
                             "icc_ka": c.get("Icc_kA"),
                             "estado": estado,
                             "observaciones": c.get("nivel_icc"),
+                            "In_A": self.protecciones.get(c.get("nombre"), {}).get("In_A"),
+                            "curva": self.protecciones.get(c.get("nombre"), {}).get("curva"),
                         }
                     )
 
@@ -953,6 +955,23 @@ class MotorCalculoBT:
                         max_dv_pct = dV_pct
                     if c.get("Icc_kA", 0.0) > max_icc_ka:
                         max_icc_ka = c.get("Icc_kA", 0.0)
+
+                # Icc en barra del transformador para Arc Flash
+                _icc_barra_ka = 0.0
+                try:
+                    if self.datos_trafo:
+                        if self.datos_trafo.get("modo") == "A":
+                            _icc_barra_ka, _, _ = calcular_icc_transformador(
+                                self.datos_trafo["kVA"],
+                                self.datos_trafo["Vn_BT"],
+                                self.datos_trafo["Ucc_pct"],
+                            )
+                        else:
+                            _icc_barra_ka, _, _ = icc_desde_tabla(
+                                self.datos_trafo["kVA"]
+                            )
+                except Exception:
+                    _icc_barra_ka = 0.0
 
                 datos_run = {
                     "project_id": self.nombre_proyecto.get() or "PROYECTO",
@@ -969,6 +988,19 @@ class MotorCalculoBT:
                     "ruta_reporte_txt": None,
                     "ruta_reporte_xlsx": None,
                     "circuitos": circuitos_persistencia,
+                    "icc_barra_ka": float(_icc_barra_ka) if _icc_barra_ka else 0.0,
+                    "proteccion_cabecera": next(
+                        (
+                            {"In_A": p.get("In_A"), "curva": p.get("curva")}
+                            for p in (
+                                self.protecciones.values()
+                                if isinstance(self.protecciones, dict)
+                                else []
+                            )
+                            if p.get("nivel", 1) == 0
+                        ),
+                        {},
+                    ),
                 }
                 try:
                     carpeta_salida = os.getcwd()
