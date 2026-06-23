@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import math
 
+import coordinacion
+
 
 # ============================================================
 # CONSTANTES NORMATIVAS
@@ -292,4 +294,67 @@ def calcular_arc_flash_completo(
         "categoria_ppe": ppe_res["categoria"],
         "estado_ppe":   ppe_res["estado"],
         "norma":        _NORMA_CALCULO,
+    }
+
+
+def arc_flash_desde_proteccion(
+    Ibf_kA: float,
+    V_kV: float,
+    In_A: float,
+    curva: str,
+    *,
+    G_mm: float = 32.0,
+    D_mm: float = 455.0,
+    config: str = "box",
+    t_techo_s: float = 2.0,
+) -> dict:
+    """Arc Flash con tiempo de despeje evaluado en la corriente de arco Ia.
+
+    La corriente de arco Ia es menor que la de falla franca Ibf, por lo que la
+    protección puede tardar más en despejar (IEEE 1584 exige evaluar en Ia).
+
+    Resolución del tiempo según la región de disparo a Ia:
+      instantaneo / termico / tiempo_corto / idmt -> t del dispositivo
+      verificar_simaris (ETU propietaria)          -> t_techo + bandera verificar_simaris
+      no_dispara / t indefinido                    -> t_techo + bandera despeje_incierto
+
+    Defaults G/D/config: típicos IEEE 1584-2002 para tablero BT cerrado.
+    """
+    ia_res = calcular_corriente_arco(Ibf_kA, V_kV, G_mm, config)
+    Ia_kA = ia_res["Ia_kA"]
+
+    disp = coordinacion.calcular_tiempo_disparo(Ia_kA * 1000.0, In_A, curva)
+    region = disp["region"]
+    despeje_incierto = False
+    verificar_simaris = False
+
+    if region in ("instantaneo", "termico", "tiempo_corto", "idmt"):
+        t = disp["t_s"]
+    elif region == "verificar_simaris":
+        t = t_techo_s
+        verificar_simaris = True
+    else:  # no_dispara u otro
+        t = t_techo_s
+        despeje_incierto = True
+
+    if t is None:  # dispara pero sin tiempo determinado (defensivo)
+        t = t_techo_s
+        despeje_incierto = True
+
+    af = calcular_arc_flash_completo(
+        Ibf_kA, V_kV, G_mm, t_s=float(t), D_mm=D_mm, config=config
+    )
+
+    return {
+        "Ibf_kA":            float(Ibf_kA),
+        "Ia_kA":             Ia_kA,
+        "t_despeje_s":       round(float(t), 4),
+        "region_despeje":    region,
+        "E_cal_cm2":         af["E_cal_cm2"],
+        "D_afb_mm":          af["D_afb_mm"],
+        "categoria_ppe":     af["categoria_ppe"],
+        "estado_ppe":        af["estado_ppe"],
+        "despeje_incierto":  despeje_incierto,
+        "verificar_simaris": verificar_simaris,
+        "norma":             af["norma"],
     }
