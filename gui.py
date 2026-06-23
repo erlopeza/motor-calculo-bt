@@ -991,13 +991,9 @@ class MotorCalculoBT:
                     "icc_barra_ka": float(_icc_barra_ka) if _icc_barra_ka else 0.0,
                     "proteccion_cabecera": next(
                         (
-                            {"In_A": p.get("In_A"), "curva": p.get("curva")}
-                            for p in (
-                                self.protecciones.values()
-                                if isinstance(self.protecciones, dict)
-                                else []
-                            )
-                            if p.get("nivel", 1) == 0
+                            {"In_A": d.get("In_A"), "curva": d.get("curva")}
+                            for d in (self.cadena_datos or [])
+                            if d.get("nivel", 1) == 0
                         ),
                         {},
                     ),
