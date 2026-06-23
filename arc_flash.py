@@ -314,10 +314,14 @@ def arc_flash_desde_proteccion(
     protección puede tardar más en despejar (IEEE 1584 exige evaluar en Ia).
 
     Resolución del tiempo según la región de disparo a Ia:
-      instantaneo / termico / tiempo_corto / idmt -> t del dispositivo
-      verificar_simaris (ETU propietaria)          -> t_techo + bandera verificar_simaris
-      no_dispara / t indefinido                    -> t_techo + bandera despeje_incierto
+      instantaneo / termico / tiempo_corto -> t del dispositivo
+      verificar_simaris (ETU propietaria)   -> t_techo + bandera verificar_simaris
+      no_dispara / t indefinido             -> t_techo + bandera despeje_incierto
+    ("idmt" se incluye en la guarda por compatibilidad futura; hoy
+    coordinacion.calcular_tiempo_disparo no produce esa región.)
 
+    t_techo_s: límite práctico de duración del arco para acotar la energía
+    cuando la protección no despeja (convención IEEE 1584; default 2 s).
     Defaults G/D/config: típicos IEEE 1584-2002 para tablero BT cerrado.
     """
     ia_res = calcular_corriente_arco(Ibf_kA, V_kV, G_mm, config)
@@ -341,6 +345,8 @@ def arc_flash_desde_proteccion(
         t = t_techo_s
         despeje_incierto = True
 
+    # calcular_arc_flash_completo recomputa Ia internamente desde Ibf;
+    # es idéntica (fórmula determinista), no hay discrepancia posible.
     af = calcular_arc_flash_completo(
         Ibf_kA, V_kV, G_mm, t_s=float(t), D_mm=D_mm, config=config
     )

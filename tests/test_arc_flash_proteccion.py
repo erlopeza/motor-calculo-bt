@@ -33,3 +33,10 @@ class TestPuenteArcFlash:
     def test_techo_parametrizable(self):
         r = arc_flash_desde_proteccion(2.0, 0.4, 4000, "C", t_techo_s=1.0)
         assert r["t_despeje_s"] == pytest.approx(1.0, abs=1e-6)
+
+    def test_verificar_simaris_aplica_techo_y_bandera(self):
+        # ETU en región térmica propietaria → verificar_simaris + techo
+        r = arc_flash_desde_proteccion(Ibf_kA=5.0, V_kV=0.4, In_A=100, curva="ETU600")
+        assert r["verificar_simaris"] is True
+        assert r["despeje_incierto"] is False
+        assert r["t_despeje_s"] == pytest.approx(2.0, abs=1e-6)
