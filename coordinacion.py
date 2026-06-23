@@ -21,9 +21,6 @@ from tcc_curvas import get_k_iec60898
 # Fuente: catálogo DATA-3 vía tcc_curvas (fuente única).
 # TM es aproximación IEC 60947-2 (no es curva IEC 60898).
 # ============================================================
-
-# Constante térmica k: B/C/D provienen del catálogo DATA-3 (fuente única);
-# TM es aproximación IEC 60947-2 (no es curva IEC 60898).
 K_CURVA = {
     "B": get_k_iec60898("B"),
     "C": get_k_iec60898("C"),
