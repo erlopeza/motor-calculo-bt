@@ -268,7 +268,7 @@ def _agregar_seccion_alcance_supuestos(doc: Document) -> None:
     )
 
 
-def _agregar_seccion_arc_flash(doc, datos_run: dict, circuitos: list) -> None:
+def _agregar_seccion_arc_flash(doc: Document, datos_run: dict, circuitos: list) -> None:
     """Seccion de Arc Flash (IEEE 1584): barra principal + tabla por circuito."""
     from arc_flash import arc_flash_desde_proteccion
     from conductores import TENSION_SISTEMA
@@ -278,7 +278,8 @@ def _agregar_seccion_arc_flash(doc, datos_run: dict, circuitos: list) -> None:
     # --- Barra principal ---
     icc_barra = datos_run.get("icc_barra_ka")
     cab = datos_run.get("proteccion_cabecera") or {}
-    v_barra_kv = float(datos_run.get("tension_barra_kv", 0.4))
+    # Tensión de barra coherente con la usada por circuito (TENSION_SISTEMA, en kV).
+    v_barra_kv = float(datos_run.get("tension_barra_kv") or TENSION_SISTEMA.get("3F", 380) / 1000.0)
     if icc_barra and cab.get("In_A") and cab.get("curva"):
         r = arc_flash_desde_proteccion(
             float(icc_barra), v_barra_kv, cab["In_A"], cab["curva"]
@@ -299,7 +300,9 @@ def _agregar_seccion_arc_flash(doc, datos_run: dict, circuitos: list) -> None:
 
     # --- Tabla por circuito ---
     con_prot = [c for c in circuitos if c.get("In_A") and c.get("curva") and c.get("icc_ka")]
-    sin_prot = [c for c in circuitos if not (c.get("In_A") and c.get("curva"))]
+    # Complemento exacto de con_prot: incluye también los que tienen protección
+    # pero les falta icc_ka (no quedan en el limbo, se reportan como omitidos).
+    sin_prot = [c for c in circuitos if not (c.get("In_A") and c.get("curva") and c.get("icc_ka"))]
 
     if con_prot:
         doc.add_heading("Por circuito", level=2)
@@ -471,6 +474,7 @@ def generar_memoria_docx(
     try:
         _agregar_seccion_arc_flash(doc, datos_run, circuitos)
     except Exception as e:
+        print(f"[reporteria_sec] Arc Flash no disponible: {e}")
         doc.add_paragraph(f"[Análisis de Arco Eléctrico no disponible: {e}]")
 
     balance_demanda = datos_run.get("balance_demanda") or {}
