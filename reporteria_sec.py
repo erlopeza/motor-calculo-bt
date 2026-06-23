@@ -561,6 +561,7 @@ def exportar_json_epc(
     datos_run: dict,
     ruta_salida: str,
     modo_emision: str = "auto",
+    circuitos: list | None = None,
 ) -> str:
     """
     Exporta un JSON minimo para consumo EPC con nivel de emision SEC.
@@ -587,6 +588,25 @@ def exportar_json_epc(
         "parametros_default": gate.get("parametros_default") or [],
         "resultados": datos_run,
     }
+    if circuitos:
+        from arc_flash import arc_flash_desde_proteccion
+        from conductores import TENSION_SISTEMA
+        filas_af = []
+        for c in circuitos:
+            if not (c.get("In_A") and c.get("curva") and c.get("icc_ka")):
+                continue
+            v_kv = TENSION_SISTEMA.get(c.get("sistema", "3F"), 380) / 1000.0
+            r = arc_flash_desde_proteccion(float(c["icc_ka"]), v_kv, c["In_A"], c["curva"])
+            filas_af.append({
+                "nombre": c.get("nombre"),
+                "Ia_kA": r["Ia_kA"],
+                "t_despeje_s": r["t_despeje_s"],
+                "E_cal_cm2": r["E_cal_cm2"],
+                "D_afb_mm": r["D_afb_mm"],
+                "categoria_ppe": r["categoria_ppe"],
+                "despeje_incierto": r["despeje_incierto"],
+            })
+        payload["arc_flash"] = {"norma": "IEEE 1584-2002", "circuitos": filas_af}
     with open(ruta_json, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, ensure_ascii=False, indent=2, default=str)
     return str(ruta_json)

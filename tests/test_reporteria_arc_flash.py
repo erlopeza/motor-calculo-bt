@@ -98,3 +98,15 @@ def test_memoria_arc_flash_marca_despeje_incierto():
         for cell in row.cells
     ]
     assert any("⚠" in t for t in textos_tabla)
+
+
+def test_json_epc_incluye_arc_flash():
+    import json
+    from reporteria_sec import exportar_json_epc
+    ruta = exportar_json_epc(_datos_run(), _tmp(), circuitos=_circuitos_af())
+    with open(ruta, encoding="utf-8") as fh:
+        payload = json.load(fh)
+    assert "arc_flash" in payload
+    filas = payload["arc_flash"]["circuitos"]
+    assert any(f["nombre"] == "C-01" for f in filas)
+    assert filas[0]["E_cal_cm2"] >= 0
