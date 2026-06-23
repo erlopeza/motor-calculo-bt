@@ -57,10 +57,12 @@ Esfuerzo S/M/L/XL · Valor ★–★★★.
 - P0.1 reactancia de cable (+DATA-1), P0.2 aporte de motores (+DATA-2), P0.3 rango de validez.
 - **Hito 1 "listo cuando":** Icc y ΔV usan impedancia compleja con contribución de motores; cada memoria declara supuestos y límites de validez; tests de regresión cubren los nuevos cálculos.
 
-### Fase 2 — Diferenciador técnico (P1)
+### Fase 2 — Diferenciador técnico (P1) · ✅ completada e integrada
 **Objetivo:** capacidades de alto valor que reutilizan datos ya disponibles.
 - P1.1 Arc Flash IEEE 1584 (usa Icc + tiempo de despeje existentes), P1.2 librería de curvas TCC (+DATA-3), P1.3 refuerzo de coordinación.
-- **Hito 2 "listo cuando":** la memoria incluye energía incidente/frontera de arco y coordinación con curvas reales de fabricante.
+- **Hito 2 "listo cuando":** ✅ la memoria SEC incluye una sección de Arco Eléctrico (energía incidente, frontera, categoría EPP) — barra principal + tabla por circuito — con el tiempo de despeje evaluado en la corriente de arco Ia (puente `arc_flash_desde_proteccion`). La región térmica de coordinación usa fuente única de `k` (catálogo TCC). Ya no son motores aislados: están **integrados a `reporteria_sec` y a la GUI**.
+- **Validación:** ejecutado end-to-end sobre datos reales **LEO-ARICA** conformados al formato canónico (`tests/fixtures/leo_arica.xlsx`, `tests/test_integracion_leo_arica.py`). El código es genérico (multi-proyecto); LEO-ARICA entra solo como dato.
+- **Insumo descartado:** importador DWG/DXF — el spike mostró que los schedules viven como objetos OLE opacos; la vía correcta es el Excel fuente (ver spec `docs/superpowers/specs/2026-06-22-arc-flash-tcc-memoria-design.md`).
 
 ### Fase 3 — Análisis de red (P2) · *salto estratégico* · ✅ completada
 **Objetivo:** pasar de determinista por circuito a red acoplada.
