@@ -268,6 +268,25 @@ def _agregar_seccion_alcance_supuestos(doc: Document) -> None:
     )
 
 
+def enriquecer_circuitos_con_proteccion(circuitos: list, protecciones: dict) -> list:
+    """Devuelve copias de los circuitos con In_A/curva de su protección (por nombre).
+
+    `protecciones` es {nombre_circuito: {"In_A": .., "curva": .., ...}}.
+    Circuitos sin protección quedan sin In_A/curva. No muta la entrada.
+    """
+    salida = []
+    for c in circuitos:
+        c2 = dict(c)
+        prot = protecciones.get(c.get("nombre"))
+        if prot:
+            if prot.get("In_A"):
+                c2["In_A"] = prot["In_A"]
+            if prot.get("curva"):
+                c2["curva"] = prot["curva"]
+        salida.append(c2)
+    return salida
+
+
 def generar_memoria_docx(
     datos_run: dict,
     circuitos: list,
