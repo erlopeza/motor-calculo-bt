@@ -13,16 +13,21 @@
 
 import math
 
+from tcc_curvas import get_k_iec60898
+
 # ============================================================
 # CONSTANTES DE CURVAS IEC 60898
 # Constante k para la región térmica: t = k / (I/In)²
-# Fuente: IEC 60898-1 Tabla 6 (valores aproximados)
+# Fuente: catálogo DATA-3 vía tcc_curvas (fuente única).
+# TM es aproximación IEC 60947-2 (no es curva IEC 60898).
 # ============================================================
 
+# Constante térmica k: B/C/D provienen del catálogo DATA-3 (fuente única);
+# TM es aproximación IEC 60947-2 (no es curva IEC 60898).
 K_CURVA = {
-    "B": 45,    # disparo magnético: 3–5×In
-    "C": 80,    # disparo magnético: 5–10×In
-    "D": 180,   # disparo magnético: 10–20×In
+    "B": get_k_iec60898("B"),
+    "C": get_k_iec60898("C"),
+    "D": get_k_iec60898("D"),
     "TM": 100,  # termomagnético IEC 60947-2 (aproximación)
 }
 

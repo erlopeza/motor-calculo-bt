@@ -63,6 +63,17 @@ def buscar_curva(tipo: str, modelo: str) -> Optional[dict]:
     return None
 
 
+def get_k_iec60898(modelo: str) -> float:
+    """Constante térmica k de una curva IEC 60898 (t = k/(I/In)²).
+
+    Fuente única del valor de k para todo el sistema (coordinación, arco).
+    """
+    entrada = buscar_curva("IEC60898", modelo)
+    if entrada is None:
+        raise ValueError(f"Curva IEC60898 modelo '{modelo}' no está en el catálogo")
+    return float(entrada["parametros"]["k"])
+
+
 def calcular_tiempo_tcc(
     I_A: float,
     In_A: float,

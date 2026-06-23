@@ -223,3 +223,21 @@ class TestGuardasDominio:
     def test_is_cero_idmt_lanza_valueerror(self):
         with pytest.raises(ValueError):
             calcular_tiempo_tcc(500, In_A=0.0, tipo="IEC60255", modelo="NI", tms=1.0)
+
+
+class TestKtermicoFuenteUnica:
+    def test_get_k_valores_catalogo(self):
+        from tcc_curvas import get_k_iec60898
+        assert get_k_iec60898("B") == 45
+        assert get_k_iec60898("C") == 80
+        assert get_k_iec60898("D") == 180
+
+    def test_get_k_insensible_mayusculas(self):
+        from tcc_curvas import get_k_iec60898
+        assert get_k_iec60898("c") == 80
+
+    def test_get_k_curva_inexistente_lanza(self):
+        from tcc_curvas import get_k_iec60898
+        import pytest
+        with pytest.raises(ValueError):
+            get_k_iec60898("Z")
