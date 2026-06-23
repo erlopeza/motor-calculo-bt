@@ -289,7 +289,7 @@ def _agregar_seccion_arc_flash(doc, datos_run: dict, circuitos: list) -> None:
             f"Ibf={r['Ibf_kA']:.2f} kA - Ia={r['Ia_kA']:.2f} kA - "
             f"t_despeje={r['t_despeje_s']:.3f} s - E={r['E_cal_cm2']:.2f} cal/cm2 - "
             f"Frontera={r['D_afb_mm']:.0f} mm - {cat}"
-            + ("  despeje incierto" if r["despeje_incierto"] else "")
+            + ("  ⚠ despeje incierto" if r["despeje_incierto"] else "")
         )
     else:
         doc.add_paragraph(
@@ -313,7 +313,7 @@ def _agregar_seccion_arc_flash(doc, datos_run: dict, circuitos: list) -> None:
             r = arc_flash_desde_proteccion(
                 float(c["icc_ka"]), v_kv, c["In_A"], c["curva"]
             )
-            marca = " W" if (r["despeje_incierto"] or r["verificar_simaris"]) else ""
+            marca = " ⚠" if (r["despeje_incierto"] or r["verificar_simaris"]) else ""
             cat = "PELIGRO" if r["categoria_ppe"] is None else str(r["categoria_ppe"])
             celdas = tabla.add_row().cells
             celdas[0].text = str(c.get("nombre", ""))

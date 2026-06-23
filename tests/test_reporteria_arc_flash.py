@@ -76,3 +76,25 @@ def test_memoria_arc_flash_lista_circuitos_sin_proteccion():
     doc = DocxDocument(ruta)
     texto = "\n".join(p.text for p in doc.paragraphs)
     assert "C-02-SIN-PROT" in texto
+
+
+def test_memoria_arc_flash_marca_despeje_incierto():
+    """Un circuito cuya protección no despeja a Ia debe marcarse con ⚠ en la tabla."""
+    from docx import Document as DocxDocument
+    from reporteria_sec import generar_memoria_docx
+    # icc baja + In enorme → no_dispara a Ia → despeje_incierto
+    circuitos = [{
+        "nombre": "C-INC", "conductor": "16mm2", "S_mm2": 16.0, "I_diseno": 40.0,
+        "I_max": 76.0, "cos_phi": 0.9, "L_m": 30.0, "paralelos": 1, "sistema": "3F",
+        "dv_v": 1.0, "dv_pct": 0.4, "icc_ka": 2.0, "estado": "OK", "norma": "MM2",
+        "observaciones": "", "In_A": 4000, "curva": "C",
+    }]
+    ruta = generar_memoria_docx(_datos_run(), circuitos, _tmp())
+    doc = DocxDocument(ruta)
+    textos_tabla = [
+        cell.text
+        for tabla in doc.tables
+        for row in tabla.rows
+        for cell in row.cells
+    ]
+    assert any("⚠" in t for t in textos_tabla)
