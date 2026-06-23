@@ -1,3 +1,8 @@
+# Spikes / scratch (no versionar)
+_spike/
+_tmp_pdf_*.txt
+_tmp_pdf_extract.py
+
 # PyInstaller - artefactos de compilacion
 dist/
 build/
