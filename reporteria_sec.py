@@ -268,6 +268,70 @@ def _agregar_seccion_alcance_supuestos(doc: Document) -> None:
     )
 
 
+def _agregar_seccion_arc_flash(doc, datos_run: dict, circuitos: list) -> None:
+    """Seccion de Arc Flash (IEEE 1584): barra principal + tabla por circuito."""
+    from arc_flash import arc_flash_desde_proteccion
+    from conductores import TENSION_SISTEMA
+
+    doc.add_heading("Análisis de Arco Eléctrico (IEEE 1584)", level=1)
+
+    # --- Barra principal ---
+    icc_barra = datos_run.get("icc_barra_ka")
+    cab = datos_run.get("proteccion_cabecera") or {}
+    v_barra_kv = float(datos_run.get("tension_barra_kv", 0.4))
+    if icc_barra and cab.get("In_A") and cab.get("curva"):
+        r = arc_flash_desde_proteccion(
+            float(icc_barra), v_barra_kv, cab["In_A"], cab["curva"]
+        )
+        cat = "PELIGRO" if r["categoria_ppe"] is None else f"Cat {r['categoria_ppe']}"
+        doc.add_heading("Barra principal", level=2)
+        doc.add_paragraph(
+            f"Ibf={r['Ibf_kA']:.2f} kA - Ia={r['Ia_kA']:.2f} kA - "
+            f"t_despeje={r['t_despeje_s']:.3f} s - E={r['E_cal_cm2']:.2f} cal/cm2 - "
+            f"Frontera={r['D_afb_mm']:.0f} mm - {cat}"
+            + ("  despeje incierto" if r["despeje_incierto"] else "")
+        )
+    else:
+        doc.add_paragraph(
+            "Barra principal: sin Icc de barra o proteccion de cabecera definida; "
+            "se omite el calculo de arco en la barra."
+        )
+
+    # --- Tabla por circuito ---
+    con_prot = [c for c in circuitos if c.get("In_A") and c.get("curva") and c.get("icc_ka")]
+    sin_prot = [c for c in circuitos if not (c.get("In_A") and c.get("curva"))]
+
+    if con_prot:
+        doc.add_heading("Por circuito", level=2)
+        tabla = doc.add_table(rows=1, cols=7)
+        encabezados = ["Circuito", "Icc (kA)", "Ia (kA)", "t_desp (s)",
+                       "E (cal/cm2)", "Frontera (mm)", "Cat EPP"]
+        for i, h in enumerate(encabezados):
+            tabla.rows[0].cells[i].text = h
+        for c in con_prot:
+            v_kv = TENSION_SISTEMA.get(c["sistema"], 380) / 1000.0
+            r = arc_flash_desde_proteccion(
+                float(c["icc_ka"]), v_kv, c["In_A"], c["curva"]
+            )
+            marca = " W" if (r["despeje_incierto"] or r["verificar_simaris"]) else ""
+            cat = "PELIGRO" if r["categoria_ppe"] is None else str(r["categoria_ppe"])
+            celdas = tabla.add_row().cells
+            celdas[0].text = str(c.get("nombre", ""))
+            celdas[1].text = f'{float(c["icc_ka"]):.2f}'
+            celdas[2].text = f'{r["Ia_kA"]:.2f}'
+            celdas[3].text = f'{r["t_despeje_s"]:.3f}'
+            celdas[4].text = f'{r["E_cal_cm2"]:.2f}'
+            celdas[5].text = f'{r["D_afb_mm"]:.0f}'
+            celdas[6].text = cat + marca
+
+    if sin_prot:
+        nombres = ", ".join(str(c.get("nombre", "?")) for c in sin_prot)
+        doc.add_paragraph(
+            "Circuitos sin datos de proteccion (omitidos del analisis de arco): "
+            + nombres
+        )
+
+
 def enriquecer_circuitos_con_proteccion(circuitos: list, protecciones: dict) -> list:
     """Devuelve copias de los circuitos con In_A/curva de su protección (por nombre).
 
@@ -403,6 +467,11 @@ def generar_memoria_docx(
             "Cálculo de cortocircuito: no declarado en este proyecto.\n"
             "Verificar con herramienta SIMARIS si aplica."
         )
+
+    try:
+        _agregar_seccion_arc_flash(doc, datos_run, circuitos)
+    except Exception as e:
+        doc.add_paragraph(f"[Análisis de Arco Eléctrico no disponible: {e}]")
 
     balance_demanda = datos_run.get("balance_demanda") or {}
     if balance_demanda:
