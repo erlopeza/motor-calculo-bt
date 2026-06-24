@@ -3,6 +3,10 @@ _spike/
 _tmp_pdf_*.txt
 _tmp_pdf_extract.py
 
+# Artefactos temporales de tests
+tests/.tmp_arcflash/
+tests/.tmp_reporteria_sec_tests/
+
 # PyInstaller - artefactos de compilacion
 dist/
 build/
