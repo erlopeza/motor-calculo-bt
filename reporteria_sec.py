@@ -356,6 +356,11 @@ def _agregar_seccion_flujo_nodal(doc: Document, datos_run: dict, circuitos: list
         return
 
     red = construir_red(cadena, trafo_z, circuitos, vn_v=vn)
+    if not red.ramas:
+        doc.add_paragraph(
+            "Flujo nodal: ningún dispositivo de la cadena tiene Icc válida; se omite."
+        )
+        return
     res = calcular_flujo_nodal(red)
 
     estado = "convergió" if res["convergido"] else "NO convergió"
@@ -668,16 +673,17 @@ def exportar_json_epc(
         from flujo_nodal import calcular_flujo_nodal
         vn = float(datos_run.get("tension_sistema_v") or 380.0)
         red = construir_red(cadena, trafo_z, circuitos or [], vn_v=vn)
-        res = calcular_flujo_nodal(red)
-        payload["flujo_nodal"] = {
-            "convergido": res["convergido"],
-            "iteraciones": res["iteraciones"],
-            "perdidas_totales_kW": res["perdidas_totales_kW"],
-            "buses": [
-                {"id": bid, "V_pu": r["V_pu"], "V_kV": r["V_kV"], "P_kW": r["P_kW"]}
-                for bid, r in res["buses"].items()
-            ],
-        }
+        if red.ramas:
+            res = calcular_flujo_nodal(red)
+            payload["flujo_nodal"] = {
+                "convergido": res["convergido"],
+                "iteraciones": res["iteraciones"],
+                "perdidas_totales_kW": res["perdidas_totales_kW"],
+                "buses": [
+                    {"id": bid, "V_pu": r["V_pu"], "V_kV": r["V_kV"], "P_kW": r["P_kW"]}
+                    for bid, r in res["buses"].items()
+                ],
+            }
     with open(ruta_json, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, ensure_ascii=False, indent=2, default=str)
     return str(ruta_json)

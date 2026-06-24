@@ -143,6 +143,24 @@ def test_nombre_duplicado_lanza():
         construir_red(cadena, trafo_z_ohm=0.005, circuitos=_circuitos_min())
 
 
+def test_nombre_trafo_colisiona_lanza():
+    cadena = [
+        {"nombre": "TRAFO", "upstream": "", "nivel": 0, "In_A": 100, "curva": "C", "Icc_kA": 10.0},
+    ]
+    with pytest.raises(ValueError):
+        construir_red(cadena, trafo_z_ohm=0.005, circuitos=_circuitos_min())
+
+
+def test_todos_sin_icc_red_sin_ramas():
+    cadena = [
+        {"nombre": "A", "upstream": "", "nivel": 0, "In_A": 100, "curva": "C", "Icc_kA": None},
+        {"nombre": "B", "upstream": "A", "nivel": 1, "In_A": 50, "curva": "C", "Icc_kA": None},
+    ]
+    red = construir_red(cadena, trafo_z_ohm=0.005, circuitos=_circuitos_min())
+    assert red.ramas == []
+    assert red.nodos_excluidos == ["A", "B"]
+
+
 def test_self_loop_se_trata_como_raiz():
     cadena = [
         {"nombre": "X", "upstream": "X", "nivel": 0, "In_A": 100, "curva": "C", "Icc_kA": 10.0},

@@ -56,6 +56,18 @@ def test_memoria_flujo_nodal_sin_cadena_omite():
     texto = "\n".join(p.text for p in doc.paragraphs)
     assert "sin cadena" in texto.lower()
 
+def test_memoria_flujo_nodal_todos_sin_icc_omite():
+    from docx import Document
+    from reporteria_sec import generar_memoria_docx
+    datos = _datos_run()
+    for d in datos["cadena"]:
+        d["Icc_kA"] = None
+    ruta = generar_memoria_docx(datos, _circuitos(), _tmp())
+    doc = Document(ruta)
+    texto = "\n".join(p.text for p in doc.paragraphs)
+    assert "Icc válida" in texto  # mensaje de omisión, no crash numpy
+
+
 def test_json_epc_incluye_flujo_nodal():
     import json
     from reporteria_sec import exportar_json_epc

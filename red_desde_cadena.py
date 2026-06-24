@@ -97,6 +97,10 @@ def construir_red(
         nombre = str(d.get("nombre") or "").strip()
         if not nombre:
             continue
+        if nombre == SLACK_ID:
+            raise ValueError(
+                f"Nombre de dispositivo {nombre!r} colisiona con el ID de slack interno"
+            )
         if nombre in vistos:
             raise ValueError(f"Nombre de dispositivo duplicado en la cadena: {nombre!r}")
         vistos.add(nombre)
