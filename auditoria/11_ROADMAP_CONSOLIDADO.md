@@ -68,6 +68,7 @@ Esfuerzo S/M/L/XL · Valor ★–★★★.
 **Objetivo:** pasar de determinista por circuito a red acoplada.
 - P2.1 ✅ `flujo_nodal.py`: modelo bus/rama + Y-bus + solver Newton-Raphson polar sobre `numpy` denso (suficiente para redes BT < 100 buses; `scipy.sparse` queda como mejora futura para redes grandes).
 - **Hito 3 "listo cuando":** ✅ flujo de carga nodal con balance de potencia y pérdidas por rama verificados (33 tests); convive con el modo simplificado actual sin tocarlo.
+- **Integración (2026-06-23):** ✅ `red_desde_cadena.py` traduce la hoja `cadena` (árbol `upstream` + Icc por nodo) a un `Red`: topología multinivel, impedancia de rama desde la escalera de Icc, cargas agregadas en hojas por peso de `In`. El flujo nodal ya **no es un motor aislado**: tiene sección en la memoria SEC (perfil de tensiones por barra + pérdidas) y bloque en `exportar_json_epc`, validado sobre la cadena real de `circuitos.xlsx`. Spec: `docs/superpowers/specs/2026-06-23-flujo-nodal-multinivel-design.md`.
 
 ### Fase 4 — Expansión opcional (P3) · *según mercado*
 Ground Grid (IEEE 80), sistemas DC (datacenter), ANSI SC, armónicos — solo si la demanda lo justifica.

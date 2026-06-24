@@ -335,6 +335,59 @@ def _agregar_seccion_arc_flash(doc: Document, datos_run: dict, circuitos: list) 
         )
 
 
+def _agregar_seccion_flujo_nodal(doc: Document, datos_run: dict, circuitos: list) -> None:
+    """Sección de Flujo de Carga Nodal: perfil de tensiones por barra (Newton-Raphson)."""
+    doc.add_heading("Flujo de Carga Nodal", level=1)
+
+    cadena = datos_run.get("cadena") or []
+    if not cadena:
+        doc.add_paragraph(
+            "Flujo nodal: sin cadena de coordinación cargada; se omite el análisis nodal."
+        )
+        return
+
+    from red_desde_cadena import construir_red
+    from flujo_nodal import calcular_flujo_nodal
+
+    trafo_z = float(datos_run.get("trafo_z_ohm") or 0.0)
+    vn = float(datos_run.get("tension_sistema_v") or 380.0)
+    if trafo_z <= 0:
+        doc.add_paragraph("Flujo nodal: impedancia del transformador no disponible; se omite.")
+        return
+
+    red = construir_red(cadena, trafo_z, circuitos, vn_v=vn)
+    if not red.ramas:
+        doc.add_paragraph(
+            "Flujo nodal: ningún dispositivo de la cadena tiene Icc válida; se omite."
+        )
+        return
+    res = calcular_flujo_nodal(red)
+
+    estado = "convergió" if res["convergido"] else "NO convergió"
+    doc.add_paragraph(
+        f"Newton-Raphson: {estado} en {res['iteraciones']} iteraciones. "
+        f"Pérdidas totales: {res['perdidas_totales_kW']:.3f} kW."
+    )
+
+    tabla = doc.add_table(rows=1, cols=5)
+    for i, h in enumerate(["Bus", "V (pu)", "V (kV)", "Caída %", "P (kW)"]):
+        tabla.rows[0].cells[i].text = h
+    for bus_id, r in res["buses"].items():
+        caida = (1.0 - r["V_pu"]) * 100.0
+        celdas = tabla.add_row().cells
+        celdas[0].text = str(bus_id)
+        celdas[1].text = f'{r["V_pu"]:.4f}'
+        celdas[2].text = f'{r["V_kV"]:.4f}'
+        celdas[3].text = f'{caida:.2f}'
+        celdas[4].text = f'{r["P_kW"]:.2f}'
+
+    excluidos = getattr(red, "nodos_excluidos", [])
+    if excluidos:
+        doc.add_paragraph(
+            "Nodos excluidos por Icc faltante/inconsistente: " + ", ".join(excluidos)
+        )
+
+
 def enriquecer_circuitos_con_proteccion(circuitos: list, protecciones: dict) -> list:
     """Devuelve copias de los circuitos con In_A/curva de su protección (por nombre).
 
@@ -477,6 +530,12 @@ def generar_memoria_docx(
         print(f"[reporteria_sec] Arc Flash no disponible: {e}")
         doc.add_paragraph(f"[Análisis de Arco Eléctrico no disponible: {e}]")
 
+    try:
+        _agregar_seccion_flujo_nodal(doc, datos_run, circuitos)
+    except Exception as e:
+        print(f"[reporteria_sec] Flujo nodal no disponible: {e}")
+        doc.add_paragraph(f"[Flujo de Carga Nodal no disponible: {e}]")
+
     balance_demanda = datos_run.get("balance_demanda") or {}
     if balance_demanda:
         doc.add_heading("Balance y Demanda", level=1)
@@ -607,6 +666,24 @@ def exportar_json_epc(
                 "despeje_incierto": r["despeje_incierto"],
             })
         payload["arc_flash"] = {"norma": "IEEE 1584-2002", "circuitos": filas_af}
+    cadena = datos_run.get("cadena") or []
+    trafo_z = float(datos_run.get("trafo_z_ohm") or 0.0)
+    if cadena and trafo_z > 0:
+        from red_desde_cadena import construir_red
+        from flujo_nodal import calcular_flujo_nodal
+        vn = float(datos_run.get("tension_sistema_v") or 380.0)
+        red = construir_red(cadena, trafo_z, circuitos or [], vn_v=vn)
+        if red.ramas:
+            res = calcular_flujo_nodal(red)
+            payload["flujo_nodal"] = {
+                "convergido": res["convergido"],
+                "iteraciones": res["iteraciones"],
+                "perdidas_totales_kW": res["perdidas_totales_kW"],
+                "buses": [
+                    {"id": bid, "V_pu": r["V_pu"], "V_kV": r["V_kV"], "P_kW": r["P_kW"]}
+                    for bid, r in res["buses"].items()
+                ],
+            }
     with open(ruta_json, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, ensure_ascii=False, indent=2, default=str)
     return str(ruta_json)
