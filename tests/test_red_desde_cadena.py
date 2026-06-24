@@ -113,6 +113,40 @@ def test_reparto_por_peso_de_In():
         {"nombre": "HojaB", "upstream": "G0", "nivel": 1, "In_A": 100, "curva": "C", "Icc_kA": 8.0},
     ]
     red = construir_red(cadena, trafo_z_ohm=0.005, circuitos=_circuitos_min())
+    g0 = next(b for b in red.buses if b.id == "G0")
     a = next(b for b in red.buses if b.id == "HojaA")
     b = next(b for b in red.buses if b.id == "HojaB")
+    assert g0.P_kW == 0.0  # intermedio: sin carga local
     assert abs(a.P_kW) == pytest.approx(2 * abs(b.P_kW), rel=1e-6)
+
+
+def test_reactiva_total_conservada_con_cosphi_real():
+    """Q se reparte usando el cos φ real de los circuitos, y se conserva el total."""
+    circuitos = [
+        {"nombre": "L1", "sistema": "3F", "I_diseno": 100.0, "cos_phi": 0.8},
+        {"nombre": "L2", "sistema": "3F", "I_diseno": 80.0, "cos_phi": 0.95},
+    ]
+    red = construir_red(_cadena_min(), trafo_z_ohm=0.005, circuitos=circuitos)
+    q_red = -sum(b.Q_kVAR for b in red.buses if b.tipo == "PQ")
+    q_esperada = 0.0
+    for c in circuitos:
+        p = math.sqrt(3) * 380.0 * c["I_diseno"] * c["cos_phi"] / 1000.0
+        q_esperada += p * math.tan(math.acos(c["cos_phi"]))
+    assert q_red == pytest.approx(q_esperada, rel=1e-6)
+
+
+def test_nombre_duplicado_lanza():
+    cadena = _cadena_min() + [
+        {"nombre": "G1", "upstream": "G0", "nivel": 1, "In_A": 630, "curva": "C", "Icc_kA": 9.0},
+    ]
+    with pytest.raises(ValueError):
+        construir_red(cadena, trafo_z_ohm=0.005, circuitos=_circuitos_min())
+
+
+def test_self_loop_se_trata_como_raiz():
+    cadena = [
+        {"nombre": "X", "upstream": "X", "nivel": 0, "In_A": 100, "curva": "C", "Icc_kA": 10.0},
+    ]
+    red = construir_red(cadena, trafo_z_ohm=0.005, circuitos=_circuitos_min())
+    pares = {(r.from_bus, r.to_bus) for r in red.ramas}
+    assert ("TRAFO", "X") in pares   # auto-referencia → cuelga del slack
