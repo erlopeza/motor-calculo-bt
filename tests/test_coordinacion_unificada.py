@@ -9,6 +9,15 @@ def test_kcurva_bcd_valores_esperados():
     assert K_CURVA["D"] == 180
 
 
+def test_kcurva_derivado_del_catalogo():
+    # Invariante de fuente única: K_CURVA B/C/D viene del catálogo tcc.
+    # Si el catálogo cambia y K_CURVA no se re-deriva, este test falla.
+    from tcc_curvas import get_k_iec60898
+    assert K_CURVA["B"] == get_k_iec60898("B")
+    assert K_CURVA["C"] == get_k_iec60898("C")
+    assert K_CURVA["D"] == get_k_iec60898("D")
+
+
 def test_kcurva_conserva_TM():
     assert K_CURVA["TM"] == 100
 
