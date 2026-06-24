@@ -973,6 +973,17 @@ class MotorCalculoBT:
                 except Exception:
                     _icc_barra_ka = 0.0
 
+                # Tensión de sistema e impedancia de barra para el flujo nodal.
+                # Z_trafo se deriva de la Icc de barra (c·Vn/√3·Icc), coherente
+                # con la convención de red_desde_cadena (Z desde la escalera de Icc).
+                _tension_v = float(
+                    (self.datos_trafo or {}).get("Vn_BT") or TENSION_SISTEMA.get("3F", 380)
+                )
+                _trafo_z_ohm = (
+                    (1.05 * _tension_v) / ((3 ** 0.5) * _icc_barra_ka * 1000.0)
+                    if _icc_barra_ka else 0.0
+                )
+
                 datos_run = {
                     "project_id": self.nombre_proyecto.get() or "PROYECTO",
                     "revision": "GUI",
@@ -989,6 +1000,9 @@ class MotorCalculoBT:
                     "ruta_reporte_xlsx": None,
                     "circuitos": circuitos_persistencia,
                     "icc_barra_ka": float(_icc_barra_ka) if _icc_barra_ka else 0.0,
+                    "cadena": self.cadena_datos or [],
+                    "trafo_z_ohm": _trafo_z_ohm,
+                    "tension_sistema_v": _tension_v,
                     "proteccion_cabecera": next(
                         (
                             {"In_A": d.get("In_A"), "curva": d.get("curva")}
