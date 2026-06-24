@@ -55,7 +55,7 @@ R = |Z_rama| / √(1 + xr²)     ;     X = R · xr
 `Rama(from_bus, to_bus, R_ohm=R, X_ohm=X)`.
 
 **Casos límite:**
-- `Icc_nodo` ausente o ≤ 0 → no se puede derivar Z; el nodo (y su subárbol) se excluye con bandera; la sección lo reporta.
+- `Icc_nodo` ausente o ≤ 0 → no se puede derivar Z; **el nodo se excluye** con bandera (`red.nodos_excluidos`). Sus **hijos con Icc válida sobreviven re-enraizados al TRAFO**: `Z_acum(hijo)` es la impedancia total real desde la fuente (independiente de la topología intermedia), así que el hijo conserva su impedancia correcta y no se pierde su carga. Solo se pierde el bus intermedio sin dato.
 - `Z_rama ≤ 0` (Icc del hijo ≥ del padre, físicamente inconsistente) → se fija a un mínimo positivo (1e-6 Ω) y se marca como dato sospechoso.
 
 ### 3.3 Cargas (agregadas en hojas)

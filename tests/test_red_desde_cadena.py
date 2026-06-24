@@ -74,6 +74,24 @@ def test_nodo_sin_icc_se_excluye():
     ids = {b.id for b in red.buses}
     assert "X9" not in ids
 
+
+def test_hijo_de_nodo_sin_icc_se_re_enraiza_al_trafo():
+    """Un nodo intermedio sin Icc se excluye, pero su hijo con Icc válida
+    sobrevive re-enraizado al TRAFO (Z_acum del hijo es la impedancia total
+    real a la fuente, independiente de la topología intermedia → no se pierde carga)."""
+    cadena = [
+        {"nombre": "A0", "upstream": "", "nivel": 0, "In_A": 1000, "curva": "TM", "Icc_kA": 25.0},
+        {"nombre": "Bsin", "upstream": "A0", "nivel": 1, "In_A": 400, "curva": "C", "Icc_kA": None},
+        {"nombre": "Cok", "upstream": "Bsin", "nivel": 2, "In_A": 100, "curva": "C", "Icc_kA": 8.0},
+    ]
+    red = construir_red(cadena, trafo_z_ohm=0.005, circuitos=_circuitos_min())
+    ids = {b.id for b in red.buses}
+    assert "Bsin" not in ids          # nodo sin Icc excluido
+    assert "Cok" in ids               # hijo con Icc sobrevive
+    pares = {(r.from_bus, r.to_bus) for r in red.ramas}
+    assert ("TRAFO", "Cok") in pares  # re-enraizado al slack
+    assert red.nodos_excluidos == ["Bsin"]
+
 # --- cargas en hojas ---
 def test_carga_solo_en_hojas():
     red = construir_red(_cadena_min(), trafo_z_ohm=0.005, circuitos=_circuitos_min())
