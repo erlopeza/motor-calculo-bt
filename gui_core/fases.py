@@ -40,7 +40,7 @@ MODULOS: list[Modulo] = [
     Modulo("icc_punto", "Icc por punto + fase-neutro", "IEC 60909-2 · IEC 60364-4-41", 2,
            "trafo + circuitos", lambda s: s.tiene_trafo and s.tiene_circuitos),
     Modulo("aporte_motores", "Aporte de motores al Icc", "IEC 60909-4:2021", 2,
-           "Icc + circuitos", lambda s: s.tiene_icc and s.tiene_circuitos),
+           "trafo + circuitos", lambda s: s.tiene_trafo and s.tiene_circuitos),
     Modulo("protecciones", "Verificación de protecciones", "IEC 60947-2 · IEC 60364-4-41", 3,
            "Icc + protecciones", lambda s: s.tiene_icc and s.tiene_protecciones),
     Modulo("coordinacion", "Coordinación TCC / selectividad", "IEC 60947-2 (M7)", 3,

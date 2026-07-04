@@ -51,3 +51,12 @@ def test_presentador_es_llamable():
     from gui_core.fases import PRESENTADOR
     for fn in PRESENTADOR.values():
         assert callable(fn)
+
+
+def test_aporte_motores_prereq_solo_trafo_y_circuitos():
+    from gui_core.fases import buscar_modulo
+    from gui_core.sesion import SesionProyecto
+    s = SesionProyecto()
+    s.cargar({"circuitos": [{"nombre": "M1"}], "trafo": {"modo": "A", "kVA": 1000}})
+    # el presentador recomputa Icc de barra desde el trafo → prereq = trafo+circuitos
+    assert buscar_modulo("aporte_motores").prereq(s) is True

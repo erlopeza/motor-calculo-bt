@@ -168,6 +168,8 @@ def presentar_sugerencia(sesion: SesionProyecto) -> dict:
         cond, cap, dv = sugerir_conductor(
             c["L_m"], c["I_diseno"], c["paralelos"], c["sistema"], c["temp_amb"], norma
         )
+        if cond is None:  # ningún conductor cumple ΔV/capacidad → hallazgo
+            alertas.append(c["nombre"])
         filas.append({"nombre": c["nombre"], "sugerido": cond, "cap_A": cap, "dv_pct": dv})
     return {"filas": filas, "alertas": alertas}
 

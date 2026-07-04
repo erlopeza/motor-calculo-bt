@@ -101,3 +101,15 @@ def test_presentar_aporte_motores_sin_motores_vacio():
     from gui_core.presentadores import presentar_aporte_motores
     r = presentar_aporte_motores(_sesion_basica())
     assert r["filas"] == []
+
+
+def test_presentar_sugerencia_marca_alerta_si_no_hay_conductor():
+    from gui_core.presentadores import presentar_sugerencia
+    s = SesionProyecto()
+    s.cargar({"circuitos": [{
+        "nombre": "IMPOSIBLE", "sistema": "3F", "paralelos": 1,
+        "I_diseno": 2000.0, "L_m": 500.0, "temp_amb": 30, "norma": "MM2",
+    }]})
+    r = presentar_sugerencia(s)
+    assert r["filas"][0]["sugerido"] is None
+    assert "IMPOSIBLE" in r["alertas"]
