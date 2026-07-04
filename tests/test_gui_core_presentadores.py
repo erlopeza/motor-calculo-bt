@@ -77,3 +77,27 @@ def test_presentar_flujo_nodal_con_cadena():
     r = presentar_flujo_nodal(s)
     assert any(b["id"] == "TRAFO" for b in r["buses"])
     assert r["convergido"] is True
+
+
+def test_presentar_sugerencia_por_circuito():
+    from gui_core.presentadores import presentar_sugerencia
+    r = presentar_sugerencia(_sesion_basica())
+    assert r["filas"] and r["filas"][0]["sugerido"]
+
+
+def test_presentar_aporte_motores_con_motor():
+    from gui_core.presentadores import presentar_aporte_motores
+    s = SesionProyecto()
+    s.cargar({
+        "circuitos": [{"nombre": "M1", "sistema": "3F", "tipo_carga": "motor", "P_kW": 37.0}],
+        "trafo": {"modo": "A", "kVA": 1000.0, "Vn_BT": 380.0, "Ucc_pct": 5.0},
+    })
+    r = presentar_aporte_motores(s)
+    assert r["filas"] and r["filas"][0]["I_aporte_A"] > 0
+    assert r["Icc_total_kA"] >= r["Icc_red_kA"]
+
+
+def test_presentar_aporte_motores_sin_motores_vacio():
+    from gui_core.presentadores import presentar_aporte_motores
+    r = presentar_aporte_motores(_sesion_basica())
+    assert r["filas"] == []

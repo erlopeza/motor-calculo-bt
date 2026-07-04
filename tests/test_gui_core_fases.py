@@ -39,3 +39,15 @@ def test_modulos_de_fase_no_vacio():
     for n in FASES:
         assert isinstance(modulos_de_fase(n), list)
     assert len(modulos_de_fase(3)) >= 3
+
+def test_cada_modulo_calculable_tiene_presentador():
+    from gui_core.fases import PRESENTADOR, MODULOS
+    ids_calculo = {m.id for m in MODULOS if m.fase in (1, 2, 3, 4)}
+    faltan = ids_calculo - set(PRESENTADOR)
+    assert not faltan, f"módulos sin presentador: {faltan}"
+
+
+def test_presentador_es_llamable():
+    from gui_core.fases import PRESENTADOR
+    for fn in PRESENTADOR.values():
+        assert callable(fn)

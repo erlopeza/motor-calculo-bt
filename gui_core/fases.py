@@ -93,3 +93,21 @@ def estado_fase(fase: int, sesion: SesionProyecto) -> Estado:
     if not estados:
         return Estado.SIN_DATOS
     return max(estados, key=lambda e: _PRIORIDAD[e])
+
+
+from gui_core import presentadores as _p
+
+PRESENTADOR = {
+    "dv": _p.presentar_dv,
+    "capacidad": _p.presentar_capacidad,
+    "sugerencia": _p.presentar_sugerencia,
+    "aporte_motores": _p.presentar_aporte_motores,
+    "icc_trafo": _p.presentar_icc_trafo,
+    "icc_punto": _p.presentar_icc_punto,
+    "protecciones": _p.presentar_protecciones,
+    "coordinacion": _p.presentar_coordinacion,
+    "arc_flash": _p.presentar_arc_flash,
+    "balance": _p.presentar_balance,
+    "demanda": _p.presentar_demanda,
+    "flujo_nodal": _p.presentar_flujo_nodal,
+}

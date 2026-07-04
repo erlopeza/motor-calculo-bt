@@ -5,9 +5,10 @@ No importan tkinter. La sesión guarda el resultado vía registrar().
 """
 from __future__ import annotations
 
-from calculos import calcular_caida_tension, clasificar_caida, capacidad_corregida
+from calculos import calcular_caida_tension, clasificar_caida, capacidad_corregida, sugerir_conductor
 from transformador import calcular_icc_transformador, icc_desde_tabla
-from icc_punto import calcular_icc_punto
+from icc_punto import calcular_icc_punto, calcular_icc_con_aporte_motores
+from motores import calcular_aporte_icc_motor
 from conductores import TENSION_SISTEMA
 from arc_flash import arc_flash_desde_proteccion
 from protecciones import verificar_circuito_completo
@@ -158,3 +159,32 @@ def presentar_flujo_nodal(sesion: SesionProyecto) -> dict:
              for b, r in res["buses"].items()]
     return {"buses": buses, "convergido": res["convergido"],
             "perdidas_kW": res["perdidas_totales_kW"], "alertas": alertas}
+
+
+def presentar_sugerencia(sesion: SesionProyecto) -> dict:
+    filas, alertas = [], []
+    for c in sesion.circuitos:
+        norma = str(c.get("norma", "MM2"))
+        cond, cap, dv = sugerir_conductor(
+            c["L_m"], c["I_diseno"], c["paralelos"], c["sistema"], c["temp_amb"], norma
+        )
+        filas.append({"nombre": c["nombre"], "sugerido": cond, "cap_A": cap, "dv_pct": dv})
+    return {"filas": filas, "alertas": alertas}
+
+
+def presentar_aporte_motores(sesion: SesionProyecto) -> dict:
+    motores_circ = [
+        c for c in sesion.circuitos
+        if str(c.get("tipo_carga", "")).lower() == "motor" and c.get("P_kW")
+    ]
+    if not motores_circ:
+        return {"filas": [], "Icc_red_kA": 0.0, "Icc_total_kA": 0.0, "alertas": []}
+    filas, aportes = [], []
+    for c in motores_circ:
+        vn = TENSION_SISTEMA.get(c["sistema"], 380)
+        ap = calcular_aporte_icc_motor(float(c["P_kW"]), vn, sistema=c["sistema"])
+        aportes.append(ap["I_aporte_A"])
+        filas.append({"nombre": c["nombre"], "P_kW": float(c["P_kW"]), "I_aporte_A": ap["I_aporte_A"]})
+    icc_red = presentar_icc_trafo(sesion)["Icc_kA"] if sesion.tiene_trafo else 0.0
+    icc_total, _ = calcular_icc_con_aporte_motores(icc_red, aportes)
+    return {"filas": filas, "Icc_red_kA": icc_red, "Icc_total_kA": icc_total, "alertas": []}
