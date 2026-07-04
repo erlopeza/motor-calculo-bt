@@ -207,6 +207,11 @@ def reporte_balance(resultado):
     lineas.append("  BALANCE DE CARGA POR TABLERO")
     lineas.append("=" * 60)
 
+    if not resultado or "tableros" not in resultado:
+        lineas.append("  (sin datos de balance)")
+        lineas.append("=" * 60)
+        return lineas
+
     for nombre_t, t in resultado["tableros"].items():
         lineas.append("")
         lineas.append(f"  Tablero   : {nombre_t}")

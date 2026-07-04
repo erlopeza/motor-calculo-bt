@@ -18,6 +18,10 @@ def calcular_zt_cable(L_m, S_mm2, paralelos=1, rho=RHO_CU) -> float:
     Mantiene firma y retorno originales para retrocompatibilidad con GUI y
     reportes que solo necesitan R. Para Icc usar calcular_zt_cable_complejo.
     """
+    if S_mm2 <= 0 or paralelos <= 0:
+        raise ValueError(
+            f"Geometría inválida: S_mm2={S_mm2}, paralelos={paralelos} (deben ser > 0)"
+        )
     return round((rho * L_m) / (S_mm2 * paralelos), 6)
 
 
@@ -29,6 +33,10 @@ def calcular_zt_cable_complejo(L_m, S_mm2, paralelos=1, rho=RHO_CU) -> complex:
 
     Retorna complex para uso en calculos de Icc; usar abs() para magnitud.
     """
+    if S_mm2 <= 0 or paralelos <= 0:
+        raise ValueError(
+            f"Geometría inválida: S_mm2={S_mm2}, paralelos={paralelos} (deben ser > 0)"
+        )
     r = (rho * L_m) / (S_mm2 * paralelos)
     x = get_reactancia_cable_ohm_km(S_mm2) * L_m / 1000.0 / paralelos
     return complex(r, x)

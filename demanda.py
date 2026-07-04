@@ -394,7 +394,11 @@ def reporte_demanda(resultado_demanda, resultado_trafo=None,
     Retorna lista de strings.
     """
     lineas = []
-    r = resultado_demanda
+    r = resultado_demanda or {}
+
+    if "tipo_instalacion" not in r:
+        lineas.append("  (sin datos de demanda)")
+        return lineas
 
     lineas.append("=" * 60)
     lineas.append("  DEMANDA MÁXIMA Y DIMENSIONAMIENTO — M6")

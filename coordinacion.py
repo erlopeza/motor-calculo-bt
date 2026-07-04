@@ -456,10 +456,10 @@ def reporte_coordinacion(resultado_cadena, nombre_cadena="Cadena"):
     Retorna lista de strings.
     """
     lineas = []
-    r = resultado_cadena
+    r = resultado_cadena or {}
 
-    if "error" in r:
-        lineas.append(f"  ERROR: {r['error']}")
+    if "error" in r or "Icc_A" not in r:
+        lineas.append(f"  ERROR: {r.get('error', 'sin datos de coordinación')}")
         return lineas
 
     lineas.append("=" * 60)
