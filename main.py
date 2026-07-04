@@ -48,7 +48,7 @@ def generar_seccion_transformador(datos_trafo):
     lineas    = []
     resultado = {}
 
-    if datos_trafo is None:
+    if not datos_trafo or "modo" not in datos_trafo:
         lineas.append("  TRANSFORMADOR: no se encontró hoja 'Transformador'")
         lineas.append("  Icc en bornes BT: no calculada")
         return lineas, resultado
@@ -774,364 +774,365 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
 # PROGRAMA PRINCIPAL
 # ============================================================
 
-print("=" * 60)
-print("  MOTOR DE CALCULO BT — VERSION MODULAR")
-print("  ΔV | Icc | Protecciones | Balance de carga")
-print("  Normativa: SEC RIC N10 / NEC / IEC 60364")
-print("=" * 60)
+if __name__ == "__main__":
+    print("=" * 60)
+    print("  MOTOR DE CALCULO BT — VERSION MODULAR")
+    print("  ΔV | Icc | Protecciones | Balance de carga")
+    print("  Normativa: SEC RIC N10 / NEC / IEC 60364")
+    print("=" * 60)
 
-parser = argparse.ArgumentParser(add_help=True)
-parser.add_argument("--proyecto", help="Nombre del proyecto")  # agregado graficos
-parser.add_argument("--excel", help="Archivo Excel de entrada (.xlsx)")  # agregado graficos
-parser.add_argument(
-    "--graficos",
-    action="store_true",
-    help="Genera graficos tecnicos PNG en 07_CONTROL/curvas/<proyecto>/",
- )  # agregado graficos
-parser.add_argument(
-    "--no-pause",
-    action="store_true",
-    help="No espera Enter al finalizar (modo automatizado).",
- )  # agregado graficos
-args = parser.parse_args()
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument("--proyecto", help="Nombre del proyecto")  # agregado graficos
+    parser.add_argument("--excel", help="Archivo Excel de entrada (.xlsx)")  # agregado graficos
+    parser.add_argument(
+        "--graficos",
+        action="store_true",
+        help="Genera graficos tecnicos PNG en 07_CONTROL/curvas/<proyecto>/",
+     )  # agregado graficos
+    parser.add_argument(
+        "--no-pause",
+        action="store_true",
+        help="No espera Enter al finalizar (modo automatizado).",
+     )  # agregado graficos
+    args = parser.parse_args()
 
-ahora         = datetime.now()
-fecha         = ahora.strftime("%d/%m/%Y %H:%M")
-fecha_archivo = ahora.strftime("%Y%m%d_%H%M")
+    ahora         = datetime.now()
+    fecha         = ahora.strftime("%d/%m/%Y %H:%M")
+    fecha_archivo = ahora.strftime("%Y%m%d_%H%M")
 
-nombre_proyecto = (args.proyecto or "").strip()
-archivo_excel = (args.excel or "").strip()
-if not nombre_proyecto:
-    nombre_proyecto = input("\n  Nombre del proyecto : ").strip()
-if not archivo_excel:
-    archivo_excel = input("  Archivo Excel       : ").strip()
+    nombre_proyecto = (args.proyecto or "").strip()
+    archivo_excel = (args.excel or "").strip()
+    if not nombre_proyecto:
+        nombre_proyecto = input("\n  Nombre del proyecto : ").strip()
+    if not archivo_excel:
+        archivo_excel = input("  Archivo Excel       : ").strip()
 
-if not archivo_excel.endswith(".xlsx"):
-    archivo_excel += ".xlsx"
+    if not archivo_excel.endswith(".xlsx"):
+        archivo_excel += ".xlsx"
 
-# --- LEER TODAS LAS HOJAS ---
-datos_trafo        = leer_transformador_excel(archivo_excel)
-protecciones_excel = {}
-balance_datos      = {}
-tableros_datos     = {}
-params_demanda     = None
-cadena_datos       = []
-datos_generador    = None
-datos_sts          = None
-datos_trafo_iso    = None
-datos_ups          = None
-datos_ats          = None
-perfil             = obtener_perfil("industrial").copy()
+    # --- LEER TODAS LAS HOJAS ---
+    datos_trafo        = leer_transformador_excel(archivo_excel)
+    protecciones_excel = {}
+    balance_datos      = {}
+    tableros_datos     = {}
+    params_demanda     = None
+    cadena_datos       = []
+    datos_generador    = None
+    datos_sts          = None
+    datos_trafo_iso    = None
+    datos_ups          = None
+    datos_ats          = None
+    perfil             = obtener_perfil("industrial").copy()
 
-try:
-    _libro = openpyxl.load_workbook(archivo_excel, data_only=True)
-    datos_perfil = leer_perfil_excel(_libro) or {}
-    perfil_clave = datos_perfil.get("perfil", "industrial")
-    perfil = obtener_perfil(perfil_clave).copy()
-
-    hoja_perfil = next(
-        (_libro[nombre] for nombre in _libro.sheetnames if nombre.lower() == "perfil"),
-        None
-    )
-    norma_explicitada = False
-    if hoja_perfil:
-        for fila in hoja_perfil.iter_rows(min_row=2, values_only=True):
-            if fila[0] and str(fila[0]).strip().lower() == "norma":
-                norma_explicitada = True
-                break
-    if norma_explicitada:
-        perfil["norma"] = datos_perfil.get("norma", "AWG").upper()
-
-    protecciones_excel = leer_protecciones_excel(_libro)
-    balance_datos      = leer_balance_excel(_libro)
-    tableros_datos     = leer_tableros_excel(_libro)
-
-    if protecciones_excel:
-        print(f"  Protecciones  : {len(protecciones_excel)} circuitos")
-    if balance_datos:
-        print(f"  Balance       : {len(balance_datos)} circuitos / "
-              f"{len(tableros_datos)} tableros")
-    params_demanda = leer_demanda_excel(_libro)
-    if params_demanda:
-        print(f"  Demanda M6    : {params_demanda['tipo_instalacion']} / "
-              f"{params_demanda['tipo_alimentador']}")
-    cadena_datos = leer_cadena_excel(_libro)
-    datos_generador = leer_generador_excel(_libro)
-    datos_sts = leer_sts_excel(_libro)
-    datos_trafo_iso = leer_trafo_iso_excel(_libro)
-    datos_ups = leer_ups_excel(_libro)
-    datos_ats = leer_ats_excel(_libro)
-    if datos_generador:
-        print(
-            f"  Generador M9  : {datos_generador['GE_nombre']} ({datos_generador['GE_modelo']})"
-        )
-    if datos_sts:
-        print(
-            f"  STS M11       : {datos_sts['STS_nombre']} ({datos_sts['STS_modelo']})"
-        )
-    if datos_trafo_iso:
-        print(
-            f"  Trafo ISO M12 : {datos_trafo_iso['TISO_nombre']} ({datos_trafo_iso['TISO_conexion']})"
-        )
-    if datos_ups:
-        print(
-            f"  UPS M12       : {datos_ups['UPS_nombre']} ({datos_ups['UPS_modelo']})"
-        )
-    if datos_ats:
-        print(
-            f"  ATS M13       : {datos_ats['ATS_nombre']} ({datos_ats['ATS_modelo']})"
-        )
-    if cadena_datos:
-        print(f"  Coordinación  : {len(cadena_datos)} dispositivos en cadena")
-except Exception as e:
-    print(f"  AVISO lectura hojas opcionales: {e}")
-    params_demanda = None
-    cadena_datos   = []
-    datos_generador = None
-    datos_sts = None
-    datos_trafo_iso = None
-    datos_ups = None
-    datos_ats = None
-
-# --- LEER CIRCUITOS ---
-try:
-    circuitos = leer_circuitos_excel(archivo_excel)
-    circuitos = enriquecer_circuitos(
-        circuitos, norma=perfil.get("norma", "AWG")
-    )
-except FileNotFoundError as e:
-    print(f"\n  ERROR: {e}")
-    if not args.no_pause:
-        input("\n  Presiona Enter para cerrar...")
-    sys.exit()
-except ValueError as e:
-    print(f"\n  ERROR: {e}")
-    if not args.no_pause:
-        input("\n  Presiona Enter para cerrar...")
-    sys.exit()
-except PermissionError as e:
-    print(f"\n  ERROR: {e}")
-    if not args.no_pause:
-        input("\n  Presiona Enter para cerrar...")
-    sys.exit()
-except Exception as e:
-    print(f"\n  ERROR inesperado: {e}")
-    print("  Contacta al desarrollador con este mensaje.")
-    if not args.no_pause:
-        input("\n  Presiona Enter para cerrar...")
-    sys.exit()
-
-if len(circuitos) == 0:
-    print("\n  ERROR: no se procesó ningún circuito válido.")
-    if not args.no_pause:
-        input("\n  Presiona Enter para cerrar...")
-    sys.exit()
-
-# --- GENERAR Y MOSTRAR REPORTE ---
-lineas, total_ok, total_falla = generar_reporte_txt(
-    nombre_proyecto, circuitos, fecha,
-    datos_trafo, protecciones_excel,
-    balance_datos, tableros_datos,
-    params_demanda, cadena_datos,
-    perfil=perfil, datos_generador=datos_generador, datos_sts=datos_sts,
-    datos_trafo_iso=datos_trafo_iso, datos_ups=datos_ups, datos_ats=datos_ats
-)
-
-print()
-for linea in lineas:
-    print(linea)
-
-# --- GUARDAR ---
-nombre_txt  = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.txt"
-nombre_xlsx = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.xlsx"
-
-guardar_txt(lineas, nombre_txt)
-exportar_excel(nombre_proyecto, circuitos, fecha, nombre_xlsx, perfil=perfil)
-
-try:
-    from persistencia import registrar_ejecucion
-
-    max_dv_pct = 0.0
-    max_icc_ka = 0.0
-    circuitos_persistencia = []
-    icc_por_circuito = {}
     try:
-        if datos_trafo:
-            if datos_trafo.get("modo") == "A":
-                _, zt_ohm, _ = calcular_icc_transformador(
-                    datos_trafo["kVA"], datos_trafo["Vn_BT"], datos_trafo["Ucc_pct"]
-                )
-            else:
-                _, ucc_pct_ref, _ = icc_desde_tabla(datos_trafo["kVA"])
-                zt_ohm = (ucc_pct_ref / 100.0) * (
-                    (datos_trafo["Vn_BT"] ** 2) / (datos_trafo["kVA"] * 1000.0)
-                )
-            circuitos_icc = calcular_icc_todos_circuitos(zt_ohm, circuitos)
-            for c_icc in circuitos_icc:
-                icc_por_circuito[c_icc.get("nombre")] = c_icc.get("Icc_kA")
-    except Exception:
-        icc_por_circuito = {}
+        _libro = openpyxl.load_workbook(archivo_excel, data_only=True)
+        datos_perfil = leer_perfil_excel(_libro) or {}
+        perfil_clave = datos_perfil.get("perfil", "industrial")
+        perfil = obtener_perfil(perfil_clave).copy()
 
-    for c in circuitos:
-        dV_V, dV_pct = calcular_caida_tension(
-            c["L_m"], c["S_mm2"], c["I_diseno"], c["paralelos"], c["sistema"]
+        hoja_perfil = next(
+            (_libro[nombre] for nombre in _libro.sheetnames if nombre.lower() == "perfil"),
+            None
         )
-        I_cap = capacidad_corregida(c["I_max"], c["paralelos"], c["temp_amb"])
-        estado_dV = clasificar_caida(dV_pct)
-        estado_I = "OK" if c["I_diseno"] <= I_cap else "SUPERA"
-        estado = "OK" if (estado_dV != "FALLA" and estado_I == "OK") else "CON_FALLAS"
-        icc_ka = c.get("icc_ka") or c.get("Icc_kA") or icc_por_circuito.get(c.get("nombre"))
+        norma_explicitada = False
+        if hoja_perfil:
+            for fila in hoja_perfil.iter_rows(min_row=2, values_only=True):
+                if fila[0] and str(fila[0]).strip().lower() == "norma":
+                    norma_explicitada = True
+                    break
+        if norma_explicitada:
+            perfil["norma"] = datos_perfil.get("norma", "AWG").upper()
 
-        observaciones = c.get("nivel_icc")
-        if estado_dV == "FALLA" or estado_I == "SUPERA":
-            cond, mm2, dv = sugerir_conductor(
-                c["L_m"], c["I_diseno"], c["paralelos"],
-                c["sistema"], c["temp_amb"],
-                norma=perfil.get("norma", "AWG")
+        protecciones_excel = leer_protecciones_excel(_libro)
+        balance_datos      = leer_balance_excel(_libro)
+        tableros_datos     = leer_tableros_excel(_libro)
+
+        if protecciones_excel:
+            print(f"  Protecciones  : {len(protecciones_excel)} circuitos")
+        if balance_datos:
+            print(f"  Balance       : {len(balance_datos)} circuitos / "
+                  f"{len(tableros_datos)} tableros")
+        params_demanda = leer_demanda_excel(_libro)
+        if params_demanda:
+            print(f"  Demanda M6    : {params_demanda['tipo_instalacion']} / "
+                  f"{params_demanda['tipo_alimentador']}")
+        cadena_datos = leer_cadena_excel(_libro)
+        datos_generador = leer_generador_excel(_libro)
+        datos_sts = leer_sts_excel(_libro)
+        datos_trafo_iso = leer_trafo_iso_excel(_libro)
+        datos_ups = leer_ups_excel(_libro)
+        datos_ats = leer_ats_excel(_libro)
+        if datos_generador:
+            print(
+                f"  Generador M9  : {datos_generador['GE_nombre']} ({datos_generador['GE_modelo']})"
             )
-            if cond:
-                observaciones = f"redimensionar a {cond} ({mm2}mm2), dV={dv}%"
-            else:
-                observaciones = "redimensionar conductor (sin alternativa en tabla)"
-
-        circuitos_persistencia.append(
-            {
-                "nombre": c.get("nombre"),
-                "conductor": c.get("conductor"),
-                "norma": perfil.get("norma", "AWG"),
-                "S_mm2": c.get("S_mm2"),
-                "I_diseno": c.get("I_diseno"),
-                "I_max": c.get("I_max"),
-                "cos_phi": c.get("cos_phi"),
-                "L_m": c.get("L_m"),
-                "paralelos": c.get("paralelos"),
-                "sistema": c.get("sistema"),
-                "dv_v": round(dV_V, 3),
-                "dv_pct": round(dV_pct, 3),
-                "icc_ka": icc_ka,
-                "estado": estado,
-                "observaciones": observaciones,
-            }
-        )
-        if dV_pct > max_dv_pct:
-            max_dv_pct = dV_pct
-        if (icc_ka or 0.0) > max_icc_ka:
-            max_icc_ka = icc_ka or 0.0
-
-    datos_transformador = None
-    try:
-        if datos_trafo:
-            kVA = float(datos_trafo["kVA"])
-            vn_bt = float(datos_trafo["Vn_BT"])
-            if datos_trafo.get("modo") == "A":
-                icc_nom_kA, _, _ = calcular_icc_transformador(
-                    datos_trafo["kVA"], datos_trafo["Vn_BT"], datos_trafo["Ucc_pct"]
-                )
-                ucc_pct = float(datos_trafo["Ucc_pct"])
-            else:
-                icc_nom_kA, ucc_pct, _ = icc_desde_tabla(datos_trafo["kVA"])
-
-            z_min = ((ucc_pct * 0.925) / 100.0) * (vn_bt ** 2 / (kVA * 1000.0))
-            z_max = ((ucc_pct * 1.075) / 100.0) * (vn_bt ** 2 / (kVA * 1000.0))
-            icc_max_kA = round((1.1 * vn_bt / (1.732 * z_min)) / 1000.0, 2) if z_min > 0 else None
-            icc_min_kA = round((0.95 * vn_bt / (1.732 * z_max)) / 1000.0, 2) if z_max > 0 else None
-
-            datos_transformador = {
-                "kVA": round(kVA, 2),
-                "Vn_BT": round(vn_bt, 2),
-                "Ucc_pct": round(ucc_pct, 2),
-                "Icc_nom_kA": round(icc_nom_kA, 2),
-                "Icc_max_kA": icc_max_kA,
-                "Icc_min_kA": icc_min_kA,
-            }
-    except Exception:
-        datos_transformador = None
-
-    datos_balance_demanda = {}
-    try:
-        if balance_datos and tableros_datos:
-            kVA_trafo = datos_trafo["kVA"] if datos_trafo else 1000
-            r_balance = calcular_balance_tableros(
-                circuitos, balance_datos, tableros_datos, kVA_trafo
+        if datos_sts:
+            print(
+                f"  STS M11       : {datos_sts['STS_nombre']} ({datos_sts['STS_modelo']})"
             )
-            datos_balance_demanda["balance"] = {
-                "S_total_kva": r_balance.get("S_total_kva"),
-                "uso_trafo_pct": r_balance.get("uso_trafo_pct"),
-                "kVA_trafo": r_balance.get("kVA_trafo"),
-            }
-        if params_demanda and balance_datos:
-            r_dem = calcular_demanda(circuitos, balance_datos, params_demanda)
-            datos_balance_demanda["demanda"] = {
-                "P_total_kw": r_dem.get("P_total_kw"),
-                "S_total_kva": r_dem.get("S_total_kva"),
-                "factor_crecimiento": r_dem.get("factor_crecimiento"),
-                "S_futuro_kva": r_dem.get("S_futuro_kva"),
-            }
-    except Exception:
-        pass
-
-    datos_run = {
-        "project_id": nombre_proyecto,
-        "revision": "CLI",
-        "timestamp": datetime.now().astimezone().isoformat(),
-        "perfil": perfil.get("label", "industrial"),
-        "norma": perfil.get("norma", "AWG"),
-        "n_circuitos": len(circuitos),
-        "n_ok": total_ok,
-        "n_advertencias": max(len(circuitos) - total_ok - total_falla, 0),
-        "n_fallas": total_falla,
-        "max_dv_pct": round(max_dv_pct, 3),
-        "max_icc_ka": round(max_icc_ka, 3),
-        "status": "OK" if total_falla == 0 else "CON_FALLAS",
-        "ruta_reporte_txt": nombre_txt,
-        "ruta_reporte_xlsx": nombre_xlsx,
-        "circuitos": circuitos_persistencia,
-        "transformador": datos_transformador,
-        "balance_demanda": datos_balance_demanda,
-    }
-
-    if args.graficos:
-        try:
-            from parser_reporte import parsear_reporte
-            from graficos import generar_todos
-
-            ruta_txt = os.path.join(os.getcwd(), nombre_txt)
-            reporte = parsear_reporte(ruta_txt)
-            ruta_curvas = os.path.join(
-                os.getcwd(),
-                "07_CONTROL",
-                "curvas",
-                nombre_proyecto,
+        if datos_trafo_iso:
+            print(
+                f"  Trafo ISO M12 : {datos_trafo_iso['TISO_nombre']} ({datos_trafo_iso['TISO_conexion']})"
             )
-            graficos = generar_todos(reporte, ruta_curvas, prefijo=nombre_proyecto + "_")
-            datos_run["graficos"] = graficos
-            if reporte.get("errores"):
-                print(f"  Parser reporte: {len(reporte['errores'])} advertencia(s)")
-            print(f"  Graficos generados: {len(graficos)}")
-        except Exception as e:
-            print(f"  Advertencia graficos: {e}")
-
-    # Reporteria SEC adicional (sin interrumpir flujo principal).
-    try:
-        from reporteria_sec import generar_memoria_docx, generar_reporte_pdf
-
-        carpeta_salida = os.getcwd()
-        ruta_docx = generar_memoria_docx(datos_run, circuitos_persistencia, carpeta_salida)
-        ruta_pdf = generar_reporte_pdf(datos_run, circuitos_persistencia, carpeta_salida)
-        datos_run["ruta_reporte_docx"] = ruta_docx
-        datos_run["ruta_reporte_pdf"] = ruta_pdf
-        print(f"  Memoria SEC : {ruta_docx}")
-        print(f"  Reporte PDF : {ruta_pdf}")
+        if datos_ups:
+            print(
+                f"  UPS M12       : {datos_ups['UPS_nombre']} ({datos_ups['UPS_modelo']})"
+            )
+        if datos_ats:
+            print(
+                f"  ATS M13       : {datos_ats['ATS_nombre']} ({datos_ats['ATS_modelo']})"
+            )
+        if cadena_datos:
+            print(f"  Coordinación  : {len(cadena_datos)} dispositivos en cadena")
     except Exception as e:
-        print(f"  Advertencia reporteria: {e}")
+        print(f"  AVISO lectura hojas opcionales: {e}")
+        params_demanda = None
+        cadena_datos   = []
+        datos_generador = None
+        datos_sts = None
+        datos_trafo_iso = None
+        datos_ups = None
+        datos_ats = None
 
-    registrar_ejecucion(datos_run)
-except Exception as e:
-    print(f"  Aviso persistencia: {e}")
+    # --- LEER CIRCUITOS ---
+    try:
+        circuitos = leer_circuitos_excel(archivo_excel)
+        circuitos = enriquecer_circuitos(
+            circuitos, norma=perfil.get("norma", "AWG")
+        )
+    except FileNotFoundError as e:
+        print(f"\n  ERROR: {e}")
+        if not args.no_pause:
+            input("\n  Presiona Enter para cerrar...")
+        sys.exit()
+    except ValueError as e:
+        print(f"\n  ERROR: {e}")
+        if not args.no_pause:
+            input("\n  Presiona Enter para cerrar...")
+        sys.exit()
+    except PermissionError as e:
+        print(f"\n  ERROR: {e}")
+        if not args.no_pause:
+            input("\n  Presiona Enter para cerrar...")
+        sys.exit()
+    except Exception as e:
+        print(f"\n  ERROR inesperado: {e}")
+        print("  Contacta al desarrollador con este mensaje.")
+        if not args.no_pause:
+            input("\n  Presiona Enter para cerrar...")
+        sys.exit()
 
-print(f"\n  Proyecto  : {nombre_proyecto}")
-print(f"  OK        : {total_ok}")
-print(f"  FALLA     : {total_falla}")
-print("\n  Listo.")
-if not args.no_pause:
-    input("\n  Presiona Enter para cerrar...")
+    if len(circuitos) == 0:
+        print("\n  ERROR: no se procesó ningún circuito válido.")
+        if not args.no_pause:
+            input("\n  Presiona Enter para cerrar...")
+        sys.exit()
+
+    # --- GENERAR Y MOSTRAR REPORTE ---
+    lineas, total_ok, total_falla = generar_reporte_txt(
+        nombre_proyecto, circuitos, fecha,
+        datos_trafo, protecciones_excel,
+        balance_datos, tableros_datos,
+        params_demanda, cadena_datos,
+        perfil=perfil, datos_generador=datos_generador, datos_sts=datos_sts,
+        datos_trafo_iso=datos_trafo_iso, datos_ups=datos_ups, datos_ats=datos_ats
+    )
+
+    print()
+    for linea in lineas:
+        print(linea)
+
+    # --- GUARDAR ---
+    nombre_txt  = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.txt"
+    nombre_xlsx = f"REPORTE_{nombre_proyecto.upper()}_{fecha_archivo}.xlsx"
+
+    guardar_txt(lineas, nombre_txt)
+    exportar_excel(nombre_proyecto, circuitos, fecha, nombre_xlsx, perfil=perfil)
+
+    try:
+        from persistencia import registrar_ejecucion
+
+        max_dv_pct = 0.0
+        max_icc_ka = 0.0
+        circuitos_persistencia = []
+        icc_por_circuito = {}
+        try:
+            if datos_trafo:
+                if datos_trafo.get("modo") == "A":
+                    _, zt_ohm, _ = calcular_icc_transformador(
+                        datos_trafo["kVA"], datos_trafo["Vn_BT"], datos_trafo["Ucc_pct"]
+                    )
+                else:
+                    _, ucc_pct_ref, _ = icc_desde_tabla(datos_trafo["kVA"])
+                    zt_ohm = (ucc_pct_ref / 100.0) * (
+                        (datos_trafo["Vn_BT"] ** 2) / (datos_trafo["kVA"] * 1000.0)
+                    )
+                circuitos_icc = calcular_icc_todos_circuitos(zt_ohm, circuitos)
+                for c_icc in circuitos_icc:
+                    icc_por_circuito[c_icc.get("nombre")] = c_icc.get("Icc_kA")
+        except Exception:
+            icc_por_circuito = {}
+
+        for c in circuitos:
+            dV_V, dV_pct = calcular_caida_tension(
+                c["L_m"], c["S_mm2"], c["I_diseno"], c["paralelos"], c["sistema"]
+            )
+            I_cap = capacidad_corregida(c["I_max"], c["paralelos"], c["temp_amb"])
+            estado_dV = clasificar_caida(dV_pct)
+            estado_I = "OK" if c["I_diseno"] <= I_cap else "SUPERA"
+            estado = "OK" if (estado_dV != "FALLA" and estado_I == "OK") else "CON_FALLAS"
+            icc_ka = c.get("icc_ka") or c.get("Icc_kA") or icc_por_circuito.get(c.get("nombre"))
+
+            observaciones = c.get("nivel_icc")
+            if estado_dV == "FALLA" or estado_I == "SUPERA":
+                cond, mm2, dv = sugerir_conductor(
+                    c["L_m"], c["I_diseno"], c["paralelos"],
+                    c["sistema"], c["temp_amb"],
+                    norma=perfil.get("norma", "AWG")
+                )
+                if cond:
+                    observaciones = f"redimensionar a {cond} ({mm2}mm2), dV={dv}%"
+                else:
+                    observaciones = "redimensionar conductor (sin alternativa en tabla)"
+
+            circuitos_persistencia.append(
+                {
+                    "nombre": c.get("nombre"),
+                    "conductor": c.get("conductor"),
+                    "norma": perfil.get("norma", "AWG"),
+                    "S_mm2": c.get("S_mm2"),
+                    "I_diseno": c.get("I_diseno"),
+                    "I_max": c.get("I_max"),
+                    "cos_phi": c.get("cos_phi"),
+                    "L_m": c.get("L_m"),
+                    "paralelos": c.get("paralelos"),
+                    "sistema": c.get("sistema"),
+                    "dv_v": round(dV_V, 3),
+                    "dv_pct": round(dV_pct, 3),
+                    "icc_ka": icc_ka,
+                    "estado": estado,
+                    "observaciones": observaciones,
+                }
+            )
+            if dV_pct > max_dv_pct:
+                max_dv_pct = dV_pct
+            if (icc_ka or 0.0) > max_icc_ka:
+                max_icc_ka = icc_ka or 0.0
+
+        datos_transformador = None
+        try:
+            if datos_trafo:
+                kVA = float(datos_trafo["kVA"])
+                vn_bt = float(datos_trafo["Vn_BT"])
+                if datos_trafo.get("modo") == "A":
+                    icc_nom_kA, _, _ = calcular_icc_transformador(
+                        datos_trafo["kVA"], datos_trafo["Vn_BT"], datos_trafo["Ucc_pct"]
+                    )
+                    ucc_pct = float(datos_trafo["Ucc_pct"])
+                else:
+                    icc_nom_kA, ucc_pct, _ = icc_desde_tabla(datos_trafo["kVA"])
+
+                z_min = ((ucc_pct * 0.925) / 100.0) * (vn_bt ** 2 / (kVA * 1000.0))
+                z_max = ((ucc_pct * 1.075) / 100.0) * (vn_bt ** 2 / (kVA * 1000.0))
+                icc_max_kA = round((1.1 * vn_bt / (1.732 * z_min)) / 1000.0, 2) if z_min > 0 else None
+                icc_min_kA = round((0.95 * vn_bt / (1.732 * z_max)) / 1000.0, 2) if z_max > 0 else None
+
+                datos_transformador = {
+                    "kVA": round(kVA, 2),
+                    "Vn_BT": round(vn_bt, 2),
+                    "Ucc_pct": round(ucc_pct, 2),
+                    "Icc_nom_kA": round(icc_nom_kA, 2),
+                    "Icc_max_kA": icc_max_kA,
+                    "Icc_min_kA": icc_min_kA,
+                }
+        except Exception:
+            datos_transformador = None
+
+        datos_balance_demanda = {}
+        try:
+            if balance_datos and tableros_datos:
+                kVA_trafo = datos_trafo["kVA"] if datos_trafo else 1000
+                r_balance = calcular_balance_tableros(
+                    circuitos, balance_datos, tableros_datos, kVA_trafo
+                )
+                datos_balance_demanda["balance"] = {
+                    "S_total_kva": r_balance.get("S_total_kva"),
+                    "uso_trafo_pct": r_balance.get("uso_trafo_pct"),
+                    "kVA_trafo": r_balance.get("kVA_trafo"),
+                }
+            if params_demanda and balance_datos:
+                r_dem = calcular_demanda(circuitos, balance_datos, params_demanda)
+                datos_balance_demanda["demanda"] = {
+                    "P_total_kw": r_dem.get("P_total_kw"),
+                    "S_total_kva": r_dem.get("S_total_kva"),
+                    "factor_crecimiento": r_dem.get("factor_crecimiento"),
+                    "S_futuro_kva": r_dem.get("S_futuro_kva"),
+                }
+        except Exception:
+            pass
+
+        datos_run = {
+            "project_id": nombre_proyecto,
+            "revision": "CLI",
+            "timestamp": datetime.now().astimezone().isoformat(),
+            "perfil": perfil.get("label", "industrial"),
+            "norma": perfil.get("norma", "AWG"),
+            "n_circuitos": len(circuitos),
+            "n_ok": total_ok,
+            "n_advertencias": max(len(circuitos) - total_ok - total_falla, 0),
+            "n_fallas": total_falla,
+            "max_dv_pct": round(max_dv_pct, 3),
+            "max_icc_ka": round(max_icc_ka, 3),
+            "status": "OK" if total_falla == 0 else "CON_FALLAS",
+            "ruta_reporte_txt": nombre_txt,
+            "ruta_reporte_xlsx": nombre_xlsx,
+            "circuitos": circuitos_persistencia,
+            "transformador": datos_transformador,
+            "balance_demanda": datos_balance_demanda,
+        }
+
+        if args.graficos:
+            try:
+                from parser_reporte import parsear_reporte
+                from graficos import generar_todos
+
+                ruta_txt = os.path.join(os.getcwd(), nombre_txt)
+                reporte = parsear_reporte(ruta_txt)
+                ruta_curvas = os.path.join(
+                    os.getcwd(),
+                    "07_CONTROL",
+                    "curvas",
+                    nombre_proyecto,
+                )
+                graficos = generar_todos(reporte, ruta_curvas, prefijo=nombre_proyecto + "_")
+                datos_run["graficos"] = graficos
+                if reporte.get("errores"):
+                    print(f"  Parser reporte: {len(reporte['errores'])} advertencia(s)")
+                print(f"  Graficos generados: {len(graficos)}")
+            except Exception as e:
+                print(f"  Advertencia graficos: {e}")
+
+        # Reporteria SEC adicional (sin interrumpir flujo principal).
+        try:
+            from reporteria_sec import generar_memoria_docx, generar_reporte_pdf
+
+            carpeta_salida = os.getcwd()
+            ruta_docx = generar_memoria_docx(datos_run, circuitos_persistencia, carpeta_salida)
+            ruta_pdf = generar_reporte_pdf(datos_run, circuitos_persistencia, carpeta_salida)
+            datos_run["ruta_reporte_docx"] = ruta_docx
+            datos_run["ruta_reporte_pdf"] = ruta_pdf
+            print(f"  Memoria SEC : {ruta_docx}")
+            print(f"  Reporte PDF : {ruta_pdf}")
+        except Exception as e:
+            print(f"  Advertencia reporteria: {e}")
+
+        registrar_ejecucion(datos_run)
+    except Exception as e:
+        print(f"  Aviso persistencia: {e}")
+
+    print(f"\n  Proyecto  : {nombre_proyecto}")
+    print(f"  OK        : {total_ok}")
+    print(f"  FALLA     : {total_falla}")
+    print("\n  Listo.")
+    if not args.no_pause:
+        input("\n  Presiona Enter para cerrar...")
