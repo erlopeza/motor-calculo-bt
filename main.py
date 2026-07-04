@@ -5,7 +5,6 @@
 # ============================================================
 
 import sys
-import math
 import os
 import argparse  # agregado graficos
 import openpyxl
@@ -585,7 +584,7 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
     lineas.append("=" * 60)
     lineas.append(f"  REPORTE — {nombre_proyecto}")
     lineas.append(f"  Fecha        : {fecha}")
-    lineas.append(f"  Normativa    : SEC RIC N10 / NEC / IEC 60364")
+    lineas.append("  Normativa    : SEC RIC N10 / NEC / IEC 60364")
     lineas.append(f"  Limite caida : {LIMITE_DV}% circuito final / 5% total")
     lineas.append(f"  Circuitos    : {len(circuitos)}")
     lineas.append("=" * 60)

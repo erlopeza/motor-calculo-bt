@@ -6,7 +6,7 @@
 # ============================================================
 
 import math
-from conductores import RHO_CU, CONDUCTORES, TENSION_SISTEMA, get_reactancia_cable_ohm_km
+from conductores import RHO_CU, TENSION_SISTEMA, get_reactancia_cable_ohm_km
 
 RHO_CU_OHM_MM2_M = RHO_CU  # resistividad cobre a 20°C (Ω·mm²/m) — IEC 60228
 C_MIN_IEC60909 = 0.95      # factor tension minima BT — IEC 60909 §4.3.1

@@ -1,6 +1,4 @@
-import math
-
-from generador import calcular_icc_ge, get_parametros_alternador
+from generador import calcular_icc_ge
 
 # ============================================================
 # CONSTANTES - clasificacion por origen

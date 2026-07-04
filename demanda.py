@@ -6,7 +6,6 @@
 # Razón para cambiar: nuevos factores de demanda o normativa
 # ============================================================
 
-import math
 
 # ============================================================
 # FACTORES DE DEMANDA — RIC N°03 + práctica SEC Chile
@@ -403,7 +402,7 @@ def reporte_demanda(resultado_demanda, resultado_trafo=None,
     lineas.append("=" * 60)
     lineas.append("  DEMANDA MÁXIMA Y DIMENSIONAMIENTO — M6")
     lineas.append(f"  Tipo de instalación : {r['tipo_instalacion'].upper()}")
-    lineas.append(f"  Normativa           : RIC N°03 SEC / IEC 60076")
+    lineas.append("  Normativa           : RIC N°03 SEC / IEC 60076")
     lineas.append("=" * 60)
 
     # Tabla detallada
