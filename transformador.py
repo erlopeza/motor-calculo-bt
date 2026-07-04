@@ -6,7 +6,6 @@
 # ============================================================
 
 import math
-from conductores import TENSION_SISTEMA
 
 # --- TABLA DE VALORES TÍPICOS POR POTENCIA ---
 # Fuente: IEC 60076 — transformadores de distribución
@@ -192,6 +191,6 @@ def reporte_transformador(datos, modo, Icc_kA):
                       f"→ verificación disparo")
 
     lineas.append(f"  Nivel Icc       : {clasificar_icc(Icc_kA)}")
-    lineas.append(f"  Normativa       : IEC 60909 §4.3.1 / IEC 60076-1 §11.4")
+    lineas.append("  Normativa       : IEC 60909 §4.3.1 / IEC 60076-1 §11.4")
     lineas.append("=" * 57)
     return lineas

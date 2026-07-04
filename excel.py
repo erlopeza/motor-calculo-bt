@@ -9,7 +9,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils.exceptions import InvalidFileException
 from conductores import (
     CONDUCTORES, get_tabla_conductores,
-    FACTOR_SISTEMA, TENSION_SISTEMA, LIMITE_DV, FACTORES_TEMP
+    FACTOR_SISTEMA, LIMITE_DV, FACTORES_TEMP
 )
 from calculos import (
     capacidad_corregida, calcular_potencia,

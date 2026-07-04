@@ -11,8 +11,6 @@
 #   En esa región la función retorna None con flag "VERIFICAR SIMARIS".
 # ============================================================
 
-import math
-
 from tcc_curvas import get_k_iec60898
 
 # ============================================================
@@ -464,7 +462,7 @@ def reporte_coordinacion(resultado_cadena, nombre_cadena="Cadena"):
 
     lineas.append("=" * 60)
     lineas.append(f"  COORDINACIÓN TCC — {nombre_cadena.upper()}")
-    lineas.append(f"  Normativa: IEC 60947-2 / IEC 60898 / IEC 60364-4-41")
+    lineas.append("  Normativa: IEC 60947-2 / IEC 60898 / IEC 60364-4-41")
     lineas.append(f"  Icc en punto de falla: {r['Icc_A']} A")
     lineas.append("=" * 60)
 
