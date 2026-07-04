@@ -205,6 +205,10 @@ def leer_circuitos_excel(nombre_archivo):
             )
             continue
 
+        if paralelos <= 0:
+            errores.append(f"Fila {num_fila} '{nombre}': paralelos debe ser >= 1")
+            continue
+
         if I_diseno <= 0:
             errores.append(f"Fila {num_fila} '{nombre}': corriente debe ser mayor a 0A")
             continue

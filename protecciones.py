@@ -66,7 +66,8 @@ def verificar_disparo(Icc_punto_A, In_A, curva):
         Im_min         : umbral mínimo de disparo en A
     """
     Im_min, Im_max = calcular_umbral_magnetico(In_A, curva)
-    if Im_min is None:
+    if Im_min is None or Im_min <= 0:
+        # curva inválida o In ≤ 0 (dato faltante) → disparo indeterminable
         return None, None, None
 
     puede_disparar = Icc_punto_A >= Im_min
