@@ -72,14 +72,20 @@ def leer_transformador_excel(nombre_archivo):
             print(f"  ⚠ {e}")
         return None
 
-    return {
-        "nombre":   str(datos.get("nombre", "Transformador")).strip(),
-        "modo":     modo,
-        "kVA":      float(datos.get("kva", 0)),
-        "Vn_BT":    float(datos.get("vn_bt", 380)),
-        "Ucc_pct":  float(datos.get("ucc_pct", 5.0)) if modo == "A" else None,
-        "conexion": str(datos.get("conexion", datos.get("conexion", "Dyn11"))).strip(),
-    }
+    # Conversión numérica defensiva: un valor no numérico en la hoja no debe
+    # crashear — se reporta y se omite el transformador (retorna None).
+    try:
+        return {
+            "nombre":   str(datos.get("nombre", "Transformador")).strip(),
+            "modo":     modo,
+            "kVA":      float(datos.get("kva", 0)),
+            "Vn_BT":    float(datos.get("vn_bt", 380)),
+            "Ucc_pct":  float(datos.get("ucc_pct", 5.0)) if modo == "A" else None,
+            "conexion": str(datos.get("conexion", "Dyn11")).strip(),
+        }
+    except (TypeError, ValueError) as e:
+        print(f"\n  ⚠ Transformador: valor numérico inválido ({e}) — omitiendo cálculo de Icc")
+        return None
 
 # ============================================================
 # LECTURA — CIRCUITOS
@@ -472,13 +478,17 @@ def leer_balance_excel(libro_openpyxl):
 
     hoja = libro_openpyxl[hoja_nombre]
 
+    def _celda(fila, idx):
+        # Acceso seguro: filas más cortas que lo esperado no deben crashear.
+        return fila[idx] if idx < len(fila) else None
+
     for fila in hoja.iter_rows(min_row=2, values_only=True):
-        if not fila[0]:
+        if not fila or not _celda(fila, 0):
             continue
-        nombre     = str(fila[0]).strip()
-        tablero    = str(fila[1]).strip() if fila[1] else "SIN TABLERO"
-        fase       = str(fila[2]).strip().upper() if fila[2] else "L1"
-        tipo_carga = str(fila[3]).strip().lower() if fila[3] else "critica"
+        nombre     = str(_celda(fila, 0)).strip()
+        tablero    = str(_celda(fila, 1)).strip() if _celda(fila, 1) else "SIN TABLERO"
+        fase       = str(_celda(fila, 2)).strip().upper() if _celda(fila, 2) else "L1"
+        tipo_carga = str(_celda(fila, 3)).strip().lower() if _celda(fila, 3) else "critica"
 
         balance[nombre] = {
             "tablero":    tablero,
@@ -509,10 +519,14 @@ def leer_tableros_excel(libro_openpyxl):
     hoja = libro_openpyxl[hoja_nombre]
 
     for fila in hoja.iter_rows(min_row=2, values_only=True):
-        if not fila[0]:
+        if not fila or not fila[0]:
             continue
-        nombre   = str(fila[0]).strip()
-        cap_kva  = float(fila[1]) if fila[1] else 0
+        nombre = str(fila[0]).strip()
+        cap_raw = fila[1] if len(fila) > 1 else None
+        try:
+            cap_kva = float(cap_raw) if cap_raw not in (None, "") else 0.0
+        except (TypeError, ValueError):
+            cap_kva = 0.0  # capacidad no numérica → 0 (se reporta como sin dato)
         tableros[nombre] = cap_kva
 
     return tableros
