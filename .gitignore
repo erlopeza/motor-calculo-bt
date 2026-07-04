@@ -58,3 +58,8 @@ rag_normativa/db/
 *.pdf
 !Referencias/
 !HCI5D-14-TD-EN_Rev_A.pdf
+
+# Artefactos de cobertura / hypothesis
+.coverage
+htmlcov/
+.hypothesis/
