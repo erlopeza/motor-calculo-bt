@@ -43,3 +43,23 @@ class TestIccGeometriaRobustez:
     def test_zt_complejo_valido_sigue_ok(self):
         z = I.calcular_zt_cable_complejo(20, 10.0, 1)
         assert z.real > 0
+
+
+# ---------------------------------------------------------------------------
+# Funciones de reporte — dict vacío/None no debe crashear
+# ---------------------------------------------------------------------------
+
+class TestReportesRobustez:
+    def test_reporte_coordinacion_vacio(self):
+        import coordinacion as C
+        assert isinstance(C.reporte_coordinacion({}), list)
+        assert isinstance(C.reporte_coordinacion(None), list)
+
+    def test_reporte_balance_vacio(self):
+        import balance as B
+        assert isinstance(B.reporte_balance({}), list)
+
+    def test_reporte_demanda_vacio_y_none(self):
+        import demanda as D
+        assert isinstance(D.reporte_demanda(None), list)
+        assert isinstance(D.reporte_demanda({}), list)
