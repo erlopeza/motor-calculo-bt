@@ -50,3 +50,32 @@ def test_tabla_resultados_llena_filas():
         assert t.num_filas() == 2
     finally:
         root.destroy()
+
+
+@requiere_display
+def test_riel_fases_lista_las_7_fases():
+    import tkinter as tk
+    from gui.componentes import RielFases
+    from gui_core.sesion import SesionProyecto
+    root = tk.Tk(); root.withdraw()
+    try:
+        seleccion = []
+        riel = RielFases(root, SesionProyecto(), on_seleccion=lambda n: seleccion.append(n))
+        assert len(riel.items) == 7
+        riel.seleccionar(3)
+        assert seleccion == [3]
+    finally:
+        root.destroy()
+
+
+@requiere_display
+def test_barra_superior_muestra_proyecto():
+    import tkinter as tk
+    from gui.componentes import BarraSuperior
+    root = tk.Tk(); root.withdraw()
+    try:
+        barra = BarraSuperior(root, on_cargar=lambda: None)
+        barra.set_info(proyecto="LEO-ARICA", perfil="datacenter", estado="12 hojas")
+        assert "LEO-ARICA" in barra.texto_proyecto()
+    finally:
+        root.destroy()
