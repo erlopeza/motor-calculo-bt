@@ -1,6 +1,7 @@
 """Ventana principal de la GUI por fases (Tokyo Night) sobre gui_core."""
 from __future__ import annotations
 
+import traceback
 import tkinter as tk
 from tkinter import filedialog
 
@@ -78,6 +79,7 @@ class AppBT(tk.Tk):
             resultado = fn(self.sesion)
             self.sesion.registrar(modulo_id, resultado, resultado.get("alertas", []))
         except Exception as e:
+            traceback.print_exc()  # detalle completo a consola; el label solo muestra el mensaje
             self.barra.set_info(self.sesion.proyecto, self.sesion.perfil,
                                  estado=f"error en {modulo_id}: {e}", es_error=True)
             return
