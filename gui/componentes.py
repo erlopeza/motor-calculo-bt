@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from gui_core.estado import COLORES, Estado, color_de_estado
+from gui_core.fases import FASES, estado_fase
 
 _ETIQUETA = {
     Estado.SIN_DATOS: "sin datos",
@@ -85,14 +86,12 @@ class TablaResultados(tk.Frame):
         return len(self.tree.get_children())
 
 
-from gui_core.fases import FASES, estado_fase
-
-
 class RielFases(tk.Frame):
     """Lista vertical de las 7 fases con badge de estado; notifica selección."""
 
     def __init__(self, master, sesion, on_seleccion):
         super().__init__(master, bg=COLORES["panel"], width=200)
+        self.pack_propagate(False)
         self.sesion = sesion
         self.on_seleccion = on_seleccion
         self.items: dict[int, tk.Frame] = {}
@@ -129,6 +128,7 @@ class BarraSuperior(tk.Frame):
 
     def __init__(self, master, on_cargar):
         super().__init__(master, bg=COLORES["panel"], height=44)
+        self.pack_propagate(False)
         self._proyecto = tk.StringVar(value="Proyecto: —")
         self._perfil = tk.StringVar(value="perfil: —")
         self._estado = tk.StringVar(value="")
