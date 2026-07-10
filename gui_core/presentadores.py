@@ -6,6 +6,8 @@ No importan tkinter. La sesión guarda el resultado vía registrar().
 from __future__ import annotations
 
 import os
+from collections import Counter
+from datetime import datetime
 
 from calculos import calcular_caida_tension, clasificar_caida, capacidad_corregida, sugerir_conductor
 from transformador import calcular_icc_transformador, icc_desde_tabla
@@ -20,7 +22,7 @@ from demanda import calcular_demanda
 from red_desde_cadena import construir_red
 from flujo_nodal import calcular_flujo_nodal
 from reporteria_sec import (
-    generar_memoria_docx, generar_reporte_pdf,
+    generar_memoria_sec, generar_reporte_pdf,
     exportar_json_epc, verificar_completitud_parametros,
 )
 from gui_core.sesion import SesionProyecto
@@ -198,25 +200,67 @@ def presentar_aporte_motores(sesion: SesionProyecto) -> dict:
     return {"filas": filas, "Icc_red_kA": icc_red, "Icc_total_kA": icc_total, "alertas": []}
 
 
+def _norma_predominante(circuitos: list) -> str:
+    normas = [str(c.get("norma")) for c in circuitos if c.get("norma")]
+    if not normas:
+        return "MM2"
+    return Counter(normas).most_common(1)[0][0]
+
+
 def _datos_run(sesion: SesionProyecto) -> dict:
     return {
         "project_id": sesion.proyecto or "PROYECTO",
         "revision": "GUI",
+        "timestamp": datetime.now().astimezone().isoformat(),
         "perfil": sesion.perfil or "industrial",
-        "norma": "MM2",
+        "norma": _norma_predominante(sesion.circuitos),
         "n_circuitos": len(sesion.circuitos),
-        "status": "OK",
         "cadena": sesion.cadena,
         "trafo_z_ohm": sesion.trafo_z_ohm,
         "tension_sistema_v": sesion.tension_sistema_v,
+        "ats": sesion.ats or {},
+        "ups": sesion.ups or {},
+        "generador": sesion.generador or {},
     }
+
+
+def _circuitos_enriquecidos(sesion: SesionProyecto) -> list:
+    """Copia sesion.circuitos y les mezcla dv/estado/icc ya calculados (si existen)."""
+    dv_filas = {
+        f["nombre"]: f
+        for f in sesion.resultados.get("dv", {}).get("resultado", {}).get("filas", [])
+    }
+    icc_filas = {
+        f["nombre"]: f
+        for f in sesion.resultados.get("icc_punto", {}).get("resultado", {}).get("filas", [])
+    }
+    salida = []
+    for c in sesion.circuitos:
+        c2 = dict(c)
+        dv = dv_filas.get(c["nombre"])
+        if dv:
+            c2["dv_v"] = dv.get("dv_v")
+            c2["dv_pct"] = dv.get("dv_pct")
+            c2["estado"] = dv.get("estado")
+        icc = icc_filas.get(c["nombre"])
+        if icc:
+            c2["icc_ka"] = icc.get("Icc_kA")
+        salida.append(c2)
+    return salida
 
 
 def presentar_reporte(sesion: SesionProyecto, carpeta_salida: str | None = None) -> dict:
     """Genera memoria DOCX/PDF/JSON EPC + gate de completitud."""
     carpeta = carpeta_salida or os.getcwd()
+    circuitos = _circuitos_enriquecidos(sesion)
     datos = _datos_run(sesion)
-    circuitos = sesion.circuitos
+    n_falla = sum(1 for c in circuitos if str(c.get("estado") or "").upper() == "FALLA")
+    n_ok = len(circuitos) - n_falla
+    datos["n_ok"] = n_ok
+    datos["n_fallas"] = n_falla
+    datos["status"] = "OK" if n_falla == 0 else "CON_FALLAS"
+    datos["max_dv_pct"] = max((float(c.get("dv_pct") or 0.0) for c in circuitos), default=0.0)
+    datos["max_icc_ka"] = max((float(c.get("icc_ka") or 0.0) for c in circuitos), default=0.0)
     gate = verificar_completitud_parametros(datos)
     alertas = [] if gate.get("apto_emision") else ["parámetros TIPO-A en default"]
     salida = {"apto_emision": gate.get("apto_emision", False),
@@ -225,7 +269,7 @@ def presentar_reporte(sesion: SesionProyecto, carpeta_salida: str | None = None)
     if not circuitos:
         return salida
     try:
-        salida["ruta_docx"] = generar_memoria_docx(datos, circuitos, carpeta)
+        salida["ruta_docx"] = generar_memoria_sec(datos, circuitos, carpeta)
         salida["ruta_pdf"] = generar_reporte_pdf(datos, circuitos, carpeta)
         salida["ruta_json"] = exportar_json_epc(datos, carpeta, circuitos=circuitos)
     except Exception as e:  # la generación no debe tumbar la GUI
