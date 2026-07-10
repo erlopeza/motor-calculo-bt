@@ -110,4 +110,5 @@ PRESENTADOR = {
     "balance": _p.presentar_balance,
     "demanda": _p.presentar_demanda,
     "flujo_nodal": _p.presentar_flujo_nodal,
+    "reporte": _p.presentar_reporte,
 }

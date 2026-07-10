@@ -5,6 +5,8 @@ No importan tkinter. La sesión guarda el resultado vía registrar().
 """
 from __future__ import annotations
 
+import os
+
 from calculos import calcular_caida_tension, clasificar_caida, capacidad_corregida, sugerir_conductor
 from transformador import calcular_icc_transformador, icc_desde_tabla
 from icc_punto import calcular_icc_punto, calcular_icc_con_aporte_motores
@@ -17,6 +19,10 @@ from balance import calcular_balance_tableros
 from demanda import calcular_demanda
 from red_desde_cadena import construir_red
 from flujo_nodal import calcular_flujo_nodal
+from reporteria_sec import (
+    generar_memoria_docx, generar_reporte_pdf,
+    exportar_json_epc, verificar_completitud_parametros,
+)
 from gui_core.sesion import SesionProyecto
 
 
@@ -190,3 +196,38 @@ def presentar_aporte_motores(sesion: SesionProyecto) -> dict:
     icc_red = presentar_icc_trafo(sesion)["Icc_kA"] if sesion.tiene_trafo else 0.0
     icc_total, _ = calcular_icc_con_aporte_motores(icc_red, aportes)
     return {"filas": filas, "Icc_red_kA": icc_red, "Icc_total_kA": icc_total, "alertas": []}
+
+
+def _datos_run(sesion: SesionProyecto) -> dict:
+    return {
+        "project_id": sesion.proyecto or "PROYECTO",
+        "revision": "GUI",
+        "perfil": sesion.perfil or "industrial",
+        "norma": "MM2",
+        "n_circuitos": len(sesion.circuitos),
+        "status": "OK",
+        "cadena": sesion.cadena,
+        "trafo_z_ohm": sesion.trafo_z_ohm,
+        "tension_sistema_v": sesion.tension_sistema_v,
+    }
+
+
+def presentar_reporte(sesion: SesionProyecto, carpeta_salida: str | None = None) -> dict:
+    """Genera memoria DOCX/PDF/JSON EPC + gate de completitud."""
+    carpeta = carpeta_salida or os.getcwd()
+    datos = _datos_run(sesion)
+    circuitos = sesion.circuitos
+    gate = verificar_completitud_parametros(datos)
+    alertas = [] if gate.get("apto_emision") else ["parámetros TIPO-A en default"]
+    salida = {"apto_emision": gate.get("apto_emision", False),
+              "nivel": gate.get("nivel", "INCOMPLETO"), "alertas": alertas,
+              "ruta_docx": "", "ruta_pdf": "", "ruta_json": ""}
+    if not circuitos:
+        return salida
+    try:
+        salida["ruta_docx"] = generar_memoria_docx(datos, circuitos, carpeta)
+        salida["ruta_pdf"] = generar_reporte_pdf(datos, circuitos, carpeta)
+        salida["ruta_json"] = exportar_json_epc(datos, carpeta, circuitos=circuitos)
+    except Exception as e:  # la generación no debe tumbar la GUI
+        salida["alertas"].append(f"error de generación: {e}")
+    return salida
