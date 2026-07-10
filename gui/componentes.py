@@ -18,7 +18,7 @@ class BadgeEstado(tk.Label):
     """Punto + etiqueta de estado, coloreado."""
 
     def __init__(self, master, estado: Estado):
-        super().__init__(master, bg=COLORES["panel"])
+        super().__init__(master)
         self.set_estado(estado)
 
     def set_estado(self, estado: Estado) -> None:
@@ -34,7 +34,9 @@ class BotonAccion(tk.Button):
         super().__init__(
             master, text=texto, command=comando,
             bg=COLORES["acento"], fg=COLORES["fondo"], relief="flat",
-            activebackground=COLORES["acento"], font=("Segoe UI", 10, "bold"),
+            activebackground=COLORES["acento"], activeforeground=COLORES["fondo"],
+            disabledforeground=COLORES["texto_tenue"],
+            font=("Segoe UI", 10, "bold"),
             padx=14, pady=6, cursor="hand2", bd=0,
         )
 
@@ -51,7 +53,21 @@ class TablaResultados(tk.Frame):
     def __init__(self, master, columnas: list[str]):
         super().__init__(master, bg=COLORES["fondo"])
         self.columnas = columnas
-        self.tree = ttk.Treeview(self, columns=columnas, show="headings", height=8)
+
+        style = ttk.Style(self)
+        style.theme_use(style.theme_use())  # no cambiar el theme base, solo overridear colores
+        style.configure("TokyoNight.Treeview",
+                        background=COLORES["panel"], fieldbackground=COLORES["panel"],
+                        foreground=COLORES["texto"], borderwidth=0)
+        style.configure("TokyoNight.Treeview.Heading",
+                        background=COLORES["seleccion"], foreground=COLORES["texto"],
+                        relief="flat")
+        style.map("TokyoNight.Treeview",
+                  background=[("selected", COLORES["seleccion"])],
+                  foreground=[("selected", COLORES["texto"])])
+
+        self.tree = ttk.Treeview(self, columns=columnas, show="headings", height=8,
+                                  style="TokyoNight.Treeview")
         for col in columnas:
             self.tree.heading(col, text=col)
             self.tree.column(col, anchor="center", width=110)
