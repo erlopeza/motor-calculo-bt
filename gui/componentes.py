@@ -55,7 +55,9 @@ class TablaResultados(tk.Frame):
         self.columnas = columnas
 
         style = ttk.Style(self)
-        style.theme_use(style.theme_use())  # no cambiar el theme base, solo overridear colores
+        # "clam" honra background/foreground de ttk.Style; el tema nativo de Windows
+        # ("vista") renderiza heading y fieldbackground via UxTheme e ignora estos colores.
+        style.theme_use("clam")
         style.configure("TokyoNight.Treeview",
                         background=COLORES["panel"], fieldbackground=COLORES["panel"],
                         foreground=COLORES["texto"], borderwidth=0)
