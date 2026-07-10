@@ -82,6 +82,23 @@ def test_barra_superior_muestra_proyecto():
 
 
 @requiere_display
+def test_barra_superior_es_error_pinta_alerta():
+    import tkinter as tk
+    from gui_core.estado import COLORES
+    from gui.componentes import BarraSuperior
+    root = tk.Tk(); root.withdraw()
+    try:
+        barra = BarraSuperior(root, on_cargar=lambda: None)
+        barra.set_info(proyecto="LEO-ARICA", perfil="datacenter",
+                        estado="archivo bloqueado", es_error=True)
+        assert barra._lbl_estado.cget("fg") == COLORES["alerta"]
+        barra.set_info(proyecto="LEO-ARICA", perfil="datacenter", estado="12 hojas")
+        assert barra._lbl_estado.cget("fg") == COLORES["ok"]
+    finally:
+        root.destroy()
+
+
+@requiere_display
 def test_panel_modulo_render_y_calcular():
     import tkinter as tk
     from gui.componentes import PanelModulo
@@ -98,5 +115,26 @@ def test_panel_modulo_render_y_calcular():
         assert "NCh" in panel.norma_texto()
         panel.boton.invoke()   # dispara on_calcular
         assert llamado == ["dv"]
+    finally:
+        root.destroy()
+
+
+@requiere_display
+def test_panel_modulo_sin_presentador_boton_deshabilitado():
+    import tkinter as tk
+    from gui.componentes import PanelModulo
+    from gui_core.fases import buscar_modulo
+    from gui_core.sesion import SesionProyecto
+    root = tk.Tk(); root.withdraw()
+    try:
+        s = SesionProyecto(circuitos=[{"nombre": "C1", "sistema": "3F", "conductor": "6AWG",
+            "S_mm2": 13.3, "I_max": 65, "paralelos": 1, "I_diseno": 40, "cos_phi": 0.9,
+            "L_m": 15, "temp_amb": 30}])
+        modulo = buscar_modulo("arranque")
+        assert modulo.prereq(s) is True   # prereq cumple, pero no hay presentador registrado
+        panel = PanelModulo(root, modulo, s, on_calcular=lambda mid: None)
+        assert str(panel.boton["state"]) == "disabled"
+        panel.refrescar_estado()
+        assert str(panel.boton["state"]) == "disabled"
     finally:
         root.destroy()

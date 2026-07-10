@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from gui_core.estado import COLORES, Estado, color_de_estado
-from gui_core.fases import FASES, estado_fase, estado_modulo
+from gui_core.fases import FASES, estado_fase, estado_modulo, PRESENTADOR
 
 _ETIQUETA = {
     Estado.SIN_DATOS: "sin datos",
@@ -137,13 +137,15 @@ class BarraSuperior(tk.Frame):
         tk.Label(self, textvariable=self._perfil, bg=COLORES["panel"],
                  fg=COLORES["texto_tenue"], font=("Segoe UI", 9)).pack(side="left")
         BotonAccion(self, "Cargar Excel", on_cargar).pack(side="right", padx=12, pady=6)
-        tk.Label(self, textvariable=self._estado, bg=COLORES["panel"],
-                 fg=COLORES["ok"], font=("Segoe UI", 9)).pack(side="right", padx=8)
+        self._lbl_estado = tk.Label(self, textvariable=self._estado, bg=COLORES["panel"],
+                 fg=COLORES["ok"], font=("Segoe UI", 9))
+        self._lbl_estado.pack(side="right", padx=8)
 
-    def set_info(self, proyecto: str, perfil: str, estado: str) -> None:
+    def set_info(self, proyecto: str, perfil: str, estado: str, es_error: bool = False) -> None:
         self._proyecto.set(f"Proyecto: {proyecto}")
         self._perfil.set(f"perfil: {perfil}")
         self._estado.set(estado)
+        self._lbl_estado.configure(fg=COLORES["alerta"] if es_error else COLORES["ok"])
 
     def texto_proyecto(self) -> str:
         return self._proyecto.get()
@@ -173,8 +175,8 @@ class PanelModulo(tk.Frame):
 
         self.boton = BotonAccion(self, "Calcular", lambda: on_calcular(modulo.id))
         self.boton.pack(anchor="w")
-        prereq_ok = modulo.prereq(sesion)
-        self.boton.set_habilitado(prereq_ok)
+        habilitado = modulo.prereq(sesion) and modulo.id in PRESENTADOR
+        self.boton.set_habilitado(habilitado)
 
         self.contenedor_resultados = tk.Frame(self, bg=COLORES["fondo"])
         self.contenedor_resultados.pack(fill="both", expand=True, pady=(10, 0))
@@ -188,7 +190,8 @@ class PanelModulo(tk.Frame):
     def refrescar_estado(self) -> None:
         self.badge.set_estado(estado_modulo(self.modulo, self.sesion))
         self.badge.configure(bg=COLORES["fondo"])
-        self.boton.set_habilitado(self.modulo.prereq(self.sesion))
+        habilitado = self.modulo.prereq(self.sesion) and self.modulo.id in PRESENTADOR
+        self.boton.set_habilitado(habilitado)
 
     def mostrar_tabla(self, columnas: list[str], filas: list[list]) -> None:
         for w in self.contenedor_resultados.winfo_children():

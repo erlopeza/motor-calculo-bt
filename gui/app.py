@@ -54,8 +54,9 @@ class AppBT(tk.Tk):
         if not ruta:
             return
         resumen = cargar_excel_a_sesion(ruta, self.sesion)
-        estado = f"{resumen['hojas']} hojas" if not resumen["error"] else "error de carga"
-        self.barra.set_info(self.sesion.proyecto, self.sesion.perfil, estado)
+        error = resumen["error"]
+        estado = f"{resumen['hojas']} hojas" if not error else str(error)[:120]
+        self.barra.set_info(self.sesion.proyecto, self.sesion.perfil, estado, es_error=bool(error))
         self.riel.refrescar()
         self.mostrar_fase(self.fase_actual)
 
@@ -73,8 +74,13 @@ class AppBT(tk.Tk):
         fn = PRESENTADOR.get(modulo_id)
         if fn is None:
             return
-        resultado = fn(self.sesion)
-        self.sesion.registrar(modulo_id, resultado, resultado.get("alertas", []))
+        try:
+            resultado = fn(self.sesion)
+            self.sesion.registrar(modulo_id, resultado, resultado.get("alertas", []))
+        except Exception as e:
+            self.barra.set_info(self.sesion.proyecto, self.sesion.perfil,
+                                 estado=f"error en {modulo_id}: {e}", es_error=True)
+            return
         # refrescar tabla del panel + badges
         cols = _COLUMNAS.get(modulo_id)
         for panel in self.paneles_actuales:
