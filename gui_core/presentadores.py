@@ -263,6 +263,10 @@ def presentar_reporte(sesion: SesionProyecto, carpeta_salida: str | None = None)
     datos["max_icc_ka"] = max((float(c.get("icc_ka") or 0.0) for c in circuitos), default=0.0)
     gate = verificar_completitud_parametros(datos)
     alertas = [] if gate.get("apto_emision") else ["parámetros TIPO-A en default"]
+    if "dv" not in sesion.resultados:
+        alertas.append("ΔV no calculado — ejecute fase 1 antes de emitir")
+    if "icc_punto" not in sesion.resultados:
+        alertas.append("Icc por punto no calculado — ejecute fase 2 antes de emitir")
     salida = {"apto_emision": gate.get("apto_emision", False),
               "nivel": gate.get("nivel", "INCOMPLETO"), "alertas": alertas,
               "ruta_docx": "", "ruta_pdf": "", "ruta_json": ""}
