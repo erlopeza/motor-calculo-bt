@@ -79,3 +79,24 @@ def test_barra_superior_muestra_proyecto():
         assert "LEO-ARICA" in barra.texto_proyecto()
     finally:
         root.destroy()
+
+
+@requiere_display
+def test_panel_modulo_render_y_calcular():
+    import tkinter as tk
+    from gui.componentes import PanelModulo
+    from gui_core.fases import buscar_modulo
+    from gui_core.sesion import SesionProyecto
+    root = tk.Tk(); root.withdraw()
+    try:
+        s = SesionProyecto(circuitos=[{"nombre": "C1", "sistema": "3F", "conductor": "6AWG",
+            "S_mm2": 13.3, "I_max": 65, "paralelos": 1, "I_diseno": 40, "cos_phi": 0.9,
+            "L_m": 15, "temp_amb": 30}])
+        llamado = []
+        panel = PanelModulo(root, buscar_modulo("dv"), s, on_calcular=lambda mid: llamado.append(mid))
+        assert "Caída de tensión" in panel.titulo_texto()
+        assert "NCh" in panel.norma_texto()
+        panel.boton.invoke()   # dispara on_calcular
+        assert llamado == ["dv"]
+    finally:
+        root.destroy()

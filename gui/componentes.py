@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from gui_core.estado import COLORES, Estado, color_de_estado
-from gui_core.fases import FASES, estado_fase
+from gui_core.fases import FASES, estado_fase, estado_modulo
 
 _ETIQUETA = {
     Estado.SIN_DATOS: "sin datos",
@@ -147,3 +147,53 @@ class BarraSuperior(tk.Frame):
 
     def texto_proyecto(self) -> str:
         return self._proyecto.get()
+
+
+class PanelModulo(tk.Frame):
+    """Anatomía uniforme: encabezado+norma+badge, aplicabilidad, acción, resultados."""
+
+    def __init__(self, master, modulo, sesion, on_calcular):
+        super().__init__(master, bg=COLORES["fondo"], padx=16, pady=12)
+        self.modulo = modulo
+        self.sesion = sesion
+
+        cab = tk.Frame(self, bg=COLORES["fondo"]); cab.pack(fill="x")
+        self._titulo = tk.Label(cab, text=modulo.nombre, bg=COLORES["fondo"],
+                                fg=COLORES["texto"], font=("Segoe UI", 13, "bold"))
+        self._titulo.pack(side="left")
+        self._norma = tk.Label(cab, text=modulo.norma, bg=COLORES["fondo"],
+                               fg=COLORES["texto_tenue"], font=("Segoe UI", 9))
+        self._norma.pack(side="left", padx=10)
+        self.badge = BadgeEstado(cab, estado_modulo(modulo, sesion))
+        self.badge.configure(bg=COLORES["fondo"])
+        self.badge.pack(side="right")
+
+        tk.Label(self, text=f"Requiere: {modulo.requiere}", bg=COLORES["fondo"],
+                 fg=COLORES["texto_tenue"], font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 8))
+
+        self.boton = BotonAccion(self, "Calcular", lambda: on_calcular(modulo.id))
+        self.boton.pack(anchor="w")
+        prereq_ok = modulo.prereq(sesion)
+        self.boton.set_habilitado(prereq_ok)
+
+        self.contenedor_resultados = tk.Frame(self, bg=COLORES["fondo"])
+        self.contenedor_resultados.pack(fill="both", expand=True, pady=(10, 0))
+
+    def titulo_texto(self) -> str:
+        return self._titulo.cget("text")
+
+    def norma_texto(self) -> str:
+        return self._norma.cget("text")
+
+    def refrescar_estado(self) -> None:
+        self.badge.set_estado(estado_modulo(self.modulo, self.sesion))
+        self.badge.configure(bg=COLORES["fondo"])
+        self.boton.set_habilitado(self.modulo.prereq(self.sesion))
+
+    def mostrar_tabla(self, columnas: list[str], filas: list[list]) -> None:
+        for w in self.contenedor_resultados.winfo_children():
+            w.destroy()
+        tabla = TablaResultados(self.contenedor_resultados, columnas)
+        tabla.configure(bg=COLORES["fondo"])
+        tabla.set_filas(filas)
+        tabla.pack(fill="both", expand=True)
