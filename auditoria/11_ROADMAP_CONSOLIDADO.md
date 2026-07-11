@@ -100,3 +100,20 @@ El siguiente paso concreto y de mayor retorno es **cerrar Fase 0 y arrancar P0.1
 3. Implementar P0.1 con TDD (tabla DATA-1 + migración a `complex` en `icc_punto.py`/`calculos.py`).
 
 > Documento de planificación, solo lectura sobre el código. No se modificó código fuente; las acciones ✅ corresponden a la corrección de higiene de la auditoría base (en working tree, sin commit).
+
+---
+
+## 6. Adenda — estado post-F3 (2026-07-11)
+
+Este documento quedó congelado al cierre de F3. Trabajo posterior, fuera del backlog original pero en la misma línea de "consolidar antes de crecer":
+
+- **Endurecimiento del motor** (rama `hardening/motor-aristas`, mergeada): lectores de Excel y calculadores protegidos contra datos malformados/faltantes (antes crasheaban con `ZeroDivisionError`/`KeyError`/`ValueError`); suite de tests basados en propiedades (`hypothesis`) añadida como capa complementaria de fuzz sobre los invariantes físicos.
+- **Limpieza de módulos** (rama `cleanup/modulos`, mergeada): eliminado el monolito legado `calculo_bt.py` (muerto, cero importadores); imports sin uso y f-strings sin placeholder corregidos; `pyflakes` en cero para todos los módulos no-GUI.
+- **Rediseño de GUI en dos planes** (ambos mergeados a `main`):
+  - Plan 1 — `gui_core/`: núcleo lógico sin tkinter (`SesionProyecto`, registro de 18 módulos en 7 fases, presentadores que orquestan el motor existente), 100 % testeable sin display.
+  - Plan 2 — `gui/`: capa visual Tkinter sobre `gui_core` (paleta Tokyo Night, navegación por fase, `AppBT`); `gui.py` pasó a ser un lanzador delgado; se retiraron las sub-ventanas `Toplevel` viejas (arranque/emergencia/guiada/reporte).
+  - Pendiente documentado (no bloqueante): paneles de parámetros de entrada para fase 5 (Emergencia) y visualización de resultados no tabulares (Icc trafo, balance, demanda, flujo nodal, reporte) — candidato a un Plan 3 futuro.
+
+**F4 (Ground Grid, DC, ANSI SC, armónicos) sigue diferido**, sin cambios respecto a la decisión original: solo se retoma si el mercado lo justifica.
+
+**Estado actual:** 766 tests (758 passed + 8 skipped), `pyflakes` limpio en todo el repo, sin `TODO`/`FIXME` pendientes.

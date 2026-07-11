@@ -2,9 +2,9 @@
 
 Herramienta de cálculo eléctrico para instalaciones de baja tensión (BT) según normativa chilena (SEC/NCh) e internacional (IEC/NEC). Lee datos desde Excel, calcula y verifica toda la instalación, y genera la memoria técnica SEC en DOCX/PDF.
 
-**Versión:** 2.0  
+**Versión:** 2.1  
 **Python:** ≥ 3.12  
-**Tests:** 480 (475 passed + 5 skipped RAG) — `pytest` verde en cada commit
+**Tests:** 766 (758 passed + 8 skipped: RAG opcional + GUI Tk sin display) — `pytest` verde en cada commit
 
 ---
 
@@ -17,13 +17,18 @@ Herramienta de cálculo eléctrico para instalaciones de baja tensión (BT) seg�
 | Protecciones | Disparo magnético (B/C/D/K/MA), poder de corte, tiempo de desconexión | IEC 60898 / 60947-2 |
 | Coordinación | Selectividad en cadena, verificación IEC 60364 | IEC 60364 |
 | Demanda y balance | FD por tipo de carga, balance de fases, selección de transformador | RIC N°10 |
+| Aporte de motores al Icc | Contribución subtransitoria de motores al cortocircuito | IEC 60909-4:2021 |
+| Arc Flash | Energía incidente, frontera de arco, categoría EPP (evaluado en Ia, no solo Ibf) | IEEE 1584-2002 / NFPA 70E |
+| Curvas TCC | Catálogo tiempo-corriente por curva (B/C/D/K/MA), fuente única de `k` térmico | IEC 60898-1 / IEC 60255-151 |
+| Coordinación | Selectividad en cadena, márgenes, verificación de respaldo (back-up) | IEC 60364 / IEC 60947-2 |
+| Flujo de carga nodal | Newton-Raphson multinivel desde la cadena de protecciones: tensión por barra, pérdidas | IEEE 399 / IEC 60909 |
 | Motores (M8) | Corriente nominal y arranque, ΔV arranque, conductor, guardamotor | NCh 4-2003 §12.28 |
 | Generador (M9) | Potencia mínima, derrateo altitud, Icc GE, autonomía, ATS | NCh 4-2003 / RIC N°08 |
 | STS | Capacidad, transferencia, sobrecarga, redundancia 2N | TIA-942 |
 | UPS | Banco de baterías, autonomía, tiempo de recarga | IEC 62040 |
 | Trafo de aislamiento | Capacidad, Icc secundario, ΔV | IEC 60076 |
 | ATS | Sincronización, tiempos de transferencia | RIC N°08 |
-| Memoria SEC | Reporte DOCX + PDF con gate de emisión (BORRADOR/INCOMPLETO) | SEC Chile |
+| Memoria SEC | Reporte DOCX + PDF + JSON EPC, con gate de emisión (FINAL/BORRADOR/INCOMPLETO) según parámetros TIPO-A confirmados | SEC Chile |
 
 ---
 
@@ -64,6 +69,12 @@ MEMORIA_NOMBRE_FECHA.docx    ← memoria técnica SEC
 python gui.py
 ```
 
+Navegación por **7 fases del proceso SEC** (Datos → Cálculo base → Cortocircuito → Protección → Carga y red → Emergencia → Reporte), paleta **Tokyo Night**, con estado por módulo derivado de los datos cargados (sin datos / listo / calculado / alerta). Arquitectura en dos capas:
+- `gui_core/` — lógica pura sin tkinter (`SesionProyecto`, registro de módulos, presentadores que orquestan el motor), 100 % testeable sin abrir ventanas.
+- `gui/` — capa visual Tkinter delgada (`AppBT`, componentes reutilizables) que solo renderiza y enruta eventos sobre `gui_core`.
+
+Alcance actual: fases 0–4 y 6 (reporte) completas con entrada/cálculo/resultado en pantalla; fase 5 (Emergencia: generador/ATS/UPS/STS) muestra estado pero sus paneles de parámetros de entrada quedan para una iteración posterior.
+
 ### Tests
 
 ```bash
@@ -84,7 +95,11 @@ motor-calculo-bt/
 ├── coordinacion.py      selectividad en cadena
 ├── demanda.py           FD, selección de transformador, acometida SEC
 ├── balance.py           balance de fases por tablero
-├── motores.py           cálculo motor NCh 4-2003
+├── motores.py           cálculo motor NCh 4-2003 + aporte al Icc (IEC 60909-4)
+├── arc_flash.py         Arc Flash IEEE 1584-2002 (energía, frontera, Cat EPP)
+├── tcc_curvas.py        catálogo de curvas TCC + fuente única de k térmico
+├── red_desde_cadena.py  traduce la cadena de protecciones a un grafo bus/rama
+├── flujo_nodal.py        flujo de carga nodal Newton-Raphson
 ├── generador.py         generador de emergencia + ATS
 ├── sts.py               Static Transfer Switch
 ├── ups.py               UPS + banco de baterías
@@ -93,17 +108,19 @@ motor-calculo-bt/
 ├── perfiles.py          perfiles INDUSTRIAL / DATACENTER / COMERCIAL
 ├── sugerencias.py       recomendador de parámetros
 ├── excel.py             I/O Excel (openpyxl)
-├── reporteria_sec.py    memoria SEC DOCX / PDF
+├── reporteria_sec.py    memoria SEC DOCX / PDF / JSON EPC + gate de completitud
 ├── graficos.py          curvas TCC, ΔV, autonomía (matplotlib)
 ├── persistencia.py      capa SQLite (corridas y eventos)
 ├── main.py              CLI principal
-├── gui.py               GUI tkinter
+├── gui.py               lanzador delgado de la GUI (→ gui.app.main)
+├── gui_core/            lógica de GUI sin tkinter (sesión, fases, presentadores)
+├── gui/                 capa visual Tkinter (shell AppBT + componentes)
 ├── src/                 módulos de apoyo (arranque, memoria DOCX)
 ├── commissioning/       protocolos de puesta en marcha P1–P4
 ├── simulaciones/        escenarios y análisis de divergencias
 ├── rag_normativa/       RAG sobre corpus IEC/NCh/TIA (opcional)
 ├── presets/             datos de fabricante (alternadores Stamford)
-├── tests/               suite de 480 tests (pytest)
+├── tests/               suite de 766 tests (pytest)
 └── auditoria/           auditoría integral + roadmap de desarrollo
 ```
 
@@ -111,10 +128,9 @@ motor-calculo-bt/
 
 ## Limitaciones del modelo actual
 
-- Impedancia de cable: modelo resistivo puro (sin reactancia X). Para cables > 200 m o secciones grandes el error es apreciable. **En roadmap F1-P0.1.**
-- Sin aporte de motores al cortocircuito (IEC 60909 §4.3). **En roadmap F1-P0.2.**
-- Sin Arc Flash IEEE 1584-2018. **En roadmap F2-P1.1.**
-- Sin flujo de carga nodal (análisis de red acoplada). **En roadmap F3-P2.1.**
+- Ground Grid (IEEE 80), sistemas DC de datacenter, cortocircuito ANSI SC y análisis de armónicos no están implementados — quedan como expansión opcional (F4), a evaluar según demanda.
+- El flujo de carga nodal usa `numpy` denso (adecuado para redes BT < 100 buses); `scipy.sparse` queda como mejora futura para redes grandes.
+- GUI: la fase 5 (Emergencia) muestra estado de generador/ATS/UPS/STS pero aún no expone paneles de parámetros de entrada; y los módulos con salida no tabular (Icc trafo, balance, demanda, flujo nodal, reporte) calculan y registran resultado sin mostrar el detalle en pantalla todavía.
 
 ---
 
