@@ -20,6 +20,7 @@ DEUDA_MARCAS_EXTERNAS_CICLO_0 = {
     Path("sugerencias.py"),
 }
 DIRS_EXCLUIDOS_GLOBAL = {
+    ".claude",  # worktrees de sesiones (checkouts completos del repo) — no es código productivo
     ".git",
     ".pytest_cache",
     ".venv",
