@@ -138,3 +138,62 @@ def test_panel_modulo_sin_presentador_boton_deshabilitado():
         assert str(panel.boton["state"]) == "disabled"
     finally:
         root.destroy()
+
+
+@requiere_display
+def test_panel_mostrar_fichas_y_limpiar():
+    import tkinter as tk
+    from gui.componentes import PanelModulo
+    from gui_core.fases import buscar_modulo
+    from gui_core.sesion import SesionProyecto
+    root = tk.Tk(); root.withdraw()
+    try:
+        s = SesionProyecto(circuitos=[{"nombre": "C1", "sistema": "3F", "conductor": "6AWG",
+            "S_mm2": 13.3, "I_max": 65, "paralelos": 1, "I_diseno": 40, "cos_phi": 0.9,
+            "L_m": 15, "temp_amb": 30}])
+        panel = PanelModulo(root, buscar_modulo("dv"), s, on_calcular=lambda mid: None)
+        panel.mostrar_fichas([("Icc (kA)", "10.8", None), ("Estado", "FALLA", "alerta")])
+        assert len(panel.contenedor_resultados.winfo_children()) >= 1
+        panel.limpiar_resultados()
+        assert len(panel.contenedor_resultados.winfo_children()) == 0
+    finally:
+        root.destroy()
+
+
+@requiere_display
+def test_panel_agregar_accion_invocable():
+    import tkinter as tk
+    from gui.componentes import PanelModulo
+    from gui_core.fases import buscar_modulo
+    from gui_core.sesion import SesionProyecto
+    root = tk.Tk(); root.withdraw()
+    try:
+        s = SesionProyecto(circuitos=[{"nombre": "C1", "sistema": "3F", "conductor": "6AWG",
+            "S_mm2": 13.3, "I_max": 65, "paralelos": 1, "I_diseno": 40, "cos_phi": 0.9,
+            "L_m": 15, "temp_amb": 30}])
+        panel = PanelModulo(root, buscar_modulo("dv"), s, on_calcular=lambda mid: None)
+        clic = []
+        btn = panel.agregar_accion("Abrir carpeta", lambda: clic.append(1))
+        btn.invoke()
+        assert clic == [1]
+    finally:
+        root.destroy()
+
+
+@requiere_display
+def test_panel_fichas_y_tabla_coexisten():
+    import tkinter as tk
+    from gui.componentes import PanelModulo
+    from gui_core.fases import buscar_modulo
+    from gui_core.sesion import SesionProyecto
+    root = tk.Tk(); root.withdraw()
+    try:
+        s = SesionProyecto(circuitos=[{"nombre": "C1", "sistema": "3F", "conductor": "6AWG",
+            "S_mm2": 13.3, "I_max": 65, "paralelos": 1, "I_diseno": 40, "cos_phi": 0.9,
+            "L_m": 15, "temp_amb": 30}])
+        panel = PanelModulo(root, buscar_modulo("dv"), s, on_calcular=lambda mid: None)
+        panel.mostrar_fichas([("Convergió", "sí", "ok")])
+        panel.mostrar_tabla(["A", "B"], [["1", "2"]])
+        assert len(panel.contenedor_resultados.winfo_children()) >= 2
+    finally:
+        root.destroy()
