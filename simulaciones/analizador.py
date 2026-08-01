@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from typing import Any
 
 from calculos import RHO_CU, calcular_caida_tension
 from generador import calcular_icc_ge
