@@ -63,3 +63,6 @@ rag_normativa/db/
 .coverage
 htmlcov/
 .hypothesis/
+
+# Estado de sesiones de agente (worktrees, settings locales, launch.json de dev)
+.claude/
