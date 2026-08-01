@@ -2,9 +2,9 @@
 
 Herramienta de cálculo eléctrico para instalaciones de baja tensión (BT) según normativa chilena (SEC/NCh) e internacional (IEC/NEC). Lee datos desde Excel, calcula y verifica toda la instalación, y genera la memoria técnica SEC en DOCX/PDF.
 
-**Versión:** 2.1  
+**Versión:** 2.2  
 **Python:** ≥ 3.12  
-**Tests:** 766 (758 passed + 8 skipped: RAG opcional + GUI Tk sin display) — `pytest` verde en cada commit
+**Tests:** 771 (760 passed + 11 skipped: RAG opcional + GUI Tk sin display) — `pytest` verde en cada commit
 
 ---
 
@@ -73,7 +73,7 @@ Navegación por **7 fases del proceso SEC** (Datos → Cálculo base → Cortoci
 - `gui_core/` — lógica pura sin tkinter (`SesionProyecto`, registro de módulos, presentadores que orquestan el motor), 100 % testeable sin abrir ventanas.
 - `gui/` — capa visual Tkinter delgada (`AppBT`, componentes reutilizables) que solo renderiza y enruta eventos sobre `gui_core`.
 
-Alcance actual: fases 0–4 y 6 (reporte) completas con entrada/cálculo/resultado en pantalla; fase 5 (Emergencia: generador/ATS/UPS/STS) muestra estado pero sus paneles de parámetros de entrada quedan para una iteración posterior.
+Cada módulo con presentador (13 de 18) muestra su resultado real en pantalla: tabla para los de detalle por circuito, fichas clave-valor para resúmenes (Icc trafo, balance, demanda, flujo nodal), y el reporte (fase 6) muestra nivel de emisión + rutas DOCX/PDF/JSON con botón "Abrir carpeta". Alcance actual: fases 0–4 y 6 completas; fase 5 (Emergencia: generador/ATS/UPS/STS) muestra estado pero sus paneles de parámetros de entrada quedan para una iteración posterior.
 
 ### Tests
 

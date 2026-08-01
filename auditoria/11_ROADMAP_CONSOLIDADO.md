@@ -112,8 +112,9 @@ Este documento quedó congelado al cierre de F3. Trabajo posterior, fuera del ba
 - **Rediseño de GUI en dos planes** (ambos mergeados a `main`):
   - Plan 1 — `gui_core/`: núcleo lógico sin tkinter (`SesionProyecto`, registro de 18 módulos en 7 fases, presentadores que orquestan el motor existente), 100 % testeable sin display.
   - Plan 2 — `gui/`: capa visual Tkinter sobre `gui_core` (paleta Tokyo Night, navegación por fase, `AppBT`); `gui.py` pasó a ser un lanzador delgado; se retiraron las sub-ventanas `Toplevel` viejas (arranque/emergencia/guiada/reporte).
-  - Pendiente documentado (no bloqueante): paneles de parámetros de entrada para fase 5 (Emergencia) y visualización de resultados no tabulares (Icc trafo, balance, demanda, flujo nodal, reporte) — candidato a un Plan 3 futuro.
+  - Plan 3-A — `gui/app.py` + `gui/componentes.py`: render de resultados no tabulares (Icc trafo, balance, demanda, flujo nodal, reporte); antes solo cambiaban el badge, ahora muestran fichas clave-valor/tabla y, en el caso del reporte, rutas de archivo + botón "Abrir carpeta". Registro `RENDER` reemplaza `_COLUMNAS`; `PanelModulo` gana `mostrar_fichas`/`agregar_accion`/`limpiar_resultados`.
+  - Pendiente documentado (no bloqueante): paneles de parámetros de entrada para fase 5 (Emergencia) — candidato a un Plan 3-B futuro.
 
 **F4 (Ground Grid, DC, ANSI SC, armónicos) sigue diferido**, sin cambios respecto a la decisión original: solo se retoma si el mercado lo justifica.
 
-**Estado actual:** 766 tests (758 passed + 8 skipped), `pyflakes` limpio en todo el repo, sin `TODO`/`FIXME` pendientes.
+**Estado actual (2026-07-12):** 771 tests (760 passed + 11 skipped), `pyflakes` limpio en todo el repo, sin `TODO`/`FIXME` pendientes. GUI verificada en runtime real (drive end-to-end con Excel real + `.exe` PyInstaller empaquetado arranca sin errores).
