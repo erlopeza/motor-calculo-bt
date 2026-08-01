@@ -14,7 +14,6 @@ a = Analysis(
     hiddenimports=[
         'openpyxl',
         'openpyxl.styles.stylesheet',
-        'pandas',
         'docx',
         'pkg_resources',
     ],

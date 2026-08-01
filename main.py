@@ -774,6 +774,12 @@ def generar_reporte_txt(nombre_proyecto, circuitos, fecha,
 # ============================================================
 
 if __name__ == "__main__":
+    # Consolas Windows con codepage no-UTF8 (cp1252, 850, etc.) revientan con
+    # UnicodeEncodeError ante cualquier caracter fuera de tabla (p.ej. "Δ", "°").
+    # 'replace' evita el crash conservando el resto de la salida legible.
+    sys.stdout.reconfigure(errors="replace")
+    sys.stderr.reconfigure(errors="replace")
+
     print("=" * 60)
     print("  MOTOR DE CALCULO BT — VERSION MODULAR")
     print("  ΔV | Icc | Protecciones | Balance de carga")
