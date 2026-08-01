@@ -66,3 +66,6 @@ htmlcov/
 
 # Estado de sesiones de agente (worktrees, settings locales, launch.json de dev)
 .claude/
+
+# Sesiones de brainstorming visual (mockups temporales de diseño)
+.superpowers/
