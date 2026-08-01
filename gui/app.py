@@ -77,7 +77,7 @@ def _render_balance(panel, r):
 
 
 def _render_demanda(panel, r):
-    res = r.get("resultado", {})
+    res = r.get("resultado") or {}
     panel.mostrar_fichas([
         ("Tipo instalación", res.get("tipo_instalacion", "—"), None),
         ("P total (kW)", _fmt(res.get("P_total_kw")), None),
@@ -87,7 +87,7 @@ def _render_demanda(panel, r):
     ])
 
 
-def _render_reporte(panel, r):
+def _render_reporte(panel, r, carpeta_reportes):
     nivel = r.get("nivel", "—")
     rol = {"FINAL": "ok", "BORRADOR": "precaucion", "INCOMPLETO": "alerta"}.get(nivel)
     fichas = [("Nivel emisión", nivel, rol)]
@@ -95,9 +95,7 @@ def _render_reporte(panel, r):
         ruta = r.get(key) or ""
         fichas.append((etq, os.path.basename(ruta) if ruta else "—", None))
     panel.mostrar_fichas(fichas)
-    carpeta = os.path.dirname(r.get("ruta_docx") or "")
-    if carpeta:
-        panel.agregar_accion("Abrir carpeta", lambda c=carpeta: _abrir_carpeta(c))
+    panel.agregar_accion("Abrir carpeta", lambda c=carpeta_reportes: _abrir_carpeta(c))
 
 
 RENDER = {
@@ -184,8 +182,16 @@ class AppBT(tk.Tk):
         adaptador = RENDER.get(modulo_id)
         for panel in self.paneles_actuales:
             if panel.modulo.id == modulo_id and adaptador is not None:
-                panel.limpiar_resultados()
-                adaptador(panel, resultado)
+                try:
+                    panel.limpiar_resultados()
+                    if modulo_id == "reporte":
+                        adaptador(panel, resultado, self.carpeta_reportes)
+                    else:
+                        adaptador(panel, resultado)
+                except Exception as e:
+                    traceback.print_exc()
+                    self.barra.set_info(self.sesion.proyecto, self.sesion.perfil,
+                                         estado=f"error al renderizar {modulo_id}: {e}", es_error=True)
             panel.refrescar_estado()
         self.riel.refrescar()
 
