@@ -137,6 +137,8 @@ def main():
         st.subheader("Rutas de reporte")
         st.text(f"ruta_reporte_txt: {_fmt_val(fila.get('ruta_reporte_txt'))}")
         st.text(f"ruta_reporte_xlsx: {_fmt_val(fila.get('ruta_reporte_xlsx'))}")
+        st.text(f"ruta_reporte_docx: {_fmt_val(fila.get('ruta_reporte_docx'))}")
+        st.text(f"ruta_reporte_pdf: {_fmt_val(fila.get('ruta_reporte_pdf'))}")
 
     with tab_estado:
         st.subheader("Distribución status")
