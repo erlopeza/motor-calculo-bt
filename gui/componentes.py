@@ -193,10 +193,33 @@ class PanelModulo(tk.Frame):
         habilitado = self.modulo.prereq(self.sesion) and self.modulo.id in PRESENTADOR
         self.boton.set_habilitado(habilitado)
 
-    def mostrar_tabla(self, columnas: list[str], filas: list[list]) -> None:
+    def limpiar_resultados(self) -> None:
         for w in self.contenedor_resultados.winfo_children():
             w.destroy()
+
+    def mostrar_tabla(self, columnas: list[str], filas: list[list]) -> None:
         tabla = TablaResultados(self.contenedor_resultados, columnas)
         tabla.configure(bg=COLORES["fondo"])
         tabla.set_filas(filas)
         tabla.pack(fill="both", expand=True)
+
+    def mostrar_fichas(self, pares: list[tuple]) -> None:
+        """pares: lista de (etiqueta, valor, rol) con rol in {None,'ok','alerta','precaucion'}."""
+        roles = {"ok": COLORES["ok"], "alerta": COLORES["alerta"],
+                 "precaucion": COLORES["precaucion"]}
+        cont = tk.Frame(self.contenedor_resultados, bg=COLORES["fondo"])
+        cont.pack(fill="x", anchor="w")
+        for par in pares:
+            etiqueta, valor = par[0], par[1]
+            rol = par[2] if len(par) > 2 else None
+            fila = tk.Frame(cont, bg=COLORES["fondo"]); fila.pack(fill="x", anchor="w", pady=1)
+            tk.Label(fila, text=f"{etiqueta}:", bg=COLORES["fondo"], fg=COLORES["texto_tenue"],
+                     font=("Segoe UI", 10), width=22, anchor="w").pack(side="left")
+            tk.Label(fila, text=str(valor), bg=COLORES["fondo"],
+                     fg=roles.get(rol, COLORES["texto"]), font=("Segoe UI", 10, "bold"),
+                     anchor="w").pack(side="left")
+
+    def agregar_accion(self, texto: str, comando):
+        btn = BotonAccion(self.contenedor_resultados, texto, comando)
+        btn.pack(anchor="w", pady=(8, 0))
+        return btn
