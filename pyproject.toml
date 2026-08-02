@@ -1,6 +1,6 @@
 [project]
 name = "motor-calculo-bt"
-version = "2.2.0"
+version = "2.3.0"
 description = "Motor de cálculo eléctrico para instalaciones BT según normativa chilena (SEC/NCh/IEC)"
 requires-python = ">=3.12"
 readme = "README.md"

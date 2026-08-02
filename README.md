@@ -2,9 +2,9 @@
 
 Herramienta de cálculo eléctrico para instalaciones de baja tensión (BT) según normativa chilena (SEC/NCh) e internacional (IEC/NEC). Lee datos desde Excel, calcula y verifica toda la instalación, y genera la memoria técnica SEC en DOCX/PDF.
 
-**Versión:** 2.2  
+**Versión:** 2.3  
 **Python:** ≥ 3.12  
-**Tests:** 771 (760 passed + 11 skipped: RAG opcional + GUI Tk sin display) — `pytest` verde en cada commit
+**Tests:** 795 (784 passed + 11 skipped: RAG opcional + GUI Tk sin display) — `pytest` verde en cada commit
 
 ---
 
@@ -43,6 +43,9 @@ pip install ".[dev]"
 
 # Solo si se usa el subsistema RAG (rag_normativa/)
 pip install ".[rag]"
+
+# Solo si se usa el dashboard técnico (dashboard.py, Streamlit)
+pip install ".[dashboard]"
 ```
 
 ---
@@ -74,6 +77,20 @@ Navegación por **7 fases del proceso SEC** (Datos → Cálculo base → Cortoci
 - `gui/` — capa visual Tkinter delgada (`AppBT`, componentes reutilizables) que solo renderiza y enruta eventos sobre `gui_core`.
 
 Cada módulo con presentador (13 de 18) muestra su resultado real en pantalla: tabla para los de detalle por circuito, fichas clave-valor para resúmenes (Icc trafo, balance, demanda, flujo nodal), y el reporte (fase 6) muestra nivel de emisión + rutas DOCX/PDF/JSON con botón "Abrir carpeta". Alcance actual: fases 0–4 y 6 completas; fase 5 (Emergencia: generador/ATS/UPS/STS) muestra estado pero sus paneles de parámetros de entrada quedan para una iteración posterior.
+
+### Dashboard técnico (Streamlit)
+
+```bash
+streamlit run dashboard.py
+```
+
+Vista de solo lectura sobre el historial de corridas persistido por `persistencia.py` (SQLite, `motor_bt.db` por defecto, configurable desde la barra lateral). 4 pestañas:
+- **Resumen global** — métricas agregadas (tasa OK, fallas acumuladas, ΔV/Icc máximos) y últimas 10 ejecuciones.
+- **Por proyecto** — evolución de ΔV/fallas por revisión y tabla de corridas del proyecto seleccionado.
+- **Detalle de ejecución** — campos completos de una corrida + rutas de los 4 reportes generados (TXT/XLSX/DOCX/PDF).
+- **Estado técnico** — distribución de status/norma y último `commit_hash` (link clickeable al repo) + branch.
+
+Filtro de rango de fecha (Todo / últimos 7 / 30 días) aplicado globalmente a las 4 pestañas. Paleta alineada con Tokyo Night vía `.streamlit/config.toml` (mismos colores que `gui_core.estado.COLORES`), con la columna de estado coloreada en las tablas. Coordinar los gráficos nativos (`st.bar_chart`/`st.line_chart`) con esa misma paleta queda pendiente (requeriría migrar a Altair).
 
 ### Tests
 
@@ -115,12 +132,14 @@ motor-calculo-bt/
 ├── gui.py               lanzador delgado de la GUI (→ gui.app.main)
 ├── gui_core/            lógica de GUI sin tkinter (sesión, fases, presentadores)
 ├── gui/                 capa visual Tkinter (shell AppBT + componentes)
+├── dashboard.py         dashboard técnico Streamlit (historial de corridas)
+├── .streamlit/          tema Tokyo Night del dashboard (config.toml)
 ├── src/                 módulos de apoyo (arranque, memoria DOCX)
 ├── commissioning/       protocolos de puesta en marcha P1–P4
 ├── simulaciones/        escenarios y análisis de divergencias
 ├── rag_normativa/       RAG sobre corpus IEC/NCh/TIA (opcional)
 ├── presets/             datos de fabricante (alternadores Stamford)
-├── tests/               suite de 766 tests (pytest)
+├── tests/               suite de 795 tests (pytest)
 └── auditoria/           auditoría integral + roadmap de desarrollo
 ```
 
@@ -145,3 +164,4 @@ motor-calculo-bt/
 | pytest | suite de tests (dev) |
 | pyinstaller | empaquetado .exe (build) |
 | llama-index / chromadb / sentence-transformers | RAG normativo (opcional) |
+| pandas / streamlit | dashboard técnico (opcional, `dashboard.py`) |
