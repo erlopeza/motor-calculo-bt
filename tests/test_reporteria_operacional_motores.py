@@ -59,3 +59,33 @@ def test_sin_motores_conserva_icc_de_red():
 
     assert payload["icc_barra_ka"] == 12.0
     assert payload["aporte_motores"] == []
+
+
+def test_cli_motor_sin_p_kw_usa_potencia_electrica_del_circuito():
+    circuito = _motor()
+    circuito.pop("P_kW")
+    circuito.update({"I_diseno": 120.0, "cos_phi": 0.85})
+
+    payload = preparar_payload_reporte_cli(
+        [circuito],
+        {},
+        datos_transformador={"Icc_nom_kA": 12.0, "Vn_BT": 380.0},
+    )
+
+    assert payload["aporte_motores"]
+    assert payload["aporte_motores"][0]["P_kW"] > 0
+
+
+def test_gui_motor_sin_p_kw_usa_potencia_electrica_del_circuito():
+    circuito = _motor()
+    circuito.pop("P_kW")
+    circuito.update({"I_diseno": 120.0, "cos_phi": 0.85})
+    sesion = SesionProyecto(
+        circuitos=[circuito],
+        trafo={"kVA": 500.0, "Vn_BT": 380.0, "Ucc_pct": 5.0, "modo": "A"},
+    )
+
+    datos = _datos_run(sesion)
+
+    assert datos["aporte_motores"]
+    assert datos["aporte_motores"][0]["P_kW"] > 0

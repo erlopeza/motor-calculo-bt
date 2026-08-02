@@ -76,16 +76,21 @@ def preparar_payload_reporte_cli(
     for circuito in circuitos:
         if str(circuito.get("tipo_carga", "")).lower() != "motor":
             continue
-        if circuito.get("P_kW") is None:
-            continue
+        p_kw = circuito.get("P_kW")
+        if p_kw is None:
+            p_kw = calcular_potencia(
+                circuito.get("I_diseno", 0.0),
+                circuito.get("cos_phi", 0.85),
+                circuito.get("sistema", "3F"),
+            ) / 1000.0
         vn = float(circuito.get("Vn_V") or (380.0 if circuito.get("sistema", "3F") == "3F" else 220.0))
         aporte = calcular_aporte_icc_motor(
-            float(circuito["P_kW"]), vn,
+            float(p_kw), vn,
             sistema=str(circuito.get("sistema", "3F")),
         )
         aportes.append({
             "nombre": circuito.get("nombre"),
-            "P_kW": float(circuito["P_kW"]),
+            "P_kW": float(p_kw),
             "I_aporte_A": aporte["I_aporte_A"],
         })
     icc_total, _ = calcular_icc_con_aporte_motores(

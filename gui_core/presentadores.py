@@ -9,7 +9,10 @@ import os
 from collections import Counter
 from datetime import datetime
 
-from calculos import calcular_caida_tension, clasificar_caida, capacidad_corregida, sugerir_conductor
+from calculos import (
+    calcular_caida_tension, clasificar_caida, capacidad_corregida,
+    sugerir_conductor, calcular_potencia,
+)
 from transformador import calcular_icc_transformador, icc_desde_tabla
 from icc_punto import calcular_icc_punto, calcular_icc_con_aporte_motores
 from motores import calcular_aporte_icc_motor
@@ -186,16 +189,23 @@ def presentar_sugerencia(sesion: SesionProyecto) -> dict:
 def presentar_aporte_motores(sesion: SesionProyecto) -> dict:
     motores_circ = [
         c for c in sesion.circuitos
-        if str(c.get("tipo_carga", "")).lower() == "motor" and c.get("P_kW")
+        if str(c.get("tipo_carga", "")).lower() == "motor"
     ]
     if not motores_circ:
         return {"filas": [], "Icc_red_kA": 0.0, "Icc_total_kA": 0.0, "alertas": []}
     filas, aportes = [], []
     for c in motores_circ:
+        p_kw = c.get("P_kW")
+        if p_kw is None:
+            p_kw = calcular_potencia(
+                c.get("I_diseno", 0.0),
+                c.get("cos_phi", 0.85),
+                c.get("sistema", "3F"),
+            ) / 1000.0
         vn = TENSION_SISTEMA.get(c["sistema"], 380)
-        ap = calcular_aporte_icc_motor(float(c["P_kW"]), vn, sistema=c["sistema"])
+        ap = calcular_aporte_icc_motor(float(p_kw), vn, sistema=c["sistema"])
         aportes.append(ap["I_aporte_A"])
-        filas.append({"nombre": c["nombre"], "P_kW": float(c["P_kW"]), "I_aporte_A": ap["I_aporte_A"]})
+        filas.append({"nombre": c["nombre"], "P_kW": float(p_kw), "I_aporte_A": ap["I_aporte_A"]})
     icc_red = presentar_icc_trafo(sesion)["Icc_kA"] if sesion.tiene_trafo else 0.0
     icc_total, _ = calcular_icc_con_aporte_motores(icc_red, aportes)
     return {"filas": filas, "Icc_red_kA": icc_red, "Icc_total_kA": icc_total, "alertas": []}
