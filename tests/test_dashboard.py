@@ -67,3 +67,23 @@ def test_resumen_muestra_timestamp_formateado(db_prueba):
     assert "UTC" in ultima.value
     # No debe quedar el separador ISO crudo 'T' (distinto de la 'T' de "UTC").
     assert "T" not in ultima.value.replace("UTC", "")
+
+
+def test_ruta_vacia_muestra_error():
+    at = _app("")
+    assert not at.exception
+    assert len(at.error) == 1
+    assert "vacío" in at.error[0].value.lower()
+
+
+def test_ruta_a_directorio_muestra_error():
+    at = _app(".")
+    assert not at.exception
+    assert len(at.error) == 1
+    assert "." in at.error[0].value
+
+
+def test_ruta_valida_no_muestra_error(db_prueba):
+    at = _app(db_prueba)
+    assert not at.exception
+    assert len(at.error) == 0

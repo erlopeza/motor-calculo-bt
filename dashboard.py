@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
@@ -53,7 +55,11 @@ def main():
     st.set_page_config(page_title="Motor BT - Dashboard", layout="wide")
     st.title("Dashboard técnico - Motor BT")
 
-    ruta_db = st.sidebar.text_input("Ruta DB", value="motor_bt.db")
+    ruta_db = st.sidebar.text_input("Ruta DB", value="motor_bt.db").strip()
+    if not ruta_db or not Path(ruta_db).is_file():
+        st.error(f"'{ruta_db or '(vacío)'}' no es un archivo válido.")
+        return
+
     df = _normalizar_dataframe(ruta_db=ruta_db)
 
     if df.empty:
