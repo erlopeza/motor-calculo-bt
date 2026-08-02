@@ -60,9 +60,13 @@ def _filtro_fecha(df: pd.DataFrame, preset: str, ahora: pd.Timestamp | None = No
     if preset == "Todo" or df.empty:
         return df
     ahora = ahora if ahora is not None else pd.Timestamp.now(tz="UTC")
-    dias = 7 if preset == "Últimos 7 días" else 30
+    dias = {"Últimos 7 días": 7, "Últimos 30 días": 30}[preset]
     corte = ahora - pd.Timedelta(days=dias)
-    return df[df["timestamp_dt"] >= corte]
+    # Las filas con timestamp_dt inválido (NaT, p.ej. un timestamp mal formado
+    # en la DB) no deben desaparecer silenciosamente del rango filtrado — al no
+    # poder ubicarlas en el tiempo, se conservan visibles en vez de asumir que
+    # quedan fuera.
+    return df[df["timestamp_dt"].isna() | (df["timestamp_dt"] >= corte)]
 
 
 def _tabla_presentacion(df: pd.DataFrame, columnas):
@@ -101,7 +105,7 @@ def main():
     df = _filtro_fecha(df, preset)
 
     if df.empty:
-        st.info("sin ejecuciones registradas")
+        st.info("sin ejecuciones en el rango de fecha seleccionado")
         return
 
     tab_resumen, tab_proyecto, tab_detalle, tab_estado = st.tabs(

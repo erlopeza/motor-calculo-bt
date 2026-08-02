@@ -160,6 +160,38 @@ def test_filtro_fecha_dataframe_vacio_no_lanza():
     assert _filtro_fecha(vacio, "Últimos 7 días").empty
 
 
+def test_filtro_fecha_conserva_filas_con_timestamp_invalido():
+    """Una fila con timestamp_dt = NaT (timestamp mal formado en la DB) no debe
+    desaparecer silenciosamente al filtrar por rango — no se puede ubicar en
+    el tiempo, así que se conserva visible en vez de asumir que queda fuera."""
+    ahora = pd.Timestamp("2026-08-01", tz="UTC")
+    df = pd.DataFrame({
+        "run_id": ["reciente", "invalida", "vieja"],
+        "timestamp_dt": [ahora - pd.Timedelta(days=1), pd.NaT, ahora - pd.Timedelta(days=40)],
+    })
+    resultado = _filtro_fecha(df, "Últimos 7 días", ahora=ahora)
+    assert set(resultado["run_id"]) == {"reciente", "invalida"}
+
+
+def test_filtro_fecha_incluye_borde_exacto():
+    """El corte es inclusivo (>=): una fila exactamente en el límite del rango
+    debe quedar incluida, no excluida."""
+    ahora = pd.Timestamp("2026-08-01", tz="UTC")
+    df = pd.DataFrame({
+        "run_id": ["borde"],
+        "timestamp_dt": [ahora - pd.Timedelta(days=7)],
+    })
+    resultado = _filtro_fecha(df, "Últimos 7 días", ahora=ahora)
+    assert list(resultado["run_id"]) == ["borde"]
+
+
+def test_filtro_fecha_preset_invalido_falla_ruidosamente():
+    ahora = pd.Timestamp("2026-08-01", tz="UTC")
+    df = _df_prueba(ahora)
+    with pytest.raises(KeyError):
+        _filtro_fecha(df, "Últimos 3 años", ahora=ahora)
+
+
 def test_sidebar_tiene_control_de_rango(db_prueba):
     at = _app(db_prueba)
     assert not at.exception
