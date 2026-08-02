@@ -4,7 +4,7 @@ Herramienta de cálculo eléctrico para instalaciones de baja tensión (BT) seg�
 
 **Versión:** 2.3  
 **Python:** ≥ 3.12  
-**Tests:** 795 (784 passed + 11 skipped: RAG opcional + GUI Tk sin display) — `pytest` verde en cada commit
+**Tests:** 811 (800 passed + 11 skipped: RAG opcional + GUI Tk sin display) — `pytest` verde en cada commit
 
 ---
 
@@ -139,7 +139,7 @@ motor-calculo-bt/
 ├── simulaciones/        escenarios y análisis de divergencias
 ├── rag_normativa/       RAG sobre corpus IEC/NCh/TIA (opcional)
 ├── presets/             datos de fabricante (alternadores Stamford)
-├── tests/               suite de 795 tests (pytest)
+├── tests/               suite de 811 tests (pytest)
 └── auditoria/           auditoría integral + roadmap de desarrollo
 ```
 
