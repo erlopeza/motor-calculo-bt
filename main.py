@@ -36,7 +36,8 @@ from demanda import (
 )
 from excel import leer_demanda_excel, leer_cadena_excel
 from coordinacion import verificar_cadena, reporte_coordinacion
-from motores import calcular_motor
+from motores import calcular_motor, calcular_aporte_icc_motor
+from icc_punto import calcular_icc_con_aporte_motores
 from generador import calcular_generador
 from sts import calcular_sts
 from trafo_iso import calcular_trafo_iso
@@ -70,6 +71,29 @@ def preparar_payload_reporte_cli(
         cabecera = seleccionar_proteccion_cabecera(protecciones)
         if cabecera:
             payload["proteccion_cabecera"] = cabecera
+    icc_red = float(payload.get("icc_barra_ka") or 0.0)
+    aportes = []
+    for circuito in circuitos:
+        if str(circuito.get("tipo_carga", "")).lower() != "motor":
+            continue
+        if circuito.get("P_kW") is None:
+            continue
+        vn = float(circuito.get("Vn_V") or (380.0 if circuito.get("sistema", "3F") == "3F" else 220.0))
+        aporte = calcular_aporte_icc_motor(
+            float(circuito["P_kW"]), vn,
+            sistema=str(circuito.get("sistema", "3F")),
+        )
+        aportes.append({
+            "nombre": circuito.get("nombre"),
+            "P_kW": float(circuito["P_kW"]),
+            "I_aporte_A": aporte["I_aporte_A"],
+        })
+    icc_total, _ = calcular_icc_con_aporte_motores(
+        icc_red, [fila["I_aporte_A"] for fila in aportes]
+    )
+    payload["icc_red_ka"] = icc_red
+    payload["icc_barra_ka"] = icc_total
+    payload["aporte_motores"] = aportes
     return payload
 
 # ============================================================
@@ -1043,6 +1067,9 @@ if __name__ == "__main__":
                     "I_diseno": c.get("I_diseno"),
                     "I_max": c.get("I_max"),
                     "cos_phi": c.get("cos_phi"),
+                    "tipo_carga": c.get("tipo_carga"),
+                    "P_kW": c.get("P_kW"),
+                    "Vn_V": c.get("Vn_V"),
                     "L_m": c.get("L_m"),
                     "paralelos": c.get("paralelos"),
                     "sistema": c.get("sistema"),

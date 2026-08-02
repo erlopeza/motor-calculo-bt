@@ -225,7 +225,14 @@ def _datos_run(sesion: SesionProyecto) -> dict:
     }
     if sesion.tiene_trafo:
         icc_trafo = presentar_icc_trafo(sesion)
-        datos["icc_barra_ka"] = icc_trafo["Icc_kA"]
+        aporte_motores = presentar_aporte_motores(sesion)
+        datos["icc_red_ka"] = icc_trafo["Icc_kA"]
+        datos["icc_barra_ka"] = (
+            aporte_motores["Icc_total_kA"]
+            if aporte_motores["filas"]
+            else icc_trafo["Icc_kA"]
+        )
+        datos["aporte_motores"] = aporte_motores["filas"]
         datos["tension_barra_kv"] = float(sesion.tension_sistema_v) / 1000.0
     cabecera = seleccionar_proteccion_cabecera(sesion.protecciones)
     if cabecera:
