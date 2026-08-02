@@ -1091,6 +1091,9 @@ if __name__ == "__main__":
             circuitos_persistencia,
             protecciones_excel,
             datos_transformador,
+            cadena=cadena_datos,
+            trafo_z_ohm=zt_ohm,
+            tension_sistema_v=(datos_trafo or {}).get("Vn_BT", 380.0),
         )
         circuitos_persistencia = payload_reporte.pop("circuitos")
 

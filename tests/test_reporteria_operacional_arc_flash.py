@@ -58,4 +58,3 @@ def test_gui_arc_flash_expone_barra_y_cabecera_solo_si_es_explicita():
 
     assert datos["icc_barra_ka"] > 0
     assert "proteccion_cabecera" not in datos
-
