@@ -1,6 +1,9 @@
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
+from gui_core.estado import COLORES
 from persistencia import obtener_ejecuciones
 
 
@@ -25,6 +28,61 @@ def _fmt_val(value):
     return value
 
 
+def _fmt_fecha(dt) -> str:
+    """Formatea un datetime (o None/NaT) a 'YYYY-MM-DD HH:MM UTC'; '—' si no hay valor."""
+    if dt is None or pd.isna(dt):
+        return "—"
+    return dt.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _repo_url_web() -> str | None:
+    """Resuelve la URL web del repo desde 'git remote get-url origin'.
+    Devuelve None ante cualquier fallo (sin git, sin remoto, etc.) — nunca crashea."""
+    try:
+        import subprocess
+        url = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"], text=True, timeout=2
+        ).strip()
+        if url.endswith(".git"):
+            url = url[:-4]
+        if url.startswith("git@github.com:"):
+            url = "https://github.com/" + url[len("git@github.com:"):]
+        return url
+    except Exception:
+        return None
+
+
+def _filtro_fecha(df: pd.DataFrame, preset: str, ahora: pd.Timestamp | None = None) -> pd.DataFrame:
+    """preset in {'Todo', 'Últimos 7 días', 'Últimos 30 días'}.
+
+    `ahora` es inyectable para que los tests no dependan de pd.Timestamp.now()
+    real. En producción se omite y usa el reloj real.
+    """
+    if preset == "Todo" or df.empty:
+        return df
+    ahora = ahora if ahora is not None else pd.Timestamp.now(tz="UTC")
+    dias = {"Últimos 7 días": 7, "Últimos 30 días": 30}[preset]
+    corte = ahora - pd.Timedelta(days=dias)
+    # Las filas con timestamp_dt inválido (NaT, p.ej. un timestamp mal formado
+    # en la DB) no deben desaparecer silenciosamente del rango filtrado — al no
+    # poder ubicarlas en el tiempo, se conservan visibles en vez de asumir que
+    # quedan fuera.
+    return df[df["timestamp_dt"].isna() | (df["timestamp_dt"] >= corte)]
+
+
+_COLOR_STATUS = {
+    "OK": COLORES["ok"],
+    "CON_FALLAS": COLORES["alerta"],
+    "ERROR": COLORES["alerta"],
+    "CON_ADVERTENCIAS": COLORES["precaucion"],
+}
+
+
+def _estilo_status(val) -> str:
+    color = _COLOR_STATUS.get(val)
+    return f"color: {color}" if color else ""
+
+
 def _tabla_presentacion(df: pd.DataFrame, columnas):
     vista = df[columnas].copy()
     for c in vista.columns:
@@ -46,11 +104,22 @@ def main():
     st.set_page_config(page_title="Motor BT - Dashboard", layout="wide")
     st.title("Dashboard técnico - Motor BT")
 
-    ruta_db = st.sidebar.text_input("Ruta DB", value="motor_bt.db")
+    ruta_db = st.sidebar.text_input("Ruta DB", value="motor_bt.db").strip()
+    if not ruta_db or not Path(ruta_db).is_file():
+        st.error(f"'{ruta_db or '(vacío)'}' no es un archivo válido.")
+        return
+
     df = _normalizar_dataframe(ruta_db=ruta_db)
 
     if df.empty:
         st.info("sin ejecuciones registradas")
+        return
+
+    preset = st.sidebar.radio("Rango", ["Todo", "Últimos 7 días", "Últimos 30 días"], index=0)
+    df = _filtro_fecha(df, preset)
+
+    if df.empty:
+        st.info("sin ejecuciones en el rango de fecha seleccionado")
         return
 
     tab_resumen, tab_proyecto, tab_detalle, tab_estado = st.tabs(
@@ -59,7 +128,7 @@ def main():
 
     with tab_resumen:
         total_runs = len(df)
-        ultima_ejecucion = _fmt_val(df.iloc[0].get("timestamp"))
+        ultima_ejecucion = _fmt_fecha(df.iloc[0].get("timestamp_dt"))
         proyectos_activos = df["project_id"].dropna().astype(str).str.strip()
         proyectos_activos = (proyectos_activos != "").sum() if len(proyectos_activos) else 0
 
@@ -86,7 +155,10 @@ def main():
             "n_ok", "n_fallas", "max_dv_pct", "max_icc_ka",
         ]
         cols = [c for c in cols if c in df.columns]
-        st.dataframe(_tabla_presentacion(df.head(10), cols), use_container_width=True)
+        st.dataframe(
+            _tabla_presentacion(df.head(10), cols).style.map(_estilo_status, subset=["status"]),
+            use_container_width=True,
+        )
 
     with tab_proyecto:
         proyectos = sorted(
@@ -119,7 +191,10 @@ def main():
                 "n_circuitos", "n_ok", "n_fallas", "max_dv_pct", "max_icc_ka",
             ]
             cols = [c for c in cols if c in df_p.columns]
-            st.dataframe(_tabla_presentacion(df_p, cols), use_container_width=True)
+            st.dataframe(
+                _tabla_presentacion(df_p, cols).style.map(_estilo_status, subset=["status"]),
+                use_container_width=True,
+            )
 
     with tab_detalle:
         opciones = df[["run_id", "timestamp"]].copy()
@@ -137,6 +212,8 @@ def main():
         st.subheader("Rutas de reporte")
         st.text(f"ruta_reporte_txt: {_fmt_val(fila.get('ruta_reporte_txt'))}")
         st.text(f"ruta_reporte_xlsx: {_fmt_val(fila.get('ruta_reporte_xlsx'))}")
+        st.text(f"ruta_reporte_docx: {_fmt_val(fila.get('ruta_reporte_docx'))}")
+        st.text(f"ruta_reporte_pdf: {_fmt_val(fila.get('ruta_reporte_pdf'))}")
 
     with tab_estado:
         st.subheader("Distribución status")
@@ -149,7 +226,12 @@ def main():
 
         st.subheader("Último control de versión")
         ultimo = df.iloc[0].to_dict()
-        st.text(f"commit_hash: {_fmt_val(ultimo.get('commit_hash'))}")
+        hash_commit = _fmt_val(ultimo.get("commit_hash"))
+        url_repo = _repo_url_web()
+        if url_repo and hash_commit != "—":
+            st.markdown(f"commit_hash: [{hash_commit}]({url_repo}/commit/{hash_commit})")
+        else:
+            st.text(f"commit_hash: {hash_commit}")
         st.text(f"branch: {_fmt_val(ultimo.get('branch'))}")
         st.text(f"estado_gantt (mapeado): {_estado_gantt_desde_status(ultimo.get('status'))}")
 

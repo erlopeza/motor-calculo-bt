@@ -36,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install "openpyxl>=3.1" "python-docx>=1.2" "reportlab>=4.4" \
                       "matplotlib>=3.8" "numpy>=1.26" "pytest>=9.0" "pytest-cov>=4.0" \
-                      "hypothesis>=6.0"
+                      "hypothesis>=6.0" "pandas>=2.3" "streamlit>=1.56"
 
       - name: Run test suite
         run: pytest --tb=short -q

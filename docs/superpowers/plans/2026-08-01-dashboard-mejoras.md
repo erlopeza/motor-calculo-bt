@@ -79,25 +79,58 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `dashboard.py` (sección "Rutas de reporte" dentro de `tab_detalle`)
-- Test: `tests/test_dashboard.py` (se crea aquí con el primer uso)
+- Modify: `.github/workflows/ci.yml` (instalar pandas/streamlit para que la colección de pytest no falle en CI)
+- Test: `tests/test_dashboard.py` (se crea aquí con el primer uso, incluye el fixture `db_prueba` reutilizado por TODAS las tareas siguientes)
 
-- [ ] **Step 1: Escribir el test (smoke AppTest)**
+**Corrección importante (hallazgo de revisión de calidad sobre un borrador anterior de este plan):** los tests NO deben apuntar a `motor_bt.db` (el archivo de trabajo real del desarrollador — no está versionado, `.gitignore` lo excluye, y su contenido es mutable). Cada test usa una DB SQLite temporal (`tmp_path` de pytest) sembrada con `persistencia.registrar_ejecucion(...)`, que ya sabe escribir las 4 rutas de reporte. Esto es determinista y reproducible en cualquier máquina/CI.
+
+- [ ] **Step 1: Escribir el test (smoke AppTest) + fixture reutilizable**
 
 Crear `tests/test_dashboard.py`:
 
 ```python
+import pytest
 from streamlit.testing.v1 import AppTest
 
-
-def _app() -> AppTest:
-    return AppTest.from_file("dashboard.py", default_timeout=10)
+import persistencia
 
 
-def test_detalle_muestra_las_4_rutas_de_reporte():
-    at = _app()
+@pytest.fixture
+def db_prueba(tmp_path) -> str:
+    """DB SQLite temporal con 1 corrida de prueba y las 4 rutas de reporte pobladas."""
+    ruta = str(tmp_path / "motor_bt_test.db")
+    persistencia.registrar_ejecucion({
+        "project_id": "PROY-TEST",
+        "revision": "CLI",
+        "perfil": "industrial",
+        "norma": "AWG",
+        "n_circuitos": 5,
+        "n_ok": 4,
+        "n_advertencias": 0,
+        "n_fallas": 1,
+        "max_dv_pct": 3.2,
+        "max_icc_ka": 12.5,
+        "status": "CON_FALLAS",
+        "ruta_reporte_txt": "REPORTE_PROY-TEST.txt",
+        "ruta_reporte_xlsx": "REPORTE_PROY-TEST.xlsx",
+        "ruta_reporte_docx": "MEMORIA_PROY-TEST.docx",
+        "ruta_reporte_pdf": "REPORTE_PROY-TEST.pdf",
+    }, ruta_db=ruta)
+    return ruta
+
+
+def _app(ruta_db: str) -> AppTest:
+    """Instancia el dashboard y lo apunta a `ruta_db`. Timeout amplio (30s)
+    para no ser frágil en un runner de CI recién aprovisionado (primera
+    ejecución sin cachés calientes)."""
+    at = AppTest.from_file("dashboard.py", default_timeout=30)
     at.run()
-    ti = at.sidebar.text_input[0]
-    ti.set_value("motor_bt.db").run()
+    at.sidebar.text_input[0].set_value(ruta_db).run()
+    return at
+
+
+def test_detalle_muestra_las_4_rutas_de_reporte(db_prueba):
+    at = _app(db_prueba)
     assert not at.exception
     textos = " ".join(t.value for t in at.text)
     assert "ruta_reporte_txt" in textos
@@ -136,11 +169,40 @@ Reemplazar por:
 Run: `python -m pytest tests/test_dashboard.py -v`
 Expected: 1 passed.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Arreglar CI — instalar pandas/streamlit (si no, la colección de pytest falla en el próximo push)**
+
+En `.github/workflows/ci.yml`, localizar el paso `Install core + dev dependencies`:
+
+```yaml
+      - name: Install core + dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "openpyxl>=3.1" "python-docx>=1.2" "reportlab>=4.4" \
+                      "matplotlib>=3.8" "numpy>=1.26" "pytest>=9.0" "pytest-cov>=4.0" \
+                      "hypothesis>=6.0"
+```
+
+Reemplazar por (se añaden `pandas` y `streamlit` a la misma línea de instalación):
+
+```yaml
+      - name: Install core + dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "openpyxl>=3.1" "python-docx>=1.2" "reportlab>=4.4" \
+                      "matplotlib>=3.8" "numpy>=1.26" "pytest>=9.0" "pytest-cov>=4.0" \
+                      "hypothesis>=6.0" "pandas>=2.3" "streamlit>=1.56"
+```
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add dashboard.py tests/test_dashboard.py
+git add dashboard.py tests/test_dashboard.py .github/workflows/ci.yml
 git commit -m "feat(dashboard): mostrar rutas DOCX/PDF en el detalle de ejecución
+
+Añade fixture db_prueba (DB SQLite temporal vía persistencia.registrar_ejecucion)
+para que los tests de dashboard.py no dependan del archivo motor_bt.db real
+del desarrollador (no versionado, mutable). Instala pandas/streamlit en CI —
+tests/test_dashboard.py los importa y CI no los tenía declarados.
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
@@ -173,10 +235,8 @@ def test_fmt_fecha_timestamp_real():
     assert _fmt_fecha(dt) == "2026-08-01 21:21 UTC"
 
 
-def test_resumen_muestra_timestamp_formateado():
-    at = _app()
-    at.run()
-    at.sidebar.text_input[0].set_value("motor_bt.db").run()
+def test_resumen_muestra_timestamp_formateado(db_prueba):
+    at = _app(db_prueba)
     assert not at.exception
     ultima = next(m for m in at.metric if m.label == "Última ejecución")
     assert "T" not in ultima.value  # no debe quedar el ISO crudo con separador 'T'
@@ -245,27 +305,21 @@ Añadir a `tests/test_dashboard.py`:
 
 ```python
 def test_ruta_vacia_muestra_error():
-    at = _app()
-    at.run()
-    at.sidebar.text_input[0].set_value("").run()
+    at = _app("")
     assert not at.exception
     assert len(at.error) == 1
     assert "vacío" in at.error[0].value.lower()
 
 
 def test_ruta_a_directorio_muestra_error():
-    at = _app()
-    at.run()
-    at.sidebar.text_input[0].set_value(".").run()
+    at = _app(".")
     assert not at.exception
     assert len(at.error) == 1
     assert "." in at.error[0].value
 
 
-def test_ruta_valida_no_muestra_error():
-    at = _app()
-    at.run()
-    at.sidebar.text_input[0].set_value("motor_bt.db").run()
+def test_ruta_valida_no_muestra_error(db_prueba):
+    at = _app(db_prueba)
     assert not at.exception
     assert len(at.error) == 0
 ```
@@ -356,10 +410,8 @@ def test_repo_url_web_excepcion_devuelve_none():
         assert _repo_url_web() is None
 
 
-def test_estado_tecnico_commit_hash_es_link():
-    at = _app()
-    at.run()
-    at.sidebar.text_input[0].set_value("motor_bt.db").run()
+def test_estado_tecnico_commit_hash_es_link(db_prueba):
+    at = _app(db_prueba)
     assert not at.exception
     markdowns = " ".join(m.value for m in at.markdown)
     assert "](https://github.com/" in markdowns or "commit_hash" in " ".join(t.value for t in at.text)
@@ -477,10 +529,8 @@ def test_filtro_fecha_dataframe_vacio_no_lanza():
     assert _filtro_fecha(vacio, "Últimos 7 días").empty
 
 
-def test_sidebar_tiene_control_de_rango():
-    at = _app()
-    at.run()
-    at.sidebar.text_input[0].set_value("motor_bt.db").run()
+def test_sidebar_tiene_control_de_rango(db_prueba):
+    at = _app(db_prueba)
     assert not at.exception
     assert len(at.sidebar.radio) == 1
     assert at.sidebar.radio[0].options == ["Todo", "Últimos 7 días", "Últimos 30 días"]
