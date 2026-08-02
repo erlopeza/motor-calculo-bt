@@ -1,7 +1,9 @@
+import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
 import persistencia
+from dashboard import _fmt_fecha
 
 
 @pytest.fixture
@@ -46,3 +48,22 @@ def test_detalle_muestra_las_4_rutas_de_reporte(db_prueba):
     assert "ruta_reporte_xlsx" in textos
     assert "ruta_reporte_docx" in textos
     assert "ruta_reporte_pdf" in textos
+
+
+def test_fmt_fecha_none_y_nat():
+    assert _fmt_fecha(None) == "—"
+    assert _fmt_fecha(pd.NaT) == "—"
+
+
+def test_fmt_fecha_timestamp_real():
+    dt = pd.Timestamp("2026-08-01T21:21:30.233149", tz="UTC")
+    assert _fmt_fecha(dt) == "2026-08-01 21:21 UTC"
+
+
+def test_resumen_muestra_timestamp_formateado(db_prueba):
+    at = _app(db_prueba)
+    assert not at.exception
+    ultima = next(m for m in at.metric if m.label == "Última ejecución")
+    assert "UTC" in ultima.value
+    # No debe quedar el separador ISO crudo 'T' (distinto de la 'T' de "UTC").
+    assert "T" not in ultima.value.replace("UTC", "")

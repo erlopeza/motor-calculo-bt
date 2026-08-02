@@ -25,6 +25,13 @@ def _fmt_val(value):
     return value
 
 
+def _fmt_fecha(dt) -> str:
+    """Formatea un datetime (o None/NaT) a 'YYYY-MM-DD HH:MM UTC'; '—' si no hay valor."""
+    if dt is None or pd.isna(dt):
+        return "—"
+    return dt.strftime("%Y-%m-%d %H:%M UTC")
+
+
 def _tabla_presentacion(df: pd.DataFrame, columnas):
     vista = df[columnas].copy()
     for c in vista.columns:
@@ -59,7 +66,7 @@ def main():
 
     with tab_resumen:
         total_runs = len(df)
-        ultima_ejecucion = _fmt_val(df.iloc[0].get("timestamp"))
+        ultima_ejecucion = _fmt_fecha(df.iloc[0].get("timestamp_dt"))
         proyectos_activos = df["project_id"].dropna().astype(str).str.strip()
         proyectos_activos = (proyectos_activos != "").sum() if len(proyectos_activos) else 0
 
