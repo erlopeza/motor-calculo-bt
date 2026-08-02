@@ -24,6 +24,7 @@ from flujo_nodal import calcular_flujo_nodal
 from reporteria_sec import (
     generar_memoria_sec, generar_reporte_pdf,
     exportar_json_epc, verificar_completitud_parametros,
+    enriquecer_circuitos_con_proteccion, seleccionar_proteccion_cabecera,
 )
 from gui_core.sesion import SesionProyecto
 
@@ -208,7 +209,7 @@ def _norma_predominante(circuitos: list) -> str:
 
 
 def _datos_run(sesion: SesionProyecto) -> dict:
-    return {
+    datos = {
         "project_id": sesion.proyecto or "PROYECTO",
         "revision": "GUI",
         "timestamp": datetime.now().astimezone().isoformat(),
@@ -222,6 +223,14 @@ def _datos_run(sesion: SesionProyecto) -> dict:
         "ups": sesion.ups or {},
         "generador": sesion.generador or {},
     }
+    if sesion.tiene_trafo:
+        icc_trafo = presentar_icc_trafo(sesion)
+        datos["icc_barra_ka"] = icc_trafo["Icc_kA"]
+        datos["tension_barra_kv"] = float(sesion.tension_sistema_v) / 1000.0
+    cabecera = seleccionar_proteccion_cabecera(sesion.protecciones)
+    if cabecera:
+        datos["proteccion_cabecera"] = cabecera
+    return datos
 
 
 def _circuitos_enriquecidos(sesion: SesionProyecto) -> list:
@@ -246,7 +255,7 @@ def _circuitos_enriquecidos(sesion: SesionProyecto) -> list:
         if icc:
             c2["icc_ka"] = icc.get("Icc_kA")
         salida.append(c2)
-    return salida
+    return enriquecer_circuitos_con_proteccion(salida, sesion.protecciones)
 
 
 def presentar_reporte(sesion: SesionProyecto, carpeta_salida: str | None = None) -> dict:

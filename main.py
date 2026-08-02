@@ -24,6 +24,10 @@ from excel import (
 from perfiles import obtener_perfil
 from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
 from icc_punto import calcular_icc_todos_circuitos
+from reporteria_sec import (
+    enriquecer_circuitos_con_proteccion,
+    seleccionar_proteccion_cabecera,
+)
 from protecciones import verificar_circuito_completo, leer_protecciones_excel
 from balance import calcular_balance_tableros, reporte_balance
 from demanda import (
@@ -38,6 +42,35 @@ from sts import calcular_sts
 from trafo_iso import calcular_trafo_iso
 from ups import calcular_ups
 from ats import calcular_ats
+
+
+def preparar_payload_reporte_cli(
+    circuitos: list,
+    protecciones: dict,
+    datos_transformador: dict | None = None,
+    *,
+    cadena: list | None = None,
+    trafo_z_ohm: float = 0.0,
+    tension_sistema_v: float | None = None,
+) -> dict:
+    """Compone los datos operacionales que consume la memoria SEC del CLI."""
+    payload = {
+        "circuitos": enriquecer_circuitos_con_proteccion(circuitos, protecciones),
+        "cadena": list(cadena or []),
+        "trafo_z_ohm": float(trafo_z_ohm or 0.0),
+    }
+    if tension_sistema_v is not None:
+        payload["tension_sistema_v"] = float(tension_sistema_v)
+        payload["tension_barra_kv"] = float(tension_sistema_v) / 1000.0
+    if datos_transformador:
+        if datos_transformador.get("Icc_nom_kA") is not None:
+            payload["icc_barra_ka"] = float(datos_transformador["Icc_nom_kA"])
+        if datos_transformador.get("Vn_BT") is not None:
+            payload["tension_barra_kv"] = float(datos_transformador["Vn_BT"]) / 1000.0
+        cabecera = seleccionar_proteccion_cabecera(protecciones)
+        if cabecera:
+            payload["proteccion_cabecera"] = cabecera
+    return payload
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
@@ -961,6 +994,7 @@ if __name__ == "__main__":
         max_icc_ka = 0.0
         circuitos_persistencia = []
         icc_por_circuito = {}
+        zt_ohm = 0.0
         try:
             if datos_trafo:
                 if datos_trafo.get("modo") == "A":
@@ -1053,6 +1087,13 @@ if __name__ == "__main__":
         except Exception:
             datos_transformador = None
 
+        payload_reporte = preparar_payload_reporte_cli(
+            circuitos_persistencia,
+            protecciones_excel,
+            datos_transformador,
+        )
+        circuitos_persistencia = payload_reporte.pop("circuitos")
+
         datos_balance_demanda = {}
         try:
             if balance_datos and tableros_datos:
@@ -1095,6 +1136,7 @@ if __name__ == "__main__":
             "transformador": datos_transformador,
             "balance_demanda": datos_balance_demanda,
         }
+        datos_run.update(payload_reporte)
 
         if args.graficos:
             try:

@@ -407,6 +407,22 @@ def enriquecer_circuitos_con_proteccion(circuitos: list, protecciones: dict) -> 
     return salida
 
 
+def seleccionar_proteccion_cabecera(protecciones: dict) -> dict | None:
+    """Retorna solo una proteccion marcada explicitamente como cabecera.
+
+    No se infiere la proteccion de cabecera desde un circuito terminal: hacerlo
+    produciria un calculo de arco de barra con datos de equipo equivocados.
+    """
+    nombres_cabecera = {
+        "cabecera", "proteccion_cabecera", "main", "general",
+    }
+    for nombre, proteccion in (protecciones or {}).items():
+        clave = str(nombre).strip().lower().replace(" ", "_")
+        if clave in nombres_cabecera:
+            return dict(proteccion)
+    return None
+
+
 def generar_memoria_docx(
     datos_run: dict,
     circuitos: list,
