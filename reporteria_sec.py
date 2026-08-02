@@ -224,8 +224,25 @@ def _insertar_grafico_docx(doc: Document, titulo: str, ruta_imagen: str) -> None
     doc.add_picture(ruta_imagen, width=Inches(6.5))
 
 
-def _agregar_seccion_alcance_supuestos(doc: Document) -> None:
+def _arc_flash_disponible(datos_run: dict, circuitos: list) -> bool:
+    """True si hay datos suficientes para al menos un cálculo de arco (barra o por circuito).
+
+    Misma condición usada por _agregar_seccion_arc_flash; centralizada aquí para que
+    el disclaimer de "Limitaciones conocidas" no pueda desincronizarse de la sección real.
+    """
+    icc_barra = datos_run.get("icc_barra_ka")
+    cab = datos_run.get("proteccion_cabecera") or {}
+    barra_ok = bool(icc_barra and cab.get("In_A") and cab.get("curva"))
+    circuito_ok = any(c.get("In_A") and c.get("curva") and c.get("icc_ka") for c in circuitos)
+    return barra_ok or circuito_ok
+
+
+def _agregar_seccion_alcance_supuestos(
+    doc: Document, datos_run: dict | None = None, circuitos: list | None = None
+) -> None:
     """Sección fija P0.3: alcance, supuestos y limitaciones del modelo de cálculo."""
+    datos_run = datos_run or {}
+    circuitos = circuitos or []
     doc.add_heading("Alcance y Supuestos del Modelo de Cálculo", level=1)
 
     doc.add_heading("Ámbito de aplicación", level=2)
@@ -258,14 +275,42 @@ def _agregar_seccion_alcance_supuestos(doc: Document) -> None:
         "  disponible en calculos.py (NEC Table 310.15(B)(1))."
     )
 
-    doc.add_heading("Limitaciones conocidas", level=2)
-    doc.add_paragraph(
+    limitaciones = [
         "• Impedancia de transformador: tratada como puramente resistiva en esta versión\n"
-        "  (X_trafo no incluida; error < 2% en BT típico).\n"
-        "• Sin aporte de motores activado en el cálculo base de esta memoria.\n"
-        "• Sin análisis nodal de flujo de carga acoplado (calculista por circuito).\n"
-        "• Sin Arc Flash IEEE 1584-2018 (previsto en fase F2 del roadmap)."
-    )
+        "  (X_trafo no incluida; error < 2% en BT típico)."
+    ]
+    if datos_run.get("aporte_motores"):
+        limitaciones.append(
+            "• Aporte de motores al Icc incluido en el cálculo de esta memoria (IEC 60909-4:2021)."
+        )
+    else:
+        limitaciones.append(
+            "• Sin aporte de motores activado en el cálculo base de esta memoria."
+        )
+
+    if datos_run.get("cadena"):
+        limitaciones.append(
+            "• Análisis nodal de flujo de carga incluido en esta memoria "
+            "(ver sección Flujo de Carga Nodal)."
+        )
+    else:
+        limitaciones.append(
+            "• Sin análisis nodal de flujo de carga acoplado (calculista por circuito)."
+        )
+
+    if _arc_flash_disponible(datos_run, circuitos):
+        limitaciones.append(
+            "• Arc Flash IEEE 1584-2002 incluido en esta memoria "
+            "(ver sección Análisis de Arco Eléctrico)."
+        )
+    else:
+        limitaciones.append(
+            "• Sin Arc Flash calculado en esta memoria (faltan Icc de barra/protección de "
+            "cabecera o datos de protección por circuito)."
+        )
+
+    doc.add_heading("Limitaciones conocidas", level=2)
+    doc.add_paragraph("\n".join(limitaciones))
 
 
 def _agregar_seccion_arc_flash(doc: Document, datos_run: dict, circuitos: list) -> None:
@@ -476,7 +521,7 @@ def generar_memoria_docx(
     if cita_dv:
         doc.add_paragraph(f"Criterio aplicado: {cita_dv}")
 
-    _agregar_seccion_alcance_supuestos(doc)
+    _agregar_seccion_alcance_supuestos(doc, datos_run, circuitos)
 
     transformador = datos_run.get("transformador") or {}
     if transformador:

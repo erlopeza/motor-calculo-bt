@@ -235,3 +235,59 @@ def test_memoria_alcance_menciona_rango_valido():
     texto_completo = "\n".join(p.text for p in doc.paragraphs)
 
     assert "1000 V" in texto_completo or "1.5 mm" in texto_completo
+
+
+def test_limitaciones_declara_sin_calculo_cuando_no_hay_datos():
+    """Sin aporte de motores/cadena/proteccion, el disclaimer debe decir 'sin' en las 3."""
+    from docx import Document as DocxDocument
+
+    ruta = generar_memoria_docx(_datos_run_base(), _circuitos_base(), str(_tmp_dir()))
+    doc = DocxDocument(ruta)
+    texto_completo = "\n".join(p.text for p in doc.paragraphs)
+
+    assert "Sin aporte de motores activado" in texto_completo
+    assert "Sin análisis nodal de flujo de carga acoplado" in texto_completo
+    assert "Sin Arc Flash calculado en esta memoria" in texto_completo
+
+
+def test_limitaciones_no_declara_omision_cuando_hay_aporte_motores():
+    """Si datos_run trae aporte_motores, el disclaimer no debe decir que está 'sin activar'."""
+    from docx import Document as DocxDocument
+
+    datos_run = dict(_datos_run_base())
+    datos_run["aporte_motores"] = {"delta_icc_ka": 0.5}
+    ruta = generar_memoria_docx(datos_run, _circuitos_base(), str(_tmp_dir()))
+    doc = DocxDocument(ruta)
+    texto_completo = "\n".join(p.text for p in doc.paragraphs)
+
+    assert "Aporte de motores al Icc incluido en el cálculo de esta memoria" in texto_completo
+    assert "Sin aporte de motores activado" not in texto_completo
+
+
+def test_limitaciones_no_declara_omision_cuando_hay_cadena():
+    """Si datos_run trae cadena (flujo nodal), el disclaimer no debe decir que está omitido."""
+    from docx import Document as DocxDocument
+
+    datos_run = dict(_datos_run_base())
+    datos_run["cadena"] = [{"nombre": "C-01", "aguas_arriba": None}]
+    ruta = generar_memoria_docx(datos_run, _circuitos_base(), str(_tmp_dir()))
+    doc = DocxDocument(ruta)
+    texto_completo = "\n".join(p.text for p in doc.paragraphs)
+
+    assert "Análisis nodal de flujo de carga incluido en esta memoria" in texto_completo
+    assert "Sin análisis nodal de flujo de carga acoplado" not in texto_completo
+
+
+def test_limitaciones_no_declara_omision_cuando_hay_arc_flash_por_circuito():
+    """Si algún circuito trae In_A/curva/icc_ka, el disclaimer debe reflejar Arc Flash calculado."""
+    from docx import Document as DocxDocument
+
+    circuitos = _circuitos_base()
+    circuitos[0]["In_A"] = 40
+    circuitos[0]["curva"] = "C"
+    ruta = generar_memoria_docx(_datos_run_base(), circuitos, str(_tmp_dir()))
+    doc = DocxDocument(ruta)
+    texto_completo = "\n".join(p.text for p in doc.paragraphs)
+
+    assert "Arc Flash IEEE 1584-2002 incluido en esta memoria" in texto_completo
+    assert "Sin Arc Flash calculado en esta memoria" not in texto_completo
