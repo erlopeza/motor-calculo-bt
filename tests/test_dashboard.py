@@ -1,3 +1,5 @@
+import re
+
 import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
@@ -110,7 +112,13 @@ def test_repo_url_web_excepcion_devuelve_none():
 
 
 def test_estado_tecnico_commit_hash_es_link(db_prueba):
+    """`AppTest.from_file` ejecuta dashboard.py en su propio contexto, aislado
+    del proceso de test — no comparte `sys.modules['dashboard']`, así que
+    `unittest.mock.patch("dashboard._repo_url_web", ...)` NO tiene efecto sobre
+    esta ejecución (verificado empíricamente). Por eso este test verifica el
+    comportamiento real contra el remoto real del repo (que sí es GitHub),
+    con una regex tolerante al hash exacto en vez de un valor mockeado."""
     at = _app(db_prueba)
     assert not at.exception
     markdowns = " ".join(m.value for m in at.markdown)
-    assert "](https://github.com/" in markdowns or "commit_hash" in " ".join(t.value for t in at.text)
+    assert re.search(r"\]\(https://github\.com/[\w.-]+/[\w.-]+/commit/[0-9a-f]{7,40}\)", markdowns)
