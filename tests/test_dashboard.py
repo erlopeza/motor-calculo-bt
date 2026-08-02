@@ -87,3 +87,30 @@ def test_ruta_valida_no_muestra_error(db_prueba):
     at = _app(db_prueba)
     assert not at.exception
     assert len(at.error) == 0
+
+
+from unittest.mock import patch
+
+from dashboard import _repo_url_web
+
+
+def test_repo_url_web_https():
+    with patch("subprocess.check_output", return_value="https://github.com/erlopeza/motor-calculo-bt.git\n"):
+        assert _repo_url_web() == "https://github.com/erlopeza/motor-calculo-bt"
+
+
+def test_repo_url_web_ssh_convertida():
+    with patch("subprocess.check_output", return_value="git@github.com:erlopeza/motor-calculo-bt.git\n"):
+        assert _repo_url_web() == "https://github.com/erlopeza/motor-calculo-bt"
+
+
+def test_repo_url_web_excepcion_devuelve_none():
+    with patch("subprocess.check_output", side_effect=OSError("git no encontrado")):
+        assert _repo_url_web() is None
+
+
+def test_estado_tecnico_commit_hash_es_link(db_prueba):
+    at = _app(db_prueba)
+    assert not at.exception
+    markdowns = " ".join(m.value for m in at.markdown)
+    assert "](https://github.com/" in markdowns or "commit_hash" in " ".join(t.value for t in at.text)

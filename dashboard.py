@@ -34,6 +34,23 @@ def _fmt_fecha(dt) -> str:
     return dt.strftime("%Y-%m-%d %H:%M UTC")
 
 
+def _repo_url_web() -> str | None:
+    """Resuelve la URL web del repo desde 'git remote get-url origin'.
+    Devuelve None ante cualquier fallo (sin git, sin remoto, etc.) — nunca crashea."""
+    try:
+        import subprocess
+        url = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"], text=True, timeout=2
+        ).strip()
+        if url.endswith(".git"):
+            url = url[:-4]
+        if url.startswith("git@github.com:"):
+            url = "https://github.com/" + url[len("git@github.com:"):]
+        return url
+    except Exception:
+        return None
+
+
 def _tabla_presentacion(df: pd.DataFrame, columnas):
     vista = df[columnas].copy()
     for c in vista.columns:
@@ -164,7 +181,12 @@ def main():
 
         st.subheader("Último control de versión")
         ultimo = df.iloc[0].to_dict()
-        st.text(f"commit_hash: {_fmt_val(ultimo.get('commit_hash'))}")
+        hash_commit = _fmt_val(ultimo.get("commit_hash"))
+        url_repo = _repo_url_web()
+        if url_repo and hash_commit != "—":
+            st.markdown(f"commit_hash: [{hash_commit}]({url_repo}/commit/{hash_commit})")
+        else:
+            st.text(f"commit_hash: {hash_commit}")
         st.text(f"branch: {_fmt_val(ultimo.get('branch'))}")
         st.text(f"estado_gantt (mapeado): {_estado_gantt_desde_status(ultimo.get('status'))}")
 
