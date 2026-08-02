@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from gui_core.estado import COLORES
 from persistencia import obtener_ejecuciones
 
 
@@ -67,6 +68,19 @@ def _filtro_fecha(df: pd.DataFrame, preset: str, ahora: pd.Timestamp | None = No
     # poder ubicarlas en el tiempo, se conservan visibles en vez de asumir que
     # quedan fuera.
     return df[df["timestamp_dt"].isna() | (df["timestamp_dt"] >= corte)]
+
+
+_COLOR_STATUS = {
+    "OK": COLORES["ok"],
+    "CON_FALLAS": COLORES["alerta"],
+    "ERROR": COLORES["alerta"],
+    "CON_ADVERTENCIAS": COLORES["precaucion"],
+}
+
+
+def _estilo_status(val) -> str:
+    color = _COLOR_STATUS.get(val)
+    return f"color: {color}" if color else ""
 
 
 def _tabla_presentacion(df: pd.DataFrame, columnas):
@@ -141,7 +155,10 @@ def main():
             "n_ok", "n_fallas", "max_dv_pct", "max_icc_ka",
         ]
         cols = [c for c in cols if c in df.columns]
-        st.dataframe(_tabla_presentacion(df.head(10), cols), use_container_width=True)
+        st.dataframe(
+            _tabla_presentacion(df.head(10), cols).style.map(_estilo_status, subset=["status"]),
+            use_container_width=True,
+        )
 
     with tab_proyecto:
         proyectos = sorted(
@@ -174,7 +191,10 @@ def main():
                 "n_circuitos", "n_ok", "n_fallas", "max_dv_pct", "max_icc_ka",
             ]
             cols = [c for c in cols if c in df_p.columns]
-            st.dataframe(_tabla_presentacion(df_p, cols), use_container_width=True)
+            st.dataframe(
+                _tabla_presentacion(df_p, cols).style.map(_estilo_status, subset=["status"]),
+                use_container_width=True,
+            )
 
     with tab_detalle:
         opciones = df[["run_id", "timestamp"]].copy()

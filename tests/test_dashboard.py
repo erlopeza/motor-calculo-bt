@@ -197,3 +197,27 @@ def test_sidebar_tiene_control_de_rango(db_prueba):
     assert not at.exception
     assert len(at.sidebar.radio) == 1
     assert at.sidebar.radio[0].options == ["Todo", "Últimos 7 días", "Últimos 30 días"]
+
+
+from dashboard import _estilo_status
+from gui_core.estado import COLORES
+
+
+def test_estilo_status_ok():
+    assert _estilo_status("OK") == f"color: {COLORES['ok']}"
+
+
+def test_estilo_status_con_fallas():
+    assert _estilo_status("CON_FALLAS") == f"color: {COLORES['alerta']}"
+
+
+def test_estilo_status_error_mismo_color_que_fallas():
+    assert _estilo_status("ERROR") == f"color: {COLORES['alerta']}"
+
+
+def test_estilo_status_advertencias():
+    assert _estilo_status("CON_ADVERTENCIAS") == f"color: {COLORES['precaucion']}"
+
+
+def test_estilo_status_desconocido_sin_estilo():
+    assert _estilo_status("ALGO_RARO") == ""

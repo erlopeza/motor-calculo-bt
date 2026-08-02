@@ -1,0 +1,8 @@
+# Colores tomados de gui_core.estado.COLORES — mantener sincronizado si esa paleta cambia.
+# TOML no puede importar Python, así que estos valores están duplicados intencionalmente.
+[theme]
+base = "dark"
+primaryColor = "#7aa2f7"
+backgroundColor = "#1a1b26"
+secondaryBackgroundColor = "#16161e"
+textColor = "#c0caf5"
