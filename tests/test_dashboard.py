@@ -80,7 +80,7 @@ def test_ruta_a_directorio_muestra_error():
     at = _app(".")
     assert not at.exception
     assert len(at.error) == 1
-    assert "." in at.error[0].value
+    assert "'.'" in at.error[0].value
 
 
 def test_ruta_valida_no_muestra_error(db_prueba):
