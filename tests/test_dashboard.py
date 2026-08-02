@@ -1,15 +1,45 @@
+import pytest
 from streamlit.testing.v1 import AppTest
 
-
-def _app() -> AppTest:
-    return AppTest.from_file("dashboard.py", default_timeout=10)
+import persistencia
 
 
-def test_detalle_muestra_las_4_rutas_de_reporte():
-    at = _app()
+@pytest.fixture
+def db_prueba(tmp_path) -> str:
+    """DB SQLite temporal con 1 corrida de prueba y las 4 rutas de reporte pobladas."""
+    ruta = str(tmp_path / "motor_bt_test.db")
+    persistencia.registrar_ejecucion({
+        "project_id": "PROY-TEST",
+        "revision": "CLI",
+        "perfil": "industrial",
+        "norma": "AWG",
+        "n_circuitos": 5,
+        "n_ok": 4,
+        "n_advertencias": 0,
+        "n_fallas": 1,
+        "max_dv_pct": 3.2,
+        "max_icc_ka": 12.5,
+        "status": "CON_FALLAS",
+        "ruta_reporte_txt": "REPORTE_PROY-TEST.txt",
+        "ruta_reporte_xlsx": "REPORTE_PROY-TEST.xlsx",
+        "ruta_reporte_docx": "MEMORIA_PROY-TEST.docx",
+        "ruta_reporte_pdf": "REPORTE_PROY-TEST.pdf",
+    }, ruta_db=ruta)
+    return ruta
+
+
+def _app(ruta_db: str) -> AppTest:
+    """Instancia el dashboard y lo apunta a `ruta_db`. Timeout amplio (30s)
+    para no ser frágil en un runner de CI recién aprovisionado (primera
+    ejecución sin cachés calientes)."""
+    at = AppTest.from_file("dashboard.py", default_timeout=30)
     at.run()
-    ti = at.sidebar.text_input[0]
-    ti.set_value("motor_bt.db").run()
+    at.sidebar.text_input[0].set_value(ruta_db).run()
+    return at
+
+
+def test_detalle_muestra_las_4_rutas_de_reporte(db_prueba):
+    at = _app(db_prueba)
     assert not at.exception
     textos = " ".join(t.value for t in at.text)
     assert "ruta_reporte_txt" in textos
