@@ -122,3 +122,46 @@ def test_estado_tecnico_commit_hash_es_link(db_prueba):
     assert not at.exception
     markdowns = " ".join(m.value for m in at.markdown)
     assert re.search(r"\]\(https://github\.com/[\w.-]+/[\w.-]+/commit/[0-9a-f]{7,40}\)", markdowns)
+
+
+from dashboard import _filtro_fecha
+
+
+def _df_prueba(ahora: pd.Timestamp) -> pd.DataFrame:
+    return pd.DataFrame({
+        "run_id": ["a", "b", "c"],
+        "timestamp_dt": [ahora - pd.Timedelta(days=1), ahora - pd.Timedelta(days=10), ahora - pd.Timedelta(days=40)],
+    })
+
+
+def test_filtro_fecha_todo_no_filtra():
+    ahora = pd.Timestamp("2026-08-01", tz="UTC")
+    df = _df_prueba(ahora)
+    resultado = _filtro_fecha(df, "Todo", ahora=ahora)
+    assert len(resultado) == 3
+
+
+def test_filtro_fecha_7_dias():
+    ahora = pd.Timestamp("2026-08-01", tz="UTC")
+    df = _df_prueba(ahora)
+    resultado = _filtro_fecha(df, "Últimos 7 días", ahora=ahora)
+    assert list(resultado["run_id"]) == ["a"]
+
+
+def test_filtro_fecha_30_dias():
+    ahora = pd.Timestamp("2026-08-01", tz="UTC")
+    df = _df_prueba(ahora)
+    resultado = _filtro_fecha(df, "Últimos 30 días", ahora=ahora)
+    assert list(resultado["run_id"]) == ["a", "b"]
+
+
+def test_filtro_fecha_dataframe_vacio_no_lanza():
+    vacio = pd.DataFrame()
+    assert _filtro_fecha(vacio, "Últimos 7 días").empty
+
+
+def test_sidebar_tiene_control_de_rango(db_prueba):
+    at = _app(db_prueba)
+    assert not at.exception
+    assert len(at.sidebar.radio) == 1
+    assert at.sidebar.radio[0].options == ["Todo", "Últimos 7 días", "Últimos 30 días"]

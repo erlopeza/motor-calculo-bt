@@ -51,6 +51,20 @@ def _repo_url_web() -> str | None:
         return None
 
 
+def _filtro_fecha(df: pd.DataFrame, preset: str, ahora: pd.Timestamp | None = None) -> pd.DataFrame:
+    """preset in {'Todo', 'Últimos 7 días', 'Últimos 30 días'}.
+
+    `ahora` es inyectable para que los tests no dependan de pd.Timestamp.now()
+    real. En producción se omite y usa el reloj real.
+    """
+    if preset == "Todo" or df.empty:
+        return df
+    ahora = ahora if ahora is not None else pd.Timestamp.now(tz="UTC")
+    dias = 7 if preset == "Últimos 7 días" else 30
+    corte = ahora - pd.Timedelta(days=dias)
+    return df[df["timestamp_dt"] >= corte]
+
+
 def _tabla_presentacion(df: pd.DataFrame, columnas):
     vista = df[columnas].copy()
     for c in vista.columns:
@@ -78,6 +92,13 @@ def main():
         return
 
     df = _normalizar_dataframe(ruta_db=ruta_db)
+
+    if df.empty:
+        st.info("sin ejecuciones registradas")
+        return
+
+    preset = st.sidebar.radio("Rango", ["Todo", "Últimos 7 días", "Últimos 30 días"], index=0)
+    df = _filtro_fecha(df, preset)
 
     if df.empty:
         st.info("sin ejecuciones registradas")
