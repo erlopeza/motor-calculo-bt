@@ -9,7 +9,10 @@ import os
 from collections import Counter
 from datetime import datetime
 
-from calculos import calcular_caida_tension, clasificar_caida, capacidad_corregida, sugerir_conductor
+from calculos import (
+    calcular_caida_tension, clasificar_caida, capacidad_corregida,
+    sugerir_conductor, calcular_potencia,
+)
 from transformador import calcular_icc_transformador, icc_desde_tabla
 from icc_punto import calcular_icc_punto, calcular_icc_con_aporte_motores
 from motores import calcular_aporte_icc_motor
@@ -24,6 +27,7 @@ from flujo_nodal import calcular_flujo_nodal
 from reporteria_sec import (
     generar_memoria_sec, generar_reporte_pdf,
     exportar_json_epc, verificar_completitud_parametros,
+    enriquecer_circuitos_con_proteccion, seleccionar_proteccion_cabecera,
 )
 from gui_core.sesion import SesionProyecto
 
@@ -185,16 +189,23 @@ def presentar_sugerencia(sesion: SesionProyecto) -> dict:
 def presentar_aporte_motores(sesion: SesionProyecto) -> dict:
     motores_circ = [
         c for c in sesion.circuitos
-        if str(c.get("tipo_carga", "")).lower() == "motor" and c.get("P_kW")
+        if str(c.get("tipo_carga", "")).lower() == "motor"
     ]
     if not motores_circ:
         return {"filas": [], "Icc_red_kA": 0.0, "Icc_total_kA": 0.0, "alertas": []}
     filas, aportes = [], []
     for c in motores_circ:
+        p_kw = c.get("P_kW")
+        if p_kw is None:
+            p_kw = calcular_potencia(
+                c.get("I_diseno", 0.0),
+                c.get("cos_phi", 0.85),
+                c.get("sistema", "3F"),
+            ) / 1000.0
         vn = TENSION_SISTEMA.get(c["sistema"], 380)
-        ap = calcular_aporte_icc_motor(float(c["P_kW"]), vn, sistema=c["sistema"])
+        ap = calcular_aporte_icc_motor(float(p_kw), vn, sistema=c["sistema"])
         aportes.append(ap["I_aporte_A"])
-        filas.append({"nombre": c["nombre"], "P_kW": float(c["P_kW"]), "I_aporte_A": ap["I_aporte_A"]})
+        filas.append({"nombre": c["nombre"], "P_kW": float(p_kw), "I_aporte_A": ap["I_aporte_A"]})
     icc_red = presentar_icc_trafo(sesion)["Icc_kA"] if sesion.tiene_trafo else 0.0
     icc_total, _ = calcular_icc_con_aporte_motores(icc_red, aportes)
     return {"filas": filas, "Icc_red_kA": icc_red, "Icc_total_kA": icc_total, "alertas": []}
@@ -208,7 +219,7 @@ def _norma_predominante(circuitos: list) -> str:
 
 
 def _datos_run(sesion: SesionProyecto) -> dict:
-    return {
+    datos = {
         "project_id": sesion.proyecto or "PROYECTO",
         "revision": "GUI",
         "timestamp": datetime.now().astimezone().isoformat(),
@@ -222,6 +233,21 @@ def _datos_run(sesion: SesionProyecto) -> dict:
         "ups": sesion.ups or {},
         "generador": sesion.generador or {},
     }
+    if sesion.tiene_trafo:
+        icc_trafo = presentar_icc_trafo(sesion)
+        aporte_motores = presentar_aporte_motores(sesion)
+        datos["icc_red_ka"] = icc_trafo["Icc_kA"]
+        datos["icc_barra_ka"] = (
+            aporte_motores["Icc_total_kA"]
+            if aporte_motores["filas"]
+            else icc_trafo["Icc_kA"]
+        )
+        datos["aporte_motores"] = aporte_motores["filas"]
+        datos["tension_barra_kv"] = float(sesion.tension_sistema_v) / 1000.0
+    cabecera = seleccionar_proteccion_cabecera(sesion.protecciones)
+    if cabecera:
+        datos["proteccion_cabecera"] = cabecera
+    return datos
 
 
 def _circuitos_enriquecidos(sesion: SesionProyecto) -> list:
@@ -246,7 +272,7 @@ def _circuitos_enriquecidos(sesion: SesionProyecto) -> list:
         if icc:
             c2["icc_ka"] = icc.get("Icc_kA")
         salida.append(c2)
-    return salida
+    return enriquecer_circuitos_con_proteccion(salida, sesion.protecciones)
 
 
 def presentar_reporte(sesion: SesionProyecto, carpeta_salida: str | None = None) -> dict:

@@ -24,6 +24,10 @@ from excel import (
 from perfiles import obtener_perfil
 from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
 from icc_punto import calcular_icc_todos_circuitos
+from reporteria_sec import (
+    enriquecer_circuitos_con_proteccion,
+    seleccionar_proteccion_cabecera,
+)
 from protecciones import verificar_circuito_completo, leer_protecciones_excel
 from balance import calcular_balance_tableros, reporte_balance
 from demanda import (
@@ -32,12 +36,70 @@ from demanda import (
 )
 from excel import leer_demanda_excel, leer_cadena_excel
 from coordinacion import verificar_cadena, reporte_coordinacion
-from motores import calcular_motor
+from motores import calcular_motor, calcular_aporte_icc_motor
+from icc_punto import calcular_icc_con_aporte_motores
 from generador import calcular_generador
 from sts import calcular_sts
 from trafo_iso import calcular_trafo_iso
 from ups import calcular_ups
 from ats import calcular_ats
+
+
+def preparar_payload_reporte_cli(
+    circuitos: list,
+    protecciones: dict,
+    datos_transformador: dict | None = None,
+    *,
+    cadena: list | None = None,
+    trafo_z_ohm: float = 0.0,
+    tension_sistema_v: float | None = None,
+) -> dict:
+    """Compone los datos operacionales que consume la memoria SEC del CLI."""
+    payload = {
+        "circuitos": enriquecer_circuitos_con_proteccion(circuitos, protecciones),
+        "cadena": list(cadena or []),
+        "trafo_z_ohm": float(trafo_z_ohm or 0.0),
+    }
+    if tension_sistema_v is not None:
+        payload["tension_sistema_v"] = float(tension_sistema_v)
+        payload["tension_barra_kv"] = float(tension_sistema_v) / 1000.0
+    if datos_transformador:
+        if datos_transformador.get("Icc_nom_kA") is not None:
+            payload["icc_barra_ka"] = float(datos_transformador["Icc_nom_kA"])
+        if datos_transformador.get("Vn_BT") is not None:
+            payload["tension_barra_kv"] = float(datos_transformador["Vn_BT"]) / 1000.0
+        cabecera = seleccionar_proteccion_cabecera(protecciones)
+        if cabecera:
+            payload["proteccion_cabecera"] = cabecera
+    icc_red = float(payload.get("icc_barra_ka") or 0.0)
+    aportes = []
+    for circuito in circuitos:
+        if str(circuito.get("tipo_carga", "")).lower() != "motor":
+            continue
+        p_kw = circuito.get("P_kW")
+        if p_kw is None:
+            p_kw = calcular_potencia(
+                circuito.get("I_diseno", 0.0),
+                circuito.get("cos_phi", 0.85),
+                circuito.get("sistema", "3F"),
+            ) / 1000.0
+        vn = float(circuito.get("Vn_V") or (380.0 if circuito.get("sistema", "3F") == "3F" else 220.0))
+        aporte = calcular_aporte_icc_motor(
+            float(p_kw), vn,
+            sistema=str(circuito.get("sistema", "3F")),
+        )
+        aportes.append({
+            "nombre": circuito.get("nombre"),
+            "P_kW": float(p_kw),
+            "I_aporte_A": aporte["I_aporte_A"],
+        })
+    icc_total, _ = calcular_icc_con_aporte_motores(
+        icc_red, [fila["I_aporte_A"] for fila in aportes]
+    )
+    payload["icc_red_ka"] = icc_red
+    payload["icc_barra_ka"] = icc_total
+    payload["aporte_motores"] = aportes
+    return payload
 
 # ============================================================
 # GENERACIÓN DE REPORTE TXT
@@ -961,6 +1023,7 @@ if __name__ == "__main__":
         max_icc_ka = 0.0
         circuitos_persistencia = []
         icc_por_circuito = {}
+        zt_ohm = 0.0
         try:
             if datos_trafo:
                 if datos_trafo.get("modo") == "A":
@@ -1009,6 +1072,9 @@ if __name__ == "__main__":
                     "I_diseno": c.get("I_diseno"),
                     "I_max": c.get("I_max"),
                     "cos_phi": c.get("cos_phi"),
+                    "tipo_carga": c.get("tipo_carga"),
+                    "P_kW": c.get("P_kW"),
+                    "Vn_V": c.get("Vn_V"),
                     "L_m": c.get("L_m"),
                     "paralelos": c.get("paralelos"),
                     "sistema": c.get("sistema"),
@@ -1053,6 +1119,16 @@ if __name__ == "__main__":
         except Exception:
             datos_transformador = None
 
+        payload_reporte = preparar_payload_reporte_cli(
+            circuitos_persistencia,
+            protecciones_excel,
+            datos_transformador,
+            cadena=cadena_datos,
+            trafo_z_ohm=zt_ohm,
+            tension_sistema_v=(datos_trafo or {}).get("Vn_BT", 380.0),
+        )
+        circuitos_persistencia = payload_reporte.pop("circuitos")
+
         datos_balance_demanda = {}
         try:
             if balance_datos and tableros_datos:
@@ -1095,6 +1171,7 @@ if __name__ == "__main__":
             "transformador": datos_transformador,
             "balance_demanda": datos_balance_demanda,
         }
+        datos_run.update(payload_reporte)
 
         if args.graficos:
             try:
