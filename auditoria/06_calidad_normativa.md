@@ -18,22 +18,22 @@ El código cita normas en comentarios y constantes de forma sistemática. Frecue
 
 Los 5 hits de "BORRADOR" en `reporteria_sec.py` **no son TODOs**: son un **estado legítimo del gate de emisión documental** (`nivel: "BORRADOR"/"INCOMPLETO"/...`), que marca documentos no aptos para emisión cuando se usan parámetros por defecto. **No se encontraron TODO/FIXME/HACK/XXX reales** en el código productivo. → hallazgo cerrado favorablemente.
 
-## H-07 (🟡 Bajo) — Datos de fabricante hardcodeados
+## H-07 (✅ Cerrado, 2026-06-19) — Datos de fabricante hardcodeados
 
-Documentado en [`../AUDITORIA_CICLO_0.md`](../AUDITORIA_CICLO_0.md): la tabla del alternador **Stamford HCI544D W14** (Xd_pp, Xd_p, Xd, X2, X0, Rs, Sn=625) está hardcodeada en `generador.py` (líneas ~32-35), pese a que existe `presets/alternadores/stamford_hci544d.py`. → **Mover a preset/catálogo** para evitar dos fuentes de verdad del mismo equipo.
+Documentado en [`../AUDITORIA_CICLO_0.md`](../AUDITORIA_CICLO_0.md), cerrado en el commit `fb5159c`. Verificado de nuevo el 2026-10-01: `STAMFORD_HCI544D_W14` ya no existe en `generador.py` ni en `ats.py` (grep sin resultados); el preset vive solo en `presets/alternadores/stamford_hci544d.py` y `generador.py::get_parametros_alternador()` lo consume por `importlib`. Sin dato de fabricante en el core.
 
-## H-08 (🟡 Bajo) — Defaults típicos sin cita normativa
+## H-08 (✅ Cerrado, 2026-06-19) — Defaults típicos sin cita normativa
 
-Inventariado en `AUDITORIA_CICLO_0.md`. Ejemplos con efecto de cálculo y **sin fuente citada**:
+Inventariado en `AUDITORIA_CICLO_0.md`, cerrado en el commit `fb5159c`. Verificado de nuevo el 2026-10-01:
 
-| Módulo | Constante | Valor | Observación |
-|---|---|---|---|
-| `generador.py` | curva de derrateo altitud | 4000/1500/0.04/300 | falta cita normativa/fabricante |
-| `generador.py` | autonomía mínima combustible | 6.0 h | umbral operativo interno sin cita |
-| `generador.py` | `DV_ARRANQUE_LIMITE_CRITICO` | 10.0 | umbral interno (vs. 15.0 NCh 4-2003 12.28.8 que sí está citado) |
-| `generador.py` | reactancias default (Xd_pp=20, Xd_p=28, Xd=120, R1=2, X0=5) | — | el comentario indica "verificar con ficha técnica" — **defaults de máquina, no universales** |
+| Módulo | Constante | Resolución |
+|---|---|---|
+| `generador.py` | curva de derrateo altitud | Citada: ISO 8528-1:2018 §13.4 / IEC 60034-1 §3.5 |
+| `generador.py` | autonomía mínima combustible | Citada: RIC N°08 §5.3.1 (SEC Chile) |
+| `generador.py` | reactancias default (Xd_pp, Xd_p, Xd, R1, X0) | Etiquetadas `# TIPO A - DEFAULT: verificar con ficha tecnica GE` — correcto: son parámetro de equipo, no citables a norma, y la etiqueta ya cumple la regla del brief Ciclo 0 ("debe llegar por input, trazado como default") |
+| `generador.py` | `DV_ARRANQUE_LIMITE_CRITICO` | Etiquetada `# TIPO C - umbral interno para cargas criticas` |
 
-**Riesgo:** un cálculo con defaults aplicados puede emitirse como definitivo sin que el usuario advierta que usó valores genéricos. ✅ Mitigado parcialmente por el gate `BORRADOR` de `reporteria_sec.py`, pero conviene **propagar ese gate a todos los módulos** que aplican defaults de equipo.
+**Riesgo residual (abierto):** el campo `usa_defaults` existe por función en `generador.py`/`ats.py`/`ups.py`/`motores.py` (cerrado en `ecca4f3`), pero el gate `BORRADOR`/`FINAL`/`INCOMPLETO` de `reporteria_sec.py::verificar_completitud_parametros` no lo consume — verificado el 2026-10-01, cero referencias a `usa_defaults` en `reporteria_sec.py`. Un cálculo con defaults de equipo aplicados puede emitirse como FINAL sin que el gate lo marque. **Sigue pendiente propagar `usa_defaults` al gate.**
 
 ## Otros aspectos de calidad
 
@@ -48,10 +48,10 @@ Inventariado en `AUDITORIA_CICLO_0.md`. Ejemplos con efecto de cálculo y **sin 
 
 ## Recomendaciones
 
-| Acción | Prioridad |
-|---|---|
-| Mover datos Stamford HCI544D a `presets/alternadores/` y referenciar | Media |
-| Citar fuente de los defaults de altitud/autonomía o exigir entrada del usuario | Media |
-| Extender el gate `BORRADOR` a todo cálculo que aplique defaults de equipo | Media |
-| Añadir `ruff` + `black` y un pre-commit | Baja |
-| Completar type hints y docstrings en módulos antiguos | Baja |
+| Acción | Prioridad | Estado |
+|---|---|---|
+| Mover datos Stamford HCI544D a `presets/alternadores/` y referenciar | Media | ✅ Cerrado (`fb5159c`) |
+| Citar fuente de los defaults de altitud/autonomía o exigir entrada del usuario | Media | ✅ Cerrado (`fb5159c`) |
+| Propagar `usa_defaults` (ya existe por función desde `ecca4f3`) al gate `BORRADOR` de `reporteria_sec.py` | Media | 🟡 Abierto |
+| Añadir `ruff` + `black` y un pre-commit | Baja | 🟡 Abierto |
+| Completar type hints y docstrings en módulos antiguos | Baja | 🟡 Abierto |
