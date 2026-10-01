@@ -159,6 +159,41 @@ def _valor_por_ruta(base: dict, ruta: tuple) -> object:
     return cur
 
 
+# Modulos cuyo orquestador (calcular_generador/calcular_ats/calcular_ups/
+# calcular_motor) ya expone "usa_defaults"/"defaults_aplicados" en su propio
+# resultado. El gate los lee genericamente desde resultados[modulo] -- hoy
+# (2026-10) ninguno de los dos entry points reales (main.py CLI, gui_core
+# GUI) escribe ese sub-dict en datos_run: generador/ats/ups nunca se asignan
+# a SesionProyecto (fase 5 sin paneles de entrada aun) y "motor" solo existe
+# en fixtures de test. Esta deteccion queda lista y testeada para cuando esa
+# fase se cablee; hasta entonces es, correctamente, un no-op.
+_MODULOS_USA_DEFAULTS = ("generador", "ats", "ups", "motor")
+
+
+def _parametros_default_desde_usa_defaults(resultados: dict, confirmados: set, ya_cubiertos: set) -> list:
+    extra = []
+    for modulo in _MODULOS_USA_DEFAULTS:
+        sub = resultados.get(modulo)
+        if not isinstance(sub, dict) or not sub.get("usa_defaults"):
+            continue
+        for variable in sub.get("defaults_aplicados") or []:
+            if (modulo, variable) in ya_cubiertos:
+                continue
+            extra.append(
+                {
+                    "modulo": modulo,
+                    "variable": variable,
+                    "valor": "DEFAULT",
+                    "advertencia": (
+                        f"Parametro de {modulo} con valor por defecto aplicado "
+                        "internamente - verificar dato real antes de emision FINAL"
+                    ),
+                    "confirmado": variable in confirmados,
+                }
+            )
+    return extra
+
+
 def verificar_completitud_parametros(resultados: dict) -> dict:
     """
     Verifica que parametros TIPO A no queden en DEFAULT sin confirmacion.
@@ -187,6 +222,11 @@ def verificar_completitud_parametros(resultados: dict) -> dict:
                 )
         except Exception:
             continue
+
+    ya_cubiertos = {(p["modulo"], p["variable"]) for p in parametros_default}
+    parametros_default.extend(
+        _parametros_default_desde_usa_defaults(resultados, confirmados, ya_cubiertos)
+    )
 
     if not parametros_default:
         return {"apto_emision": True, "parametros_default": [], "nivel": "FINAL"}

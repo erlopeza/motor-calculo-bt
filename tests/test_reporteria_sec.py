@@ -147,6 +147,71 @@ def test_gate_emision_aprueba_sin_defaults():
     assert gate["nivel"] == "FINAL"
 
 
+def test_gate_detecta_usa_defaults_de_generador():
+    """El gate debe leer usa_defaults/defaults_aplicados, no solo la lista TIPO_A fija."""
+    gate = verificar_completitud_parametros(
+        {"generador": {"usa_defaults": True, "defaults_aplicados": ["Xd_pp_pct"]}}
+    )
+    assert gate["apto_emision"] is False
+    assert gate["nivel"] == "INCOMPLETO"
+    entradas = [p for p in gate["parametros_default"] if p["modulo"] == "generador"]
+    assert len(entradas) == 1
+    assert entradas[0]["variable"] == "Xd_pp_pct"
+    assert entradas[0]["confirmado"] is False
+
+
+def test_gate_usa_defaults_confirmado_queda_borrador():
+    gate = verificar_completitud_parametros(
+        {
+            "generador": {"usa_defaults": True, "defaults_aplicados": ["Xd_pp_pct"]},
+            "defaults_confirmados": ["Xd_pp_pct"],
+        }
+    )
+    assert gate["apto_emision"] is True
+    assert gate["nivel"] == "BORRADOR"
+
+
+def test_gate_usa_defaults_false_no_bloquea():
+    gate = verificar_completitud_parametros(
+        {"generador": {"usa_defaults": False, "defaults_aplicados": []}}
+    )
+    assert gate["apto_emision"] is True
+    assert gate["nivel"] == "FINAL"
+    assert gate["parametros_default"] == []
+
+
+def test_gate_usa_defaults_cubre_ats_ups_motor():
+    gate = verificar_completitud_parametros(
+        {
+            "ats": {"usa_defaults": True, "defaults_aplicados": ["t_cierre_contactor_ms"]},
+            "ups": {"usa_defaults": True, "defaults_aplicados": ["eta_ups"]},
+            "motor": {"usa_defaults": True, "defaults_aplicados": ["factor_arranque"]},
+        }
+    )
+    modulos = {p["modulo"] for p in gate["parametros_default"]}
+    assert modulos == {"ats", "ups", "motor"}
+    assert gate["apto_emision"] is False
+
+
+def test_gate_usa_defaults_no_duplica_entrada_ya_cubierta_por_tipo_a():
+    """ats/t_arranque_ge_ms ya esta cubierto por PARAMETROS_DEFAULT_TIPO_A (por valor);
+    si ademas aparece en defaults_aplicados, debe quedar UNA sola entrada, no dos."""
+    gate = verificar_completitud_parametros(
+        {
+            "ats": {
+                "t_arranque_ge_ms": 10000.0,
+                "usa_defaults": True,
+                "defaults_aplicados": ["t_arranque_ge_ms"],
+            },
+        }
+    )
+    entradas = [
+        p for p in gate["parametros_default"]
+        if p["modulo"] == "ats" and p["variable"] == "t_arranque_ge_ms"
+    ]
+    assert len(entradas) == 1
+
+
 def test_memoria_borrador_incluye_lista_defaults():
     datos = {
         **_datos_run_base(),
