@@ -28,8 +28,8 @@ Inventariado en `AUDITORIA_CICLO_0.md`, cerrado en el commit `fb5159c`. Verifica
 
 | Módulo | Constante | Resolución |
 |---|---|---|
-| `generador.py` | curva de derrateo altitud | Citada: ISO 8528-1:2018 §13.4 / IEC 60034-1 §3.5 |
-| `generador.py` | autonomía mínima combustible | Citada: RIC N°08 §5.3.1 (SEC Chile) |
+| `generador.py` | curva de derrateo altitud | Citada: ISO 8528-1:2018 cláusula 13.4 / IEC 60034-1 cláusula 3.5 |
+| `generador.py` | autonomía mínima combustible | Citada: RIC N°08 cláusula 5.3.1 (SEC Chile) |
 | `generador.py` | reactancias default (Xd_pp, Xd_p, Xd, R1, X0) | Etiquetadas `# TIPO A - DEFAULT: verificar con ficha tecnica GE` — correcto: son parámetro de equipo, no citables a norma, y la etiqueta ya cumple la regla del brief Ciclo 0 ("debe llegar por input, trazado como default") |
 | `generador.py` | `DV_ARRANQUE_LIMITE_CRITICO` | Etiquetada `# TIPO C - umbral interno para cargas criticas` |
 
