@@ -22,7 +22,7 @@ from excel import (
     leer_trafo_iso_excel, leer_ups_excel, leer_ats_excel
 )
 from perfiles import obtener_perfil
-from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador
+from transformador import calcular_icc_transformador, icc_desde_tabla, clasificar_icc, reporte_transformador, C_MAX, C_MIN
 from icc_punto import calcular_icc_todos_circuitos
 from reporteria_sec import (
     enriquecer_circuitos_con_proteccion,
@@ -1105,8 +1105,11 @@ if __name__ == "__main__":
 
                 z_min = ((ucc_pct * 0.925) / 100.0) * (vn_bt ** 2 / (kVA * 1000.0))
                 z_max = ((ucc_pct * 1.075) / 100.0) * (vn_bt ** 2 / (kVA * 1000.0))
-                icc_max_kA = round((1.1 * vn_bt / (1.732 * z_min)) / 1000.0, 2) if z_min > 0 else None
-                icc_min_kA = round((0.95 * vn_bt / (1.732 * z_max)) / 1000.0, 2) if z_max > 0 else None
+                # C_MAX/C_MIN importados de transformador.py (IEC 60909 §4.3.1, BT) -
+                # antes hardcodeados como 1.1/0.95 aqui, desincronizados del valor
+                # correcto (ver auditoria/12_HALLAZGO_C_MAX_ICC.md).
+                icc_max_kA = round((C_MAX * vn_bt / (1.732 * z_min)) / 1000.0, 2) if z_min > 0 else None
+                icc_min_kA = round((C_MIN * vn_bt / (1.732 * z_max)) / 1000.0, 2) if z_max > 0 else None
 
                 datos_transformador = {
                     "kVA": round(kVA, 2),
