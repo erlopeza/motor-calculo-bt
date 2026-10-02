@@ -608,7 +608,7 @@ def test_cadena_leo_arica_modo_red():
 from transformador import reporte_transformador
 
 def test_icc_max_mayor_que_nominal():
-    """Icc_max (c=1.1 · %Z mín) > Icc_nominal"""
+    """Icc_max (c=1.05 · %Z mín) > Icc_nominal"""
     _, _, d = calcular_icc_transformador(1000, 380, 5.0)
     assert d["Icc_max_kA"] > d["Icc_kA"]
 
@@ -618,9 +618,14 @@ def test_icc_min_menor_que_nominal():
     assert d["Icc_min_kA"] < d["Icc_kA"]
 
 def test_icc_max_leo_arica():
-    """LEO ARICA: Icc_max ≈ 36.14 kA con c=1.1 y tol=7.5%"""
+    """LEO ARICA: Icc_max ~= 34.49 kA con c_max=1.05 (BT, IEC 60909 4.3.1) y tol=7.5%.
+
+    c_max=1.05 es el valor BT (Vn<=1kV); 1.10 es el valor MT y no aplica aqui
+    (ver rag_normativa/referencias_iec.py y reporteria_sec.py, que ya citaban
+    1.05 en el texto de la memoria aunque el calculo usaba 1.10 - bug corregido).
+    """
     _, _, d = calcular_icc_transformador(1000, 380, 5.0)
-    assert 35.0 < d["Icc_max_kA"] < 38.0
+    assert 34.0 < d["Icc_max_kA"] < 35.0
 
 def test_icc_min_leo_arica():
     """LEO ARICA: Icc_min ≈ 26.85 kA con c=0.95 y tol=7.5%"""

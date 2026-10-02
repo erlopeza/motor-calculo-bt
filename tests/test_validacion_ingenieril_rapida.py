@@ -39,7 +39,7 @@ def test_icc_transformador_respeta_cmax_cmin_y_tolerancia():
     """
     icc_nom, zt_ohm, datos = calcular_icc_transformador(1000, 380, 6.0)
 
-    assert datos["c_max"] == 1.10
+    assert datos["c_max"] == 1.05  # IEC 60909 4.3.1, BT (Vn<=1kV); 1.10 es MT
     assert datos["c_min"] == 0.95
     assert datos["tolerancia_pct"] == 7.5
     assert datos["Zt_min_ohm"] < round(zt_ohm, 6)

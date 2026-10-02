@@ -14,6 +14,7 @@ import pytest
 
 from conductores import get_reactancia_cable_ohm_km
 from icc_punto import (
+    C_MAX_IEC60909,
     calcular_icc_fase_neutro,
     calcular_icc_punto,
     calcular_zt_cable,
@@ -159,6 +160,26 @@ class TestIccPuntoComplejo:
         assert icc_kA > 0
         assert zt_total > 0
         assert zt_cable > 0
+
+    def test_c_max_iec60909_es_1_05_bt(self):
+        """IEC 60909 4.3.1: c_max BT (Vn<=1kV) es 1.05, no 1.10 (ese es MT)."""
+        assert C_MAX_IEC60909 == 1.05
+
+    def test_icc_punto_aplica_c_max_por_defecto(self):
+        """calcular_icc_punto debe aplicar c_max=1.05 por defecto, tal como
+        dice su propio docstring (Icc = c_max x Vn / (sqrt(3) x |Z_total|)),
+        no un c=1.0 implicito."""
+        Zt_trafo = 0.007220
+        icc_con_c, _, _ = calcular_icc_punto(Zt_trafo, 10, 13.3, 1, "3F")
+        icc_sin_c, _, _ = calcular_icc_punto(Zt_trafo, 10, 13.3, 1, "3F", c_max=1.0)
+        assert icc_con_c == pytest.approx(icc_sin_c * C_MAX_IEC60909, abs=0.01)
+
+    def test_icc_punto_c_max_parametrizable(self):
+        """c_max debe poder sobrescribirse (ej. para MT, 1.10)."""
+        Zt_trafo = 0.007220
+        icc_bt, _, _ = calcular_icc_punto(Zt_trafo, 10, 13.3, 1, "3F", c_max=1.05)
+        icc_mt, _, _ = calcular_icc_punto(Zt_trafo, 10, 13.3, 1, "3F", c_max=1.10)
+        assert icc_mt > icc_bt
 
 
 # ---------------------------------------------------------------------------

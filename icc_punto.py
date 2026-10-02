@@ -9,6 +9,7 @@ import math
 from conductores import RHO_CU, TENSION_SISTEMA, get_reactancia_cable_ohm_km
 
 RHO_CU_OHM_MM2_M = RHO_CU  # resistividad cobre a 20°C (Ω·mm²/m) — IEC 60228
+C_MAX_IEC60909 = 1.05      # factor tension maxima BT (Vn<=1kV) — IEC 60909 §4.3.1 (1.10 es MT)
 C_MIN_IEC60909 = 0.95      # factor tension minima BT — IEC 60909 §4.3.1
 
 
@@ -41,12 +42,17 @@ def calcular_zt_cable_complejo(L_m, S_mm2, paralelos=1, rho=RHO_CU) -> complex:
     x = get_reactancia_cable_ohm_km(S_mm2) * L_m / 1000.0 / paralelos
     return complex(r, x)
 
-def calcular_icc_punto(Zt_trafo_ohm, L_m, S_mm2, paralelos, sistema="3F"):
-    """Corriente de cortocircuito en un punto usando impedancia compleja R+jX.
+def calcular_icc_punto(Zt_trafo_ohm, L_m, S_mm2, paralelos, sistema="3F", c_max: float = C_MAX_IEC60909):
+    """Corriente de cortocircuito maxima en un punto usando impedancia compleja R+jX.
 
     Modelo: Z_cable = R + jX (IEC 60909-2 Tabla B.1); Z_trafo = real.
     Icc = c_max × Vn / (√3 × |Z_total|) para 3F.
-    Para 1F/2F: Icc = Vn / |Z_total + Z_retorno|.
+    Para 1F/2F: Icc = c_max × Vn / |Z_total + Z_retorno|.
+
+    c_max por defecto es 1.05 (BT, Vn<=1kV, IEC 60909 §4.3.1); pasar 1.10
+    explicitamente solo si el punto es MT. Esta es la Icc MAXIMA (peor caso
+    para poder de corte/seleccion de proteccion) — no confundir con la Icc
+    MINIMA (c_min) que usa calcular_icc_fase_neutro() para verificar disparo.
 
     Retorna:
         Icc_kA   : float — corriente de cortocircuito en kA
@@ -54,6 +60,7 @@ def calcular_icc_punto(Zt_trafo_ohm, L_m, S_mm2, paralelos, sistema="3F"):
         Zt_cable : float — |Z_cable| en Ω (magnitud, retrocompatible)
     """
     V_nom = TENSION_SISTEMA.get(sistema, 380)
+    c = float(c_max)
 
     Z_cable = calcular_zt_cable_complejo(L_m, S_mm2, paralelos)
     # trafo modelado como impedancia puramente resistiva (fase posterior: añadir X_trafo)
@@ -61,10 +68,10 @@ def calcular_icc_punto(Zt_trafo_ohm, L_m, S_mm2, paralelos, sistema="3F"):
     Z_total = Z_trafo + Z_cable
 
     if sistema == "3F":
-        Icc_A = V_nom / (math.sqrt(3) * abs(Z_total))
+        Icc_A = c * V_nom / (math.sqrt(3) * abs(Z_total))
     else:
         Z_retorno = Z_cable  # neutro mismo calibre que fase
-        Icc_A = V_nom / abs(Z_total + Z_retorno)
+        Icc_A = c * V_nom / abs(Z_total + Z_retorno)
 
     return round(Icc_A / 1000, 2), round(abs(Z_total), 6), round(abs(Z_cable), 6)
 

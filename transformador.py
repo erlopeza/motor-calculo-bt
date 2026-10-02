@@ -32,7 +32,7 @@ TABLA_TIPICA = {
 # c_min : factor de tensión para Icc mínima (peor caso para
 #         verificación de disparo de protecciones)
 # ============================================================
-C_MAX = 1.10   # IEC 60909 §4.3.1 — BT hasta 1000V
+C_MAX = 1.05   # IEC 60909 §4.3.1 — BT (Vn<=1kV); 1.10 es el valor MT, no aplica aqui
 C_MIN = 0.95   # IEC 60909 §4.3.1 — BT hasta 1000V
 
 # Tolerancia típica de impedancia de cortocircuito
