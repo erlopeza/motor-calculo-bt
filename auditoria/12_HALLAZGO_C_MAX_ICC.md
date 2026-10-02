@@ -49,3 +49,28 @@ Correr el CLI real (`python main.py --proyecto ... --excel circuitos.xlsx`) tras
 **Verificado con CLI real** (no solo tests, porque este bloque de `main.py` no tenía cobertura de test dedicada — otro hallazgo: es lógica inline en una función grande, sin test unitario propio): memoria regenerada sobre `circuitos.xlsx` ahora muestra `Icc bornes BT: nominal=30.39 kA, maxima=34.49 kA, minima=26.85 kA` — coherente con el texto de la propia memoria. 819 tests (808 passed + 11 skipped), `pyflakes` limpio.
 
 **Nota:** la GUI (`gui_core/presentadores.py`) no tiene esta duplicación porque no calcula `Icc_max_kA`/`Icc_min_kA` en absoluto todavía — mismo vacío de fase 5 documentado en `06_calidad_normativa.md` y `11_ROADMAP_CONSOLIDADO.md`.
+
+## Adenda 2 — caso de regresión dedicado BT-ICC-REG-001
+
+A pedido explícito, se diseñó y ejecutó un caso de regresión formal (`tests/test_regresion_bt_icc_reg_001.py`, 5 tests) para blindar este fix contra reversión futura:
+
+1. **Valor esperado independiente** — calcula `Icc = c_max × Vn / (√3 × |Z_total|)` a mano (no toma el resultado de producción como única fuente) para `Vn=380V` (único valor real que `sistema="3F"` soporta sin ampliar la API — el escenario original pedía 400V), `|Z_total|=0.040 Ω` (vía `L_m=0`, cable sin impedancia) y `c_max=1.10`.
+2. **Regresión explícita** — compara `c_max=1.10` vs `c_max=1.0` en el mismo escenario; si una futura regresión elimina la aplicación de `c_max`, este test falla porque ambos resultados dejarían de diferir.
+3. **Integración con protección** — usa la Icc calculada como entrada real de `protecciones.py::verificar_circuito_completo()`/`verificar_poder_de_corte()`. Demuestra la consecuencia real del bug con un breaker de `poder_corte_kA=6.0`: con `c_max=1.10` (correcto) el breaker queda **insuficiente** (`Icc=6.03 kA > 6.0 kA`, estado `"FALLA PODER CORTE"`); con `c=1.0` (comportamiento previo al fix) el MISMO breaker habría quedado **aprobado** (`Icc=5.48 kA`, estado `"OK"`) — un falso positivo de seguridad.
+4. **Consistencia entre módulos** — `icc_punto.C_MAX_IEC60909 == transformador.C_MAX == generador.C_MAX_BT == 1.05`.
+5. **Consistencia con reportería** — genera una memoria DOCX real y verifica que el `Icc_max_kA` impreso coincide con el que devuelve `calcular_icc_transformador()` (no un valor recalculado aparte), y que el texto "c_max = 1.05" coincide con `transformador.C_MAX`.
+
+**Evidencia de estado rojo (contra el código previo al fix, commit `b10ee7f`, vía `git worktree` temporal, sin tocar el árbol de trabajo):**
+```
+icc_punto.calcular_icc_punto() PRE-FIX (sin parametro c_max, c=1.0 implicito):
+  Icc = 5.48 kA  (esperado con c_max=1.10: 6.03 kA -> NO coincide, confirma el bug)
+  firma acepta c_max? NO -> calcular_icc_punto() got an unexpected keyword argument 'c_max'
+
+transformador.C_MAX PRE-FIX = 1.1 (deberia ser 1.05 BT, no 1.10 MT)
+Icc_max_kA PRE-FIX = 36.14 (valor incorrecto con C_MAX=1.10)
+```
+(La suite de regresión no pudo ni colectarse contra ese commit: `ImportError: cannot import name 'C_MAX_IEC60909'` — confirma que falla por la causa esperada.)
+
+**Evidencia de estado verde (código actual):** 5/5 passed. Suite completa: **824 tests (813 passed + 11 skipped)**, sin regresiones. `pyflakes` limpio en todo el código fuente de primera parte.
+
+**Hallazgo adicional, no corregido (fuera de alcance de este caso, requiere aprobación aparte):** la cita de `c_max` en el texto fijo de `reporteria_sec.py` es un string estático, no derivado programáticamente de `transformador.C_MAX`. Hoy coinciden porque este mismo fix corrigió ambos a la vez, pero nada impide que vuelvan a divergir si `C_MAX` cambia sin tocar el texto. El test 5 lo deja documentado como comentario, no lo "arregla" haciendo el texto dinámico (sería un cambio de arquitectura ajeno a este caso).
